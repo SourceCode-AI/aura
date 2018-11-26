@@ -1,0 +1,27 @@
+{
+  "function_calls": [
+    {"call": "eval", "score": 100},
+    {"call": "os.system"}
+  ],
+  "sensitive_filenames": [
+    ".bash_history",
+    "supersecret_file"
+  ],
+  "modules": [
+    {
+      "name": "network",
+      "score": 10,
+      "modules": [
+        "requests",
+        "urllib2"
+      ]
+    },
+    {
+      "name": "useless",
+      "modules": [
+        "codecs",
+        "binascii"
+      ]
+    }
+  ]
+}
