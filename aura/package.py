@@ -26,7 +26,7 @@ class PypiPackage():
     @classmethod
     def from_pypi(cls, name, *args, **kwargs):
         kwargs['info'] = requests.get(f'https://pypi.org/pypi/{name}/json').json()
-        print(kwargs['info'])
+        #print(kwargs['info'])
         kwargs['source'] = 'pypi'
 
         return cls(name, *args, **kwargs)

@@ -1,7 +1,7 @@
 from aura import typos
 
-# TODO: fix this test
-def disabled_test_analyze_info_data():
+
+def test_analyze_info_data():
     uri1 = 'pypi://requests2'
     uri2 = 'pypi://requests'
     ta = typos.TypoAnalyzer(uri1, uri2)

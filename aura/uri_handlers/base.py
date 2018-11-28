@@ -1,6 +1,10 @@
 #-*- coding: utf-8 -*-
 
 import urllib.parse
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class URIHandler:
     scheme = None
@@ -19,6 +23,8 @@ class URIHandler:
         for handler in cls.__subclasses__():
             if handler.scheme == uri.scheme:
                 return handler(uri)
+
+        logger.warning(f"No handler for scheme '{uri.scheme}'")
 
     def get_paths(self):
         raise NotImplementedError("Need to be re-implemented in the child class")

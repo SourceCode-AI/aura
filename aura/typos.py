@@ -9,9 +9,8 @@ import dateutil.parser
 from . import json
 from . import diff
 from .utils import normalize_name
-from .mirror import LocalMirror
-from .package import PypiPackage
 from .uri_handlers.base import URIHandler
+from .uri_handlers.handlers import *  # Dummy import to register URI handlers
 
 
 WAREHOUSE_XML_RPC = 'https://pypi.python.org/pypi'
@@ -28,8 +27,6 @@ class TypoAnalyzer(object):
             raise ValueError(f"Invalid uri: '{uri2}'")
 
         self.mirror = None  # local_mirror
-        #self.pkg1 = PypiPackage.from_local_mirror(package1, self.mirror)
-        #self.pkg2 = PypiPackage.from_local_mirror(package2, self.mirror)
         self.flags = {}
         # self.__order()
         # self.analyze()
@@ -228,5 +225,5 @@ if __name__ == '__main__':
     import sys
     import pprint
     ta = TypoAnalyzer(sys.argv[1], sys.argv[2])
-    pprint.pprint(ta.flags)
+    #pprint.pprint(ta.flags)
     ta.diff_releases()

@@ -7,8 +7,21 @@ from .base import URIHandler
 
 class LocalFileHandler(URIHandler):
     scheme = 'file'
+    help = """
+    Local file handler:\n
+    Default URI handler, any given URI that is not specifically handled by other handlers is considered to be a local path
+    Accept references to either local files or directories\n
+    By aware that paths to local directories are not supported by all modules as some of them require direct path to a file\n
+    
+    Examples:\n
+    - ./quarantine\n
+    - /tmp/package.tgz\n
+    - file:///tmp/pypi-package.egg
+    """
 
     def __init__(self, uri: ParseResult):
+        super().__init__(uri)
+
         self.uri = uri
         self.path = pathlib.Path(uri.path)
         self.opts = {}

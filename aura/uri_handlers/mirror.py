@@ -32,4 +32,3 @@ class MirrorHandler(URIHandler):
             pkg_path = self.mirror_path / urlparse(x['url']).path.lstrip('/')
             if pkg_path.exists():
                 yield pkg_path
-

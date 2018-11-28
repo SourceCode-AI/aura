@@ -13,4 +13,5 @@ ssdeep==3.3
 python-dateutil==2.7.3
 requests==2.20.0
 GitPython==2.1.11
+pyjq==2.2.0
 pytest==4.0.1

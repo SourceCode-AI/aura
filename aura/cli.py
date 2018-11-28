@@ -27,7 +27,7 @@ def scan_help_text():
     for uri_handler in URIHandler.__subclasses__():
         if hasattr(uri_handler, 'help'):
             uhelp = textwrap.dedent(uri_handler.help).strip()
-            help_text += f"\n{uhelp}"
+            help_text += f"\n{uhelp}\n"
 
     return help_text
 
