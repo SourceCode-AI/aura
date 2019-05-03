@@ -6,10 +6,14 @@ from urllib.parse import urlparse, ParseResult
 from . import utils
 from . import json
 from .exceptions import NoSuchPackage
+from .config import CFG
 
 
 class LocalMirror(object):
-    def __init__(self, mirror_path):
+    def __init__(self, mirror_path=None):
+        if mirror_path is None:
+            mirror_path = CFG['aura']['mirror']
+
         self.mirror_path = Path(mirror_path)
 
     def list_packages(self):
@@ -17,6 +21,7 @@ class LocalMirror(object):
 
     def get_json(self, package_name):
         json_path = self.mirror_path / 'json' / package_name
+
         if not json_path.is_file():
             json_path = self.mirror_path / 'json' / self._lookup_package(package_name)
 

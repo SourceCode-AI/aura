@@ -2,6 +2,7 @@
 import difflib
 import itertools
 import xmlrpc.client
+from functools import partial
 
 import ssdeep
 import dateutil.parser
@@ -10,7 +11,6 @@ from . import json
 from . import diff
 from .utils import normalize_name
 from .uri_handlers.base import URIHandler
-from .uri_handlers.handlers import *  # Dummy import to register URI handlers
 
 
 WAREHOUSE_XML_RPC = 'https://pypi.python.org/pypi'
@@ -170,13 +170,17 @@ def damerau_levenshtein(s1, s2, max_distance=3, cap=None):
                     curRow[colNum] = min(curRow[colNum], transpositionRow[colNum - 2] + 1)
 
     #  the last cell of the matrix is ALWAYS the shortest distance between the two strings
-    return curRow[-1]
+    distance = curRow[-1]
+    if distance > max_distance:
+        return None
+    else:
+        return distance
 
 
 def diff_distance(s1, s2, cutoff=0.8, cut_return=None):
     """
     This is the same implementation as difflib.get_close_matches with a modification
-    that this function jsut compare 2 given strings instead of returning close matches from an arrray
+    that this function just compare 2 given strings instead of returning close matches from an arrray
     Reference:
     https://github.com/python/cpython/blob/01b731fc2b04744a11e32f93aba8bfb9ddb3dd29/Lib/difflib.py#L722
 
@@ -217,13 +221,27 @@ def generate_popular(json_path, full_list=None):
 def enumerator(generator=None, method=None):
     for (pkg1, pkg2) in generator:
         res = method(pkg1, pkg2)
-        if res:
+        if res and res < 2:
             yield (pkg1, pkg2)
+
+"""
+SELECT file.project as package_name, count(file.project) as downloads FROM [the-psf:pypi.downloads20190222]
+
+GROUP BY package_name
+ORDER BY downloads DESC
+LIMIT 10000
+"""
 
 
 if __name__ == '__main__':
     import sys
     import pprint
-    ta = TypoAnalyzer(sys.argv[1], sys.argv[2])
+    #ta = TypoAnalyzer(sys.argv[1], sys.argv[2])
     #pprint.pprint(ta.flags)
-    ta.diff_releases()
+    #ta.diff_releases()
+
+    f = partial(damerau_levenshtein, max_distance=2)
+
+    for x, y in enumerator(generate_popular('pypi_download_stats.json'), f):
+        print(x, y)
+

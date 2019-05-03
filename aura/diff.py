@@ -100,6 +100,7 @@ class DiffAnalyzer:
         elif b_path.is_dir() and a_path.is_dir():
             self._diff_dirs(a_path, b_path, ctx)
         else:
+            print(f"{repr(b_path)}, {repr(a_path)}")
             raise ValueError("FS type mismatch")
 
     def _diff_dirs(self, a_path, b_path, ctx):
@@ -213,10 +214,13 @@ class DiffAnalyzer:
                 if diff.b_path in same_files:
                     same_files.remove(diff.b_path)
 
-                self.diff_hit.send(diff, ctx=ctx)
+                self.on_diff(diff, ctx=ctx)
 
             for x in same_files:
-                self.same_file_hit.send(a_path / x)
+                if a_path.is_dir():
+                    self.same_file_hit.send(a_path / x)
+                else:
+                    self.same_file_hit.send(x)
 
         finally:
             shutil.rmtree(tmp)

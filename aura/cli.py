@@ -1,17 +1,26 @@
+"""
+Main CLI for the Project Aura
+"""
+
+import json
+import sys
 import textwrap
 from pathlib import Path
 
 import click
-import simplejson as json
 
+from . import commands
 from .uri_handlers.base import URIHandler
-from .uri_handlers.handlers import *  # Dummy import to register URI handlers
-from .package_analyzer import Analyzer
-from .scan_results import ScanResults
 from .diff import DiffAnalyzer
+
+from .analyzers.base import get_analyzers
+
 from . import utils
+from . import exceptions
+from . import config
 
 
+LOGGER = config.get_logger(__name__)
 CONTEXT_SETTINGS = dict(
     help_option_names=['-h', '--help']
 )
@@ -38,33 +47,26 @@ def scan_help_text():
 @click.pass_context
 def cli(ctx, **kwargs):
     """Package security aura project"""
-    ctx.obj.update(kwargs)
+    if ctx.obj:  # TODO: remove and transition to scan options
+        ctx.obj.update(kwargs)
 
 
 @cli.command(name='scan', help=scan_help_text())
 @click.argument('uri', metavar='<SCAN_URI>')
 @click.option('-v', '--verbose', count=True)
+@click.option('-a', '--analyzer', help="Specify analyzer to run")
+@click.option('-f', '--format', 'out_type', default='text', type=click.Choice(['text', 'json']), help="Output format")
 @click.pass_context
-def scan(ctx, uri, verbose=0):
-    handler = URIHandler.from_uri(uri)
+def scan(ctx, uri, verbose=0, analyzer=None, out_type='plain'):
+    meta = {
+        'verbosity': verbose,
+        'format': out_type,
+        'min_score': ctx.obj.get('min_score'),
+    }
 
-    if handler is None:
-        raise ValueError("Could not find a handler for provided URI")
-    try:
-        for location in handler.get_paths():
-            scan = ScanResults(location.name)
-            sandbox = Analyzer(location=location, callback=scan.signal)
-            sandbox.run(strip_path=location.parent)
+    commands.scan_uri(uri, metadata=meta, analyzer=analyzer)
 
-            if scan.score < ctx.obj['min_score']:
-                continue
-
-            if ctx.obj['out_type'] == 'json':
-                click.echo(json.dumps(scan.json, default=utils.json_encoder))
-            else:
-                scan.pprint(verbose=verbose)
-    finally:
-        handler.cleanup()
+    sys.exit(0)
 
 
 @cli.command(name='diff')
@@ -80,9 +82,43 @@ def diff(ctx, pth1, pth2):
     da.pprint()
 
 
+@cli.command(name='parse_ast')
+@click.argument('path')
+#@click.option('--raw', is_flag=True, default=False, help="Print raw AST tree as received from parser")
+def parse_ast(path):
+    commands.parse_ast(path)
+
+@cli.command(name='info')
+def info():
+    analyzers = get_analyzers()
+    if analyzers:
+        click.secho("Installed analyzers:", color='green')
+        for x in analyzers.values():
+            click.secho(f" - {x.analyzer_id}")
+    else:
+        click.secho("No installed analyzers found!", color='red', blink=True, bold=True)
+
+    click.secho(f"Installed URI handlers:")
+    for k, v in URIHandler.load_handlers().items():
+        click.secho(f"- '{k}://'")
+
+
+
+@cli.command(name='check_requirement')
+def check_requirement():
+    """
+    Perform security check of the given requirement
+    This command is used for integration with package managers (e.g. PIP)
+
+    :return:
+    """
+    payload = json.loads(sys.stdin.read())
+    commands.check_requirement(payload)
+
+
 def main():
     cli(obj={
-        'out_type': 'text',
+        'out_type': config.CFG.get('aura', 'output-format') or 'text',
         'min_score': 0,
         'release': 'latest'
     })

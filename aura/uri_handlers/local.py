@@ -2,7 +2,7 @@
 import pathlib
 from urllib.parse import ParseResult
 
-from .base import URIHandler
+from .base import URIHandler, ScanLocation
 
 
 class LocalFileHandler(URIHandler):
@@ -27,8 +27,10 @@ class LocalFileHandler(URIHandler):
         self.opts = {}
 
     def get_paths(self):
-        yield self.path
+        yield ScanLocation(
+            location = self.path
+        )
 
 
 # Set this a the default handler
-URIHandler.default = LocalFileHandler
+LocalFileHandler.default = True

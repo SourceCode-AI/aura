@@ -4,7 +4,7 @@ import tempfile
 import pathlib
 import urllib.parse
 
-from .base import URIHandler, PackageProvider
+from .base import URIHandler, PackageProvider, ScanLocation
 from ..package import PypiPackage
 
 
@@ -43,13 +43,24 @@ class PyPiHandler(URIHandler, PackageProvider):
     def package(self):
         return self.pkg
 
+    @property
+    def metadata(self):
+        m = {
+            'uri': self.uri,
+            'scheme': self.scheme,
+            'package_name': self.package_name,
+            'package_release': self.opts['release']
+        }
+        return m
+
     def get_paths(self):
         if self.opts.get('download_dir') is None:
             self.opts['download_dir'] = pathlib.Path(tempfile.mkdtemp(prefix='aura_pypi_download_'))
             self.opts['cleanup'] = True
         for f in self.package.download_release(dest=self.opts['download_dir'], release=self.release):
-            yield self.opts['download_dir'] / f
-
+            yield ScanLocation(
+                location = self.opts['download_dir'] / f
+            )
 
     def cleanup(self):
         if self.opts.get('cleanup', False) and self.opts['download_dir'].exists():

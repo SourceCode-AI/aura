@@ -1,6 +1,6 @@
 #-*- coding: utf-8 -*-
 import tempfile
-import shutil
+import functools
 from urllib.parse import urlparse, ParseResult
 from pathlib import Path
 from contextlib import contextmanager
@@ -9,8 +9,21 @@ import requests
 import requirements
 from packaging import version
 
+from . import config
 from . import utils
+from . import exceptions
 from .mirror import LocalMirror
+
+
+LOGGER = config.get_logger(__name__)
+CONSTRAINS = {
+    '<': lambda x, ver: x < ver,
+    '<=': lambda x, ver: x <= ver,
+    '!=': lambda x, ver: x != ver,
+    '==': lambda x, ver: x == ver,
+    '>=': lambda x, ver: x >= ver,
+    '>': lambda x, ver: x > ver,
+}
 
 
 class PypiPackage():
@@ -25,18 +38,20 @@ class PypiPackage():
 
     @classmethod
     def from_pypi(cls, name, *args, **kwargs):
-        kwargs['info'] = requests.get(f'https://pypi.org/pypi/{name}/json').json()
-        #print(kwargs['info'])
+        resp = requests.get(f'https://pypi.org/pypi/{name}/json')
+        if resp.status_code == 404:
+            LOGGER.error(f"Package {name} does not exists on PyPI")
+            raise exceptions.NoSuchPackage(f"{name} on PyPI repository")
+
+        kwargs['info'] = resp.json()
         kwargs['source'] = 'pypi'
 
         return cls(name, *args, **kwargs)
 
     @classmethod
-    def from_local_mirror(cls, name, mirror, *args, **kwargs):
-        if isinstance(mirror, LocalMirror):
-            cls.mirror = mirror
-        else:
-            cls.mirror = mirror.LocalMirror(mirror)
+    def from_local_mirror(cls, name, *args, **kwargs):
+        if cls.mirror is None:
+            cls.mirror = LocalMirror()
 
         kwargs['source'] = 'local_mirror'
         kwargs['info'] = cls.mirror.get_json(name)
@@ -70,19 +85,8 @@ class PypiPackage():
         for cond, c_ver in constrains:
             c_ver = version.parse(c_ver)
 
-            # TODO: change this to dict
-            if cond == '<':
-                condition = lambda x: x < c_ver
-            elif cond == '<=':
-                condition = lambda x: x <= c_ver
-            elif cond == '!=':
-                condition = lambda x: x != c_ver
-            elif cond == '==':
-                condition = lambda x: x == c_ver
-            elif cond == '>=':
-                condition = lambda x: x >= c_ver
-            elif cond == '>':
-                condition = lambda x: x > c_ver
+            if cond in CONSTRAINS:
+                condition = functools.partial(CONSTRAINS[cond], ver=c_ver)
             else:
                 continue
 
@@ -118,7 +122,7 @@ class PypiPackage():
         return files
 
     @contextmanager
-    def url2local(self, url):
+    def url2local(self, url:str):
         if not isinstance(url, ParseResult):
             url = urlparse(url)
 

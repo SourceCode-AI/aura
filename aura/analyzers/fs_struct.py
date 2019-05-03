@@ -1,33 +1,64 @@
 #-*- coding: utf-8 -*-
 # Analyzer for FileSystem structure
+import os
+import fnmatch
 from pathlib import Path
+from dataclasses import dataclass
 
-from .rules import sensitive_file, suspicious_file
-from ..utils import construct_path
-
-
-sensitive_filenames = (
-    '.pypirc',
-    'id_rsa'
-    '.bash_history',
-    '.htpasswd',
-)
+from .rules import Rule
+from ..utils import Analyzer
+from .. import config
+from ..config import CFG
 
 
+@dataclass
+class SensitiveFile(Rule):
+    __hash__ = Rule.__hash__
+    file_name: str = ''
+
+    def _asdict(self):
+        d = {
+            'file_name': self.file_name
+        }
+        d.update(Rule._asdict(self))
+        return d
+
+
+@dataclass
+class SuspiciousFile(Rule):
+    __hash__ = Rule.__hash__
+    file_name: str = ''
+    file_type: str = ''
+
+    def _asdict(self):
+        d = {
+            'file_name': self.file_name,
+            'file_type': self.file_type,
+        }
+        d.update(Rule._asdict(self))
+        return d
+
+
+@Analyzer.ID('sensitive_files')
 def analyze_sensitive(pth: Path, **kwargs):
+    if pth.stat().st_size == 0:
+        return
+
     name = pth.name
+    str_pth = os.fspath(pth.absolute())
 
-    if name in sensitive_filenames and pth.stat().st_size > 0:
-        yield sensitive_file(
-            name=name,
-            location=construct_path(pth, kwargs.get('strip_path'), parent=kwargs.get('parent')),
-            score=100
-        )
+    for pattern in config.SEMANTIC_RULES['sensitive_filenames']:
+        if fnmatch.fnmatch(str_pth, pattern) or str_pth.endswith(pattern):
+            yield SensitiveFile(
+                file_name=name,
+                score=int(CFG.get('score', 'contain-sensitive-file')),
+                signature=f'sensitive_file#{os.fspath(pth)}'
+            )
 
 
+@Analyzer.ID('suspicious_files')
 def analyze_suspicious(pth: Path, **kwargs):
     name = pth.name
-
     if name.startswith('.'):
         f_type = 'hidden'
 
@@ -36,9 +67,9 @@ def analyze_suspicious(pth: Path, **kwargs):
     else:
         return
 
-    yield suspicious_file(
-        name=name,
-        location=construct_path(pth, kwargs.get('strip_path'), parent=kwargs.get('parent')),
-        type = f_type,
-        score=5
+    yield SuspiciousFile(
+        file_name=name,
+        file_type = f_type,
+        score=int(CFG.get('score', 'contain-suspicious-file')),
+        signature = f'suspicious_file#{os.fspath(pth)}'
     )

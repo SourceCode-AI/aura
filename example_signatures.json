@@ -1,13 +1,23 @@
+# WARNING: Remove the comment lines if you intend to use this file
 {
+  # Specify function calls for execution flow analysis
   "function_calls": [
-    {"call": "eval", "score": 100},
+    # You can define how much score will be added if the call is found
+    # Tags will be added to the scanned file/package as defined
+    {"call": "eval", "score": 100, "tags": ["code_execution"]},
+    # Default is 0, it won't affect the score but it will still be logged in output
     {"call": "os.system"}
   ],
+  # List of sensitive files for data leakage scanner to look for
   "sensitive_filenames": [
     ".bash_history",
     "supersecret_file"
   ],
   "modules": [
+    # You can define a group/categories of modules here
+    # AST scanner will look for imports of these modules and compute the score
+    # Category name is also added as a tag to the scanned target
+    # Module can be listed multipletime in different categories
     {
       "name": "network",
       "score": 10,
@@ -16,6 +26,7 @@
         "urllib2"
       ]
     },
+    # Default score & behavior is same as for function calls
     {
       "name": "useless",
       "modules": [

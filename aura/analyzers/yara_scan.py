@@ -1,26 +1,69 @@
 #-*- coding: utf-8 -*-
 
 import os
-
+import time
+from dataclasses import dataclass, field
 from pathlib import Path
 
-import yara
 
-from .rules import yara_match
-from ..utils import construct_path
+from .base import AnalyzerDeactivated
+from .rules import Rule
+from ..utils import Analyzer
+from .. import config
+
+try:
+    import yara
+except ImportError:
+    raise AnalyzerDeactivated("Yara for python is not installed or can't be imported, see docs.")
+else:
+    rules = yara.compile(filepath=config.CFG.get('aura', 'yara-rules', fallback='rules.yara'))
+
+logger = config.get_logger(__name__)
 
 
-rules = yara.compile(filepath=os.path.join(os.getcwd(), 'rules.yara'))
+@dataclass
+class YaraMatch(Rule):
+    rule: str = ''
+    strings: tuple = ()
+    meta: dict = field(default_factory=dict)
+
+    def _asdict(self):
+        d = {
+            'rule': self.rule,
+            'strings': self.strings
+        }
+
+        if self.meta:
+            d['metadata'] = self.meta
+
+        d.update(Rule._asdict(self))
+        return d
+
+    def __hash__(self):
+        if self._hash is None:
+            self._hash = hash((
+                self.rule,
+                self.strings
+            ))
+
+        return self._hash
 
 
+@Analyzer.ID('yara')
 def analyze(pth: Path, **kwargs):
     pth = os.fspath(pth)
+    start = time.time()
 
     for m in rules.match(pth, timeout=10):
         strings = set(x[-1] for x in m.strings)
-        yield yara_match(
-            rule=m.rule,
-            location=construct_path(pth, kwargs.get('strip_path'), parent=kwargs.get('parent')),
-            strings=strings,
-            meta=m.meta
+        hit = YaraMatch(
+            rule = m.rule,
+            strings = tuple(strings),
+            meta = m.meta,
+            tags = set(m.tags)
         )
+        yield hit
+
+    end = time.time() - start
+    if end >= 1:
+        logger.info(f"Yara scan of {pth} took {end} s")

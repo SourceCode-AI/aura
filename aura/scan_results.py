@@ -2,66 +2,84 @@ import copy
 from collections import defaultdict
 
 import click
-from blinker import signal
 
+from . import utils
 from .analyzers import rules
 
 
 class ScanResults():
-    def __init__(self, name):
+    def __init__(self, name, verbosity=1, metadata=None):
         self.name = name
-        self.hits = []
-        self.signal = signal('scan')
-        self.signal.connect(self.on_signal)
+        self.verbosity = verbosity
+        self.metadata = metadata
+        self.hits = set()
 
         self._yara_hits = defaultdict(lambda : {'score': 0, 'hits': 0})
-        self._import_categories = set()
-        self._import_hits = defaultdict(lambda : {'score': 0, 'hits': 0})
+        self._tags = set()
+
+        self.__imported_modules = set()
         self.__call_hits = defaultdict(lambda : {'score': 0, 'hits': 0})
 
-    def on_signal(self, sender):
-        self.hits.append(sender)
+    def add_hit(self, sender):
+        self.hits.add(sender)
+
+        if isinstance(sender, rules.ModuleImport):
+            self.__imported_modules.add(sender.name)
 
     @property
     def score(self):
         score = 0
         for x in self.hits:
-            if isinstance(x, rules.yara_match):
+            if hasattr(x, 'tags') and isinstance(x.tags, set):
+                self._tags |= x.tags
+
+            if False: # FIXME: isinstance(x, rules.YaraMatch):
                 self._process_yara(x)
-            elif isinstance(x, rules.module_import):
-                self._process_import(x)
-            elif isinstance(x, rules.function_call):
+            elif isinstance(x, rules.FunctionCall):
                 self._process_call(x)
             else:
-                score += getattr(x, 'score', 0)
+                score += x.score
 
         score += sum(x['score'] for x in self._yara_hits.values())
-        score += sum(x['score'] for x in self._import_hits.values())
         score += sum(x['score'] for x in self.__call_hits.values())
 
         return score
 
     def pprint(self, verbose=0):
-
         click.secho(f"\n---[ Scan results for '{self.name}' ]---", fg='green')
         click.secho(f"Scan score: {self.score}", fg='red', bold=True)
 
-        if self._import_categories:
-            click.echo("Code categories: {}".format(', '.join(self._import_categories)))
+        if self._tags:
+            click.echo(f"Tags: {', '.join(self._tags)}")
 
-        click.echo("Imported modules: {}".format(', '.join(self._import_hits.keys())))
+        click.echo("Imported modules:")
+        click.echo(utils.pprint_imports(utils.imports_to_tree(self.__imported_modules)))
 
         if self.hits and verbose:
             click.echo("- Rules hits:")
-            for x in self.hits:
-                click.echo(f" * {x}")
+            hits = sorted(self.hits)
+            for x in hits:
+                if x.informational and x.score == 0 and verbose < 2:
+                    continue
+                click.echo(f" * {x._asdict()}")
 
     @property
     def json(self):
         data = copy.deepcopy(self.data)
-        data['hits'] = [x._asdict() for x in data['hits']]
-        data['imported_modules'] = list(self._import_hits.keys())
-        data['categories'] = list(self._import_categories)
+        data['hits'] = []
+
+        for x in self.data['hits']:
+            if self.verbosity < 2 and x.informational and x.score == 0:
+                continue
+
+            data['hits'].append(x._asdict())
+
+        data['imported_modules'] = list(self.__imported_modules)
+        data['tags'] = list(self._tags)
+
+        if self.metadata:
+            data['metadata'] = self.metadata
+
         return data
 
     @property
@@ -69,11 +87,11 @@ class ScanResults():
         data = {
             'name': self.name,
             'score': self.score,
-            'hits': self.hits
+            'hits': list(self.hits),
         }
         return data
 
-    def _process_yara(self, yara_hit:rules.yara_match):
+    def _process_yara(self, yara_hit):
         stats = self._yara_hits[yara_hit.rule]
 
         if yara_hit.meta.get('max_hits'):
@@ -89,15 +107,7 @@ class ScanResults():
         score = stats['score'] + yara_hit.score
         stats['score'] = max_score if score > max_score else score
 
-    def _process_import(self, import_hit:rules.module_import):
-        if import_hit.category:
-            self._import_categories.add(import_hit.category)
-
-        stats = self._import_hits[import_hit.name]
-        stats['score'] = import_hit.score
-        stats['hits'] += 1
-
-    def _process_call(self, call_hit:rules.function_call):
+    def _process_call(self, call_hit:rules.FunctionCall):
         key = call_hit.function
         max_hits = 10
         max_score = call_hit.score * max_hits
@@ -105,4 +115,3 @@ class ScanResults():
         score = stats['score'] + call_hit.score
         stats['score'] = score if score < max_score else max_score
         stats['hits'] += 1
-

@@ -5,6 +5,11 @@ from pathlib import Path
 import pytest
 
 
+cfg_path = Path(__file__).parent / 'files' / 'test_config.ini'
+
+os.environ.setdefault('AURA_CFG', os.fspath(cfg_path))
+
+
 class Fixtures(object):
     BASE_PATH = Path(__file__).parent / 'files'
 
