@@ -18,8 +18,12 @@ CFG = configparser.ConfigParser(default_section='default')
 SEMANTIC_RULES = None
 LOG_FMT = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 LOG_STREAM = logging.StreamHandler()
-LOG_ERR = RotatingFileHandler("aura_errors.log", maxBytes=1024**2, backupCount=5)
-LOG_ERR.setLevel(logging.ERROR)
+LOG_ERR = None
+# Check if the log file can be created otherwise it will crash here
+if os.access("aura_errors.log", os.W_OK):
+    LOG_ERR = RotatingFileHandler("aura_errors.log", maxBytes=1024**2, backupCount=5)
+    LOG_ERR.setLevel(logging.ERROR)
+
 
 logger = logging.getLogger('aura')
 
@@ -29,18 +33,19 @@ if os.environ.get('AURA_DEBUG_LEAKS'):
     gc.set_debug(gc.DEBUG_LEAK)
 
 
-
 def configure_logger(level):
     logger.setLevel(level)
     LOG_STREAM.setLevel(level)
     LOG_STREAM.setFormatter(LOG_FMT)
     logger.addHandler(LOG_STREAM)
-    logger.addHandler(LOG_ERR)
+    if LOG_ERR is not None:
+        logger.addHandler(LOG_ERR)
 
 def get_logger(name):
     _log = logging.getLogger(name)
-    _log.addHandler(LOG_ERR)
     _log.addHandler(LOG_STREAM)
+    if LOG_ERR is not None:
+        _log.addHandler(LOG_ERR)
     return _log
 
 
@@ -48,7 +53,7 @@ def load_config():
     global SEMANTIC_RULES, CFG
     pth = Path(os.environ.get('AURA_CFG', 'config.ini'))
     if pth.is_dir():
-        pth /= "config.ini"
+        pth /= 'config.ini'
 
     if not pth.is_file():
         logger.fatal(f"Invalid configuration path: {pth}")

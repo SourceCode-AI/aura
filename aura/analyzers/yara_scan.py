@@ -11,12 +11,20 @@ from .rules import Rule
 from ..utils import Analyzer
 from .. import config
 
+rules = None
+yara = None
+
 try:
     import yara
 except ImportError:
     raise AnalyzerDeactivated("Yara for python is not installed or can't be imported, see docs.")
-else:
+
+try:
     rules = yara.compile(filepath=config.CFG.get('aura', 'yara-rules', fallback='rules.yara'))
+except yara.Error:
+    raise AnalyzerDeactivated("Can't compile/find yara rules")
+
+
 
 logger = config.get_logger(__name__)
 

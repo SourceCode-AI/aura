@@ -103,6 +103,23 @@ def info():
         click.secho(f"- '{k}://'")
 
 
+@cli.group('r2c')
+def r2c():
+    pass
+
+@r2c.command(name='generate_input')
+@click.argument('out_file', metavar='<OUTPUT FILE>', type=click.File('w'))
+def generate_input(out_file):
+    commands.generate_r2c_input(out_file)
+
+
+@r2c.command(name='scan')
+@click.option('--out', default='/analysis/output/output.json', type=click.File('w'))
+@click.argument('source', nargs=-1, type=click.Path())
+def run_r2c_analyzer(source, out):
+
+    commands.r2c_scan(source=source, out_file=out)
+
 
 @cli.command(name='check_requirement')
 def check_requirement():

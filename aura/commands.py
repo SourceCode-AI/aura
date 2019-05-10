@@ -15,6 +15,7 @@ from .uri_handlers.base import URIHandler, ScanLocation
 from . import config
 from . import exceptions
 from . import utils
+from . import mirror
 
 logger = config.get_logger(__name__)
 
@@ -72,6 +73,8 @@ def scan_uri(uri, metadata=None, analyzer=None):
     start = time.time()
     handler = None
     metadata = metadata or {}
+    output_format = metadata.get('format', 'plain')
+    all_hits = []
 
     try:
         handler = URIHandler.from_uri(uri)
@@ -92,10 +95,15 @@ def scan_uri(uri, metadata=None, analyzer=None):
                 if scan.score < metadata.get('min_score', 0):
                     continue
 
-                if metadata.get('format') == 'json':
+                if output_format == 'json':
                     click.echo(json.dumps(scan.json, default=utils.json_encoder))
+                elif output_format == 'none':
+                    pass
                 else:
                     scan.pprint(verbose=metadata.get('verbosity', 0))
+
+                all_hits.append(scan.json)
+
     except exceptions.NoSuchPackage:
         logger.warn(f"No such package: {uri}")
     except Exception:
@@ -106,6 +114,7 @@ def scan_uri(uri, metadata=None, analyzer=None):
             handler.cleanup()
 
     logger.info(f"Scan finished in {time.time() - start} s")
+    return all_hits
 
 
 def parse_ast(path):
@@ -123,3 +132,51 @@ def parse_ast(path):
         print("\n---[ Hits ]---\n")
         for x in traversal.hits:
             print(" * " + repr(x._asdict()))
+
+
+def generate_r2c_input(out_file):
+    lm = mirror.LocalMirror()
+    for x in lm.list_packages():
+        pkg = lm.get_json(x.name)
+
+        urls = []
+        for u in pkg.get('urls', []):
+            urls.append(u['url'])
+
+        if urls:
+            record = {f'https://pypi.org/project/{x.name}': urls}
+            out_file.write(json.dumps(record) + '\n')
+
+
+def r2c_scan(source, out_file):
+    out = {
+        'results': [],
+        'errors': []
+    }
+    metadata = {
+        'format': 'none'
+    }
+
+    for src in source:
+        try:
+            data = scan_uri(
+                src,
+                metadata=metadata
+            )
+
+            for loc in data:
+                for hit in loc['hits']:
+                    out['results'].append({
+                        'check_id': hit.pop('type'),
+                        'extra': hit
+                    })
+
+        except Exception as exc:
+            out['errors'].append({
+                "message": f"An exception occurred: {str(exc)}",
+                "path": src(src)
+            })
+
+    pprint.pprint(out)
+
+    out_file.write(json.dumps(out, default=utils.json_encoder))
