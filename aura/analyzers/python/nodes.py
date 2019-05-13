@@ -99,6 +99,8 @@ class String(ASTNode):
         else:
             raise exceptions.ASTNodeRewrite(f"Can't multiply String and `{type(other)}`")
 
+    def __str__(self):
+        return str(self.value)
 
 @dataclass
 class Var(ASTNode):
@@ -209,10 +211,12 @@ class Call(ASTNode):
 
     @property
     def full_name(self):
-        if self._full_name:
+        if self._full_name is not None:
             return self._full_name
-        elif hasattr(self.func, 'full_name'):
-            return self.func.full_name
+
+        f_name = getattr(self.func, 'full_name', None)
+        if f_name is not None:
+            return f_name
         else:
             return self.func
 

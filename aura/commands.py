@@ -1,4 +1,5 @@
 import sys
+import os
 import json
 import time
 import pprint
@@ -118,20 +119,28 @@ def scan_uri(uri, metadata=None, analyzer=None):
 
 
 def parse_ast(path):
+    from .analyzers.python import rewrite_ast
+
     meta = {
         'path': path,
         'source': 'cli'
     }
 
-    traversal = execution_flow.ExecutionFlow.from_cache(source=path, metadata=meta)
-    if not traversal.traversed:
-        traversal.traverse()
+    analyzer = rewrite_ast.ASTRewrite.from_cache(source=path, metadata=meta)
+    if not analyzer.traversed:
+        analyzer.traverse()
 
-    pprint.pprint(traversal.tree)
-    if traversal.hits:
-        print("\n---[ Hits ]---\n")
-        for x in traversal.hits:
-            print(" * " + repr(x._asdict()))
+    pprint.pprint(analyzer.tree['ast_tree'])
+
+    #traversal = execution_flow.ExecutionFlow.from_cache(source=path, metadata=meta)
+    #if not traversal.traversed:
+    #    traversal.traverse()
+
+    #pprint.pprint(traversal.tree)
+    #if traversal.hits:
+    #    print("\n---[ Hits ]---\n")
+    #    for x in traversal.hits:
+    #        print(" * " + repr(x._asdict()))
 
 
 def generate_r2c_input(out_file):
@@ -148,16 +157,40 @@ def generate_r2c_input(out_file):
             out_file.write(json.dumps(record) + '\n')
 
 
-def r2c_scan(source, out_file):
+
+def r2c_scan(source, out_file, mode='generic'):
     out = {
         'results': [],
         'errors': []
     }
+
+    pkg_metadata = {}
+
     metadata = {
         'format': 'none'
     }
 
+
+
+    if mode == 'pypi':
+        logger.info("R2C mode set to PyPI")
+        assert len(source) == 1
+        location = Path(source[0])
+
+        with open(location / 'metadata.json', "r") as fd:
+            pkg_metadata = json.loads(fd.read())
+            metadata.update({
+                'package_type': pkg_metadata.get('packagetype'),
+                'package_name': pkg_metadata.get('name'),
+                'python_version': pkg_metadata.get('python_version')
+            })
+        source = [os.fspath(x.absolute()) for x in location.iterdir() if x.name != 'metadata.json']
+    else:
+        logger.info("R2C mode set to generic")
+
     for src in source:
+        logger.info(f"Enumerating {src} with metadata: {metadata}")
+
         try:
             data = scan_uri(
                 src,
@@ -174,7 +207,7 @@ def r2c_scan(source, out_file):
         except Exception as exc:
             out['errors'].append({
                 "message": f"An exception occurred: {str(exc)}",
-                "path": src(src)
+                "path": str(src)
             })
 
     pprint.pprint(out)

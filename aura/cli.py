@@ -115,10 +115,10 @@ def generate_input(out_file):
 
 @r2c.command(name='scan')
 @click.option('--out', default='/analysis/output/output.json', type=click.File('w'))
+@click.option('--mode', default='generic')
 @click.argument('source', nargs=-1, type=click.Path())
-def run_r2c_analyzer(source, out):
-
-    commands.r2c_scan(source=source, out_file=out)
+def run_r2c_analyzer(source, out, mode):
+    commands.r2c_scan(source=source, out_file=out, mode=mode)
 
 
 @cli.command(name='check_requirement')

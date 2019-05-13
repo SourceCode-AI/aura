@@ -41,9 +41,10 @@ def configure_logger(level):
     if LOG_ERR is not None:
         logger.addHandler(LOG_ERR)
 
+
 def get_logger(name):
     _log = logging.getLogger(name)
-    _log.addHandler(LOG_STREAM)
+    # _log.addHandler(LOG_STREAM)
     if LOG_ERR is not None:
         _log.addHandler(LOG_ERR)
     return _log

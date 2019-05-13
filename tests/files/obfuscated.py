@@ -3,7 +3,6 @@ import pprint as fabulous  # Rename imported module
 import ab.cd
 from a.b.c import d
 from x import y as z
-
 from .. import relative
 
 from requests import post  # Import only function from a module

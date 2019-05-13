@@ -1,3 +1,4 @@
+import base64
 from .visitor import Visitor
 from .convert_ast import ASTVisitor
 from .nodes import *
@@ -24,6 +25,7 @@ class ASTRewrite(Visitor):
             self.binop,
             self.resolve_variable,
             self.string_slice,
+            self.decode_inline_base64
         )
         super().__init__(**kwargs)
 
@@ -155,3 +157,25 @@ class ASTRewrite(Visitor):
         #                 context.node.values[idx] = target
         #                 context.visitor.modified = True
 
+    def decode_inline_base64(self, context):
+        node = context.node
+        if not isinstance(node, Call):
+            return
+
+        #check if it is calling <str>.decode(something)
+        elif not (isinstance(node.func, Attribute) and isinstance(node.func.source, String) and node.func.attr == 'decode'):
+            return
+        #check if the decode attribute is base64
+        elif not (len(node.args) == 1 and isinstance(node.args[0], (String, str))):
+            return
+
+        codec = str(node.args[0])
+        if codec != 'base64':
+            return
+
+        try:
+            decoded = base64.b64decode(str(node.func.source)).decode()
+            context.replace(String(value=decoded))
+        except Exception:
+            pass
+        return
