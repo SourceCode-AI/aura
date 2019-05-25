@@ -4,7 +4,7 @@ RUN groupadd -r analysis && useradd -m --no-log-init --gid analysis analysis
 RUN pacman -Syyu --noconfirm python python2 python-pip gcc ssdeep python-yara git wget tree
 RUN mkdir /analyzer && mkdir /config
 
-ADD requirements.txt setup.py setup.cfg entrypoint.sh config.ini pypi_stats.json /analyzer/
+ADD requirements.txt setup.py setup.cfg entrypoint.sh config.ini files/pypi_stats.json /analyzer/
 ADD aura /analyzer/aura
 ADD tests /analyzer/tests
 ADD files /analyzer/files
