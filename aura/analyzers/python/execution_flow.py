@@ -1,3 +1,8 @@
+"""
+Perform execution flow analysis
+Lookup module imports and function calls according to semantic rules
+"""
+
 from fnmatch import fnmatch
 
 from ..base import NodeAnalyzerV2
@@ -9,6 +14,7 @@ from ... import config
 
 
 @Analyzer.ID("execution_flow")
+@Analyzer.description("Analyze code execution flow to find semantic module imports and function calls")
 class ExecutionFlow(NodeAnalyzerV2):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

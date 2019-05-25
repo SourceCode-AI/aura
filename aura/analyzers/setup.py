@@ -20,6 +20,7 @@ class SetupScript(rules.Rule):
 
 
 @Analyzer.ID("setup_py")
+@Analyzer.description("Audit setup.py file for anomalies such as code execution or network communication")
 class SetupPy(NodeAnalyzerV2):
     """
     Analyzer for setup.py files

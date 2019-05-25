@@ -2,6 +2,7 @@
 #-*- coding: utf-8 -*-
 """
 PIP wrapper for aura security project
+It hijacks the pip install process via monkeypatching and when forwards data to the aura framework for analysis
 """
 from __future__ import absolute_import
 from __future__ import division
@@ -75,6 +76,8 @@ def check_package(pkg):
     import pprint
     pprint.pprint(pkg)
 
+    print("\n*** Installation interrupted by apip ***")
+
     payload = json.dumps(pkg)
 
     subprocess.run(
@@ -98,7 +101,7 @@ def mp_install_requirement(
     It collects the package information and sends it to aura for security audit
     User then has a choice to proceed or abort the installation process based on audit results
     """
-    subprocess.call(['tree', self.setup_py_dir])
+    # subprocess.call(['tree', self.setup_py_dir])
 
     data = {
         'format': '0.1',

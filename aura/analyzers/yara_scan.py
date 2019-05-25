@@ -58,6 +58,7 @@ class YaraMatch(Rule):
 
 
 @Analyzer.ID('yara')
+@Analyzer.description("Run Yara rules on all input files recursively")
 def analyze(pth: Path, **kwargs):
     pth = os.fspath(pth)
     start = time.time()

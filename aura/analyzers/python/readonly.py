@@ -1,3 +1,4 @@
+import os
 import typing
 from pathlib import Path
 
@@ -28,7 +29,7 @@ class ReadOnlyAnalyzer(Visitor):
     def __call__(self, pth: Path) -> typing.Iterator[rules.Rule]:
         if not self.hooks:
             return
-        elif self.kwargs.get('mime') != 'text/x-python':
+        elif self.kwargs.get('mime') != 'text/x-python' and not os.fspath(self.path).endswith('.py'):
             return
         try:
             self.load_tree(source=pth)

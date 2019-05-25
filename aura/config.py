@@ -15,6 +15,7 @@ except ImportError:
 
 
 CFG = configparser.ConfigParser(default_section='default')
+CFG_PATH = None
 SEMANTIC_RULES = None
 LOG_FMT = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 LOG_STREAM = logging.StreamHandler()
@@ -42,6 +43,25 @@ def configure_logger(level):
         logger.addHandler(LOG_ERR)
 
 
+# Helper for loading API tokens for external integrations
+def get_token(name):
+    value = CFG.get('api_tokens', name, fallback=None)
+    # If the token is not specified in the config, fall back to the env variable
+    if value is None:
+        value = os.environ.get(f"AURA_{name.upper()}_TOKEN", None)
+
+    return value
+
+
+def get_relative_path(name):
+    """
+    Fetch a path to the file based on configuration and relative path of Aura
+    """
+    pth = CFG.get('aura', name)
+    return Path(CFG_PATH).parent.joinpath(pth)
+
+
+
 def get_logger(name):
     _log = logging.getLogger(name)
     # _log.addHandler(LOG_STREAM)
@@ -51,7 +71,7 @@ def get_logger(name):
 
 
 def load_config():
-    global SEMANTIC_RULES, CFG
+    global SEMANTIC_RULES, CFG, CFG_PATH
     pth = Path(os.environ.get('AURA_CFG', 'config.ini'))
     if pth.is_dir():
         pth /= 'config.ini'
@@ -60,11 +80,12 @@ def load_config():
         logger.fatal(f"Invalid configuration path: {pth}")
         sys.exit(1)
 
+    CFG_PATH = os.fspath(pth)
     CFG.read(pth)
 
     json_sig_pth = (pth.parent / CFG.get('aura', 'semantic-rules', fallback='signatures.json')).absolute()
 
-    if not json_sig_pth.is_file:
+    if not json_sig_pth.is_file():
         logger.fatal(f"Invalid path to the signatures file: {json_sig_pth}")
         sys.exit(1)
 

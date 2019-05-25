@@ -175,7 +175,7 @@ class ASTRewrite(Visitor):
 
         try:
             decoded = base64.b64decode(str(node.func.source)).decode()
-            context.replace(String(value=decoded))
+            context.replace(String(value=decoded, line_no=context.node.line_no))
         except Exception:
             pass
         return

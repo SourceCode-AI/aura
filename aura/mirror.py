@@ -1,10 +1,9 @@
 #-*- coding: utf-8 -*-
-
+import json
 from pathlib import Path
 from urllib.parse import urlparse, ParseResult
 
 from . import utils
-from . import json
 from .exceptions import NoSuchPackage
 from .config import CFG
 

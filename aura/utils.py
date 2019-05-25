@@ -1,7 +1,6 @@
 import os
 import re
 import sys
-import logging
 import hashlib
 import shutil
 import importlib
@@ -13,8 +12,10 @@ from typing import Generator
 import requests
 from click import secho
 
+from . import config
 
-logger = logging.getLogger(__name__)
+
+logger = config.get_logger(__name__)
 
 
 def walk(location) -> Generator[Path, None, None]:
@@ -213,3 +214,7 @@ class Analyzer:
     @classmethod
     def type(cls, atype):
         return set_function_attr(analyzer_type = atype)
+
+    @classmethod
+    def description(cls, desc):
+        return set_function_attr(analyzer_description = desc)

@@ -40,13 +40,17 @@ def visit_Assign(context):
     if isinstance(target, Var) and target.var_type == "name":
         target = target.name()
 
-    context.replace(Var(target, context.node['value']))
+    new_node = Var(target, context.node['value'])
+    new_node.line_no = context.node['lineno']
+    context.replace(new_node)
 
 
 def visit_BinOp(context):
         left = context.node['right']
         right = context.node['left']
-        context.replace(BinOp(left=left, right=right, op=context.node['op']['_type'].lower()))
+        new_node = BinOp(left=left, right=right, op=context.node['op']['_type'].lower())
+        new_node.line_no = context.node['lineno']
+        context.replace(new_node)
 
 
 def visit_Name(context):
@@ -93,6 +97,16 @@ def visit_Print(context):
     context.replace(new_node)
 
 
+def visit_Compare(context):
+    new_node = Compare(
+        left = context.node['left'],
+        ops = context.node['ops'],
+        comparators = context.node['comparators']
+    )
+    new_node._original = context.node
+    context.replace(new_node)
+
+
 VISITORS = {
     'List': visit_List,
     'Tuple': visit_List,
@@ -108,6 +122,7 @@ VISITORS = {
     'ImportFrom': visit_ImportFrom,
     'Import': visit_Import,
     'Print': visit_Print,
+    'Compare': visit_Compare,
 }
 
 

@@ -4,6 +4,7 @@ This module contains wrappers for parsed AST nodes
 from __future__ import annotations
 
 import typing
+import inspect
 from dataclasses import dataclass, InitVar
 from functools import partial
 
@@ -67,6 +68,9 @@ class Dictionary(ASTNode):  # TODO: implement methods from ASTNode
             elif not x.is_static:
                 return False
         return True
+
+    def to_dict(self):
+        return dict(zip(self.keys, self.values))
 
 
 @dataclass
@@ -160,6 +164,12 @@ class Attribute(ASTNode):
     def __repr__(self):
         return f"Attribute({repr(self.source)} . {repr(self.attr)})"
 
+    @property
+    def full_name(self):
+        if isinstance(self.source, Import):
+            return f"{self.source.module}.{self.attr}"
+        return None
+
     def _visit_node(self, context):
         context.visit_child(
             node = self.source,
@@ -172,12 +182,26 @@ class Attribute(ASTNode):
 
 
 @dataclass
+class Compare(ASTNode):
+    left: str
+    ops: typing.List[ASTNode]
+    comparators: typing.List[ASTNode]
+
+
+@dataclass
+class FunctionDef(ASTNode):
+    name: str
+    args: typing.List[ASTNode]
+    body: typing.List[ASTNode]
+    decorator_list: typing.List[ASTNode]
+    returns: ASTNode
+
+
+@dataclass
 class Call(ASTNode):
     func: NodeType
     args: list
     kwargs: dict
-
-    signature: InitVar = None
 
     def __repr__(self):
         if len(self.args) == 0 and len(self.kwargs) == 0:
@@ -232,8 +256,50 @@ class Call(ASTNode):
         visitor.modified = True
         self.func = value
 
-    def get_arg(self, index, default=None):
-        pass
+    def get_signature(
+            self,
+            *sig_args,
+            aura_capture_args=None,
+            aura_capture_kwargs=None,
+            **sig_kwargs
+    ):
+        params = []
+        for x in sig_args:
+            params.append(
+                inspect.Parameter(name=x, kind=inspect.Parameter.POSITIONAL_ONLY)
+            )
+
+        for k, v in sig_kwargs.items():
+            params.append(
+                inspect.Parameter(name=k, default=v, kind=inspect.Parameter.POSITIONAL_OR_KEYWORD)
+            )
+
+        if aura_capture_kwargs:
+            params.append(
+                inspect.Parameter(name=aura_capture_kwargs, kind=inspect.Parameter.VAR_KEYWORD)
+            )
+
+        return inspect.Signature(parameters=params)
+
+    def apply_signature(
+            self,
+            *args,
+            aura_capture_args = None,
+            aura_capture_kwargs=None,
+            **kwargs
+    ):
+        sig = self.get_signature(
+            *args,
+            aura_capture_args = aura_capture_args,
+            aura_capture_kwargs = aura_capture_kwargs,
+            **kwargs
+        )
+        if isinstance(self.kwargs, Dictionary):
+            kw = self.kwargs.to_dict()
+        else:
+            kw = self.kwargs
+
+        return sig.bind(*self.args, **kw)
 
 
 @dataclass

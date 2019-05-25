@@ -36,3 +36,19 @@ It is highly recommended to also run tests after the installation and configurat
 pytest tests/
 ```
 
+# Integrations
+There are several different kind of integrations available for the Aura framework that enhance the capabilities.
+
+
+#### BigQuery
+
+This integration is needed if you would like to operate with the latest typosquatting data. Please follow the official documentation on installing the python client and enabling the authentication:
+https://cloud.google.com/bigquery/docs/reference/libraries
+
+#### Typosquatting
+
+To enable the typosquatting lookups such as when the package is installed via `apip`, a specific JSON file is required. This file ,`pypi_download_stats.json`, contains a list of the most popular PyPI packages. Typosquatting detection is using that to check if there might is another popular PyPI package with a very similar name. This file is also a part of this repository, but be aware it might be outdated as the list is changing from time to time. You can also fetch the latest version by enabling the BigQuery integration and running `aura fetch-pypi-stats`.
+
+#### Libraries.io
+
+This integration is used in the internal API that generates graphs of compromises by fetching the related package/author data.

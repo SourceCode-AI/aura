@@ -28,7 +28,8 @@ class Base64Blob(rules.Rule):
     __hash__ = rules.Rule.__hash__
 
 
-@Analyzer.ID("data_finder")
+@Analyzer.ID('data_finder')
+@Analyzer.description('Extracts artifacts from the source code such sa URLs or Base64 blobs')
 class DataFinder(NodeAnalyzerV2):
     def node_String(self, context):
         val = context.node.value

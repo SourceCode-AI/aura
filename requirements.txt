@@ -16,3 +16,6 @@ GitPython==2.1.11
 stevedore==1.30.0
 pytest==4.0.1
 pytest-cov==2.6.1
+
+#Extras
+google-cloud-bigquery[full]==1.12.0

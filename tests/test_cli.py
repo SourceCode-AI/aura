@@ -27,14 +27,13 @@ def test_simple_cli_analysis(fixtures):
     assert 'url' in output['tags']
 
 
-def test_complex_cli_analysis(fixtures):
+def test_complex_cli_analysis(fixtures, fuzzy_rule_match):
     runner = CliRunner()
     pth = fixtures.path("obfuscated.py")
 
     result = runner.invoke(
         cli.cli,
         ['scan', os.fspath(pth), '--format', 'json'],
-        obj={'min_score': 0}
     )
 
     if result.exception:
@@ -43,10 +42,10 @@ def test_complex_cli_analysis(fixtures):
     assert result.exit_code == 0
     output = json.loads(result.output)
 
-    urls = set()
+    hits = [
+        {'type': 'URL', 'extra': {'url': 'https://example.com/index.html'}}
+    ]
 
-    for x in output['hits']:
-        if x['type'] == "URL":
-            urls.add(x['extra']['url'])
+    for x in hits:
+        assert any(fuzzy_rule_match(h, x) for h in output['hits'])
 
-    assert "https://example.com/index.html" in urls

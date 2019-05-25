@@ -8,3 +8,5 @@ class InvalidArchiveMember(AuraException): pass
 class NoSuchPackage(AuraException): pass
 
 class ASTNodeRewrite(AuraException): pass
+
+class PluginDisabled(AuraException): pass

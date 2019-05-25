@@ -1,3 +1,9 @@
+"""
+This module contains a package analysis functionality
+It will recursively traverse input files and run the configured analyzers on them
+Produced hits from analyzers are collected for later processing
+"""
+
 import os
 import sys
 import shutil
@@ -15,6 +21,7 @@ import magic
 
 from . import utils
 from . import config
+from . import plugins
 from .analyzers import base, rules
 from .analyzers import archive as archive_analyzer
 from .analyzers.python.readonly import ReadOnlyAnalyzer
@@ -135,13 +142,10 @@ class Analyzer(object):
                     })
                 for x in archive.hits:
                     hits.put(x)
-            # elif m in ('text/plain', 'application/octet-stream'):  # Skip generic file types
             # TODO: let analyzer specify mime_types
             #    return
             else:
-                # Run analyzers on a file
-                if analyzers is None:
-                    analyzers = cls.__run_default_analyzers
+                analyzers = plugins.get_analyzer_group(metadata.get('analyzers', []))
 
                 for x in analyzers(path=path, strip_path=strip_path, parent=parent, mime=m, metadata=metadata):
                     hits.put(x)
@@ -149,13 +153,12 @@ class Analyzer(object):
             pass
 
     @classmethod
-    def __run_default_analyzers(cls, path, **kwargs):
+    def __run_default_analyzers(cls, path, **kwargs):  # TODO: remove
         for analyzer in base.get_analyzers().values():
             yield from analyzer(pth=path, **kwargs)
 
         a = ReadOnlyAnalyzer(path=path, **kwargs)
         yield from a(path)
-
 
 
 class Unpacker(object):

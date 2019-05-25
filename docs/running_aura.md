@@ -22,6 +22,8 @@ The output of the analysis can be controlled via the `--format` switch and can b
 
 This is an experimental drop-in replacement for pip. It can be used exactly as pip is being used, e.g. `apip install -r requirements.txt`. This wrapper proxy the call to the underlying pip and via monkey patching intercept any installation of the package. This is because pip does not provide an official API/hooks. When the installation of the package is intercepted, aura framework is called (pointed to via `AURA_PATH` environment variable) for analysis. Based on the analysis output, the user can decide to either proceed with the installation of the package or to abort the process. `apip` is automatically installed with Aura, but you can copy/paste it anywhere, also into different virtualenvs as well as different python versions as it is dependency free. The only requirement here is that the `AURA_PATH` environment variable is configured and pointing to the aura framework executable.
 
+![apip install requestes](example_output/apip_requestes.png)
+
 ## Diff
 
 When incidents are investigated such as typosquatting packages, it is very helpful to have an automated tool that displays differences between them. This tool is a more intelligent version of the Unix `diff` as it does not only compare the content of the packages but also metadata such as description, author, GitHub URL, etc.

@@ -40,6 +40,7 @@ class SuspiciousFile(Rule):
 
 
 @Analyzer.ID('sensitive_files')
+@Analyzer.description("Find files not intended to be published such as .pypirc leaking user password")
 def analyze_sensitive(pth: Path, **kwargs):
     if pth.stat().st_size == 0:
         return
@@ -57,6 +58,7 @@ def analyze_sensitive(pth: Path, **kwargs):
 
 
 @Analyzer.ID('suspicious_files')
+@Analyzer.description("Find non-standard files such as *.exe, compiled python code (*.pyc) or hidden files")
 def analyze_suspicious(pth: Path, **kwargs):
     name = pth.name
     if name.startswith('.'):

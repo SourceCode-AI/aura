@@ -34,6 +34,8 @@ The core part of the Aura is analyzing the source code for anomalies or potentia
 
 ![Obfuscated source code scan](docs/example_output/scan.png)
 
+![apip install requestes](docs/example_output/apip_requestes.png)
+
 ##Documentation
 
 - [Installation and configuration](docs/install.md)

@@ -1,19 +1,34 @@
 #-*- coding: utf-8 -*-
+import json
 import difflib
 import itertools
 import xmlrpc.client
 from functools import partial
+from pathlib import Path
 
+import click
 import ssdeep
 import dateutil.parser
 
-from . import json
 from . import diff
+from . import config
 from .utils import normalize_name
 from .uri_handlers.base import URIHandler
 
 
+logger = config.get_logger(__name__)
 WAREHOUSE_XML_RPC = 'https://pypi.python.org/pypi'
+PYPI_STATS_QUERY = """
+SELECT file.project as package_name, count(file.project) as downloads
+FROM `the-psf.pypi.downloads*`
+WHERE
+    _TABLE_SUFFIX
+    BETWEEN FORMAT_DATE(
+      '%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY))
+    AND FORMAT_DATE('%Y%m%d', CURRENT_DATE())
+GROUP BY package_name
+ORDER BY downloads DESC
+LIMIT 10000"""
 
 
 class TypoAnalyzer(object):
@@ -204,6 +219,10 @@ def diff_distance(s1, s2, cutoff=0.8, cut_return=None):
 
 
 def generate_popular(json_path, full_list=None):
+
+    if not json_path.exists():
+        raise ValueError(f"PyPI stats file does not exists: {json_path}")
+
     if full_list is None:
         full_list = get_all_pypi_packages()
     # We need to convert generator to tuple because we run it in multiple loops
@@ -224,24 +243,39 @@ def enumerator(generator=None, method=None):
         if res and res < 2:
             yield (pkg1, pkg2)
 
-"""
-SELECT file.project as package_name, count(file.project) as downloads FROM [the-psf:pypi.downloads20190222]
 
-GROUP BY package_name
-ORDER BY downloads DESC
-LIMIT 10000
-"""
+def check_name(name):
+    pth = Path('pypi_download_stats.json')
+    typos = []
+    with pth.open() as fd:
+        for line in fd:
+            line = json.loads(line)
+            if name == line['package_name']:
+                continue
+
+            dist = damerau_levenshtein(name, line['package_name'])
+            if dist and dist < 3:
+                typos.append(line['package_name'])
+
+    return typos
 
 
-if __name__ == '__main__':
-    import sys
-    import pprint
-    #ta = TypoAnalyzer(sys.argv[1], sys.argv[2])
-    #pprint.pprint(ta.flags)
-    #ta.diff_releases()
+def generate_stats(output:click.File):
+    try:
+        from google.cloud import bigquery
+        client = bigquery.Client()
+    except Exception:
+        logger.error("Error creating BigQuery client, Aura is probably not correctly configured. Please consult docs.")
+        sys.exit(1)
 
-    f = partial(damerau_levenshtein, max_distance=2)
+    logger.info("Running Query on PyPI download dataset")
+    query_job = client.query(
+        PYPI_STATS_QUERY,
+        location = 'US',
+    )
 
-    for x, y in enumerator(generate_popular('pypi_download_stats.json'), f):
-        print(x, y)
+    for row in query_job:
+        output.write(json.dumps(dict(row)) + '\n')
+
+    logger.info("PyPI download stats generation finished")
 

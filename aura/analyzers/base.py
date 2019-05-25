@@ -1,10 +1,10 @@
 import inspect
 import typing
-import logging
 
 import pkg_resources
 from .python.readonly import ReadOnlyAnalyzer
 from .. import config
+from .. import exceptions
 
 
 logger = config.get_logger(__name__)
@@ -19,7 +19,7 @@ class NodeAnalyzerV2:
         pass
 
 
-class AnalyzerDeactivated(EnvironmentError):
+class AnalyzerDeactivated(exceptions.PluginDisabled):
     pass
 
 

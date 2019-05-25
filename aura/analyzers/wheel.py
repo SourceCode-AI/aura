@@ -23,6 +23,7 @@ def get_checksum(alg:str, path: Path):
 
 
 @Analyzer.ID('wheel')
+@Analyzer.description("Find anomalies in the Wheel packages that could be caused by manipulation or using a non-standard tools")
 def analyze_wheel(pth:Path, **kwargs):
     parts = pth.parts
 

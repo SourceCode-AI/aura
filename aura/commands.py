@@ -3,20 +3,22 @@ import os
 import json
 import time
 import pprint
-import copy
 from pathlib import Path
+from functools import partial
 
 import click
 
 from .package_analyzer import Analyzer
-from .analyzers.python import execution_flow
 from .scan_results import ScanResults
 from .uri_handlers.base import URIHandler, ScanLocation
 
+from . import __version__ as version
 from . import config
 from . import exceptions
 from . import utils
 from . import mirror
+from . import plugins
+from . import typos
 
 logger = config.get_logger(__name__)
 
@@ -38,12 +40,19 @@ def check_requirement(pkg):
 
             scan.pprint()
 
+        typosquatting = typos.check_name(pkg['name'])
+        if typosquatting:
+            click.secho("Possible typosquatting detected", fg='red', bold=True, blink=True)
+            click.secho(f"Following {len(typosquatting)} packages with similar names has been found:")
+            for x in typosquatting:
+                click.echo(f" - '{x}'")
+
     finally:
         handler.cleanup()
     sys.exit(1)
 
 
-def scan_worker(item, metadata, analyzer=None):
+def scan_worker(item, metadata):
     item_metadata = metadata.copy()
     if 'path' not in item_metadata:
         item_metadata['path'] = item.location
@@ -59,9 +68,6 @@ def scan_worker(item, metadata, analyzer=None):
 
     sandbox = Analyzer(location=item.location)
 
-    if analyzer:
-        sandbox.analyzers = utils.import_hook(analyzer)
-
     hits = sandbox.run(strip_path=item.location.parent, metadata=item_metadata)
 
     for x in hits:
@@ -70,7 +76,7 @@ def scan_worker(item, metadata, analyzer=None):
     return scan
 
 
-def scan_uri(uri, metadata=None, analyzer=None):
+def scan_uri(uri, metadata=None):
     start = time.time()
     handler = None
     metadata = metadata or {}
@@ -90,7 +96,7 @@ def scan_uri(uri, metadata=None, analyzer=None):
         })
 
         for x in handler.get_paths(): #type: ScanLocation
-            scan = scan_worker(x, metadata, analyzer)
+            scan = scan_worker(x, metadata)
 
             if scan is not None:
                 if scan.score < metadata.get('min_score', 0):
@@ -143,6 +149,64 @@ def parse_ast(path):
     #        print(" * " + repr(x._asdict()))
 
 
+def info():
+    """
+    Collect and print information about the framework environment and plugins
+    """
+    click.secho(f"---[ Aura framework version {version} ]---", fg='blue', bold=True)
+    analyzers = plugins.load_entrypoint('aura.analyzers')
+    if not analyzers['entrypoints']:
+        click.secho("No analyzers available", color='red', blink=True, bold=True)
+    else:
+        click.echo("Available analyzers:")
+
+    for k, v in analyzers['entrypoints'].items():
+        click.echo(f" * {k} - {getattr(v, 'analyzer_description', 'Description N/A')}")
+
+    if analyzers['disabled']:
+        click.secho("Disabled analyzers:", color='red', bold=True)
+        for (k, v) in analyzers['disabled']:
+            click.echo(f" * {k.name} - {v}")
+
+    click.secho(f"\nAvailable URI handlers:")
+    for k, v in URIHandler.load_handlers().items():
+        click.secho(f"- '{k}://'")
+
+    click.echo("\nExternal integrations:")
+    tokens = {'librariesio': "Libraries.io API"}
+    for k, v in tokens.items():
+        t = config.get_token(k)
+        fg = 'green' if t is not None else 'red'
+        status = 'enabled' if t is not None else 'Disabled - Token not found'
+        click.secho(f" * {v}: {status}", fg=fg)
+
+        try:
+            from google.cloud import bigquery
+            client = bigquery.Client()
+            client.get_service_account_email()
+            click.secho(" * BigQuery: enabled", fg='green')
+        except Exception:
+            click.secho(" * BigQuery: disabled", fg='red')
+
+    if config.get_relative_path('pypi_stats').is_file():
+        click.secho("\nPyPI download stats present. Typosquatting protection enabled", fg='green')
+    else:
+        click.secho("\nPyPI download stats not found, run `aura fetch-pypi-stats`. Typosquatting protection disabled", fg='red')
+
+
+def fetch_pypi_stats(out):
+    typos.generate_stats(out)
+
+
+def generate_typosquatting(out, distance=2, limit=None):
+    f = partial(typos.damerau_levenshtein, max_distance=distance)
+    pth = config.get_relative_path('pypi_stats')
+    for num, (x, y) in enumerate(typos.enumerator(typos.generate_popular(pth), f)):
+        out.write(json.dumps({'original': x, 'typosquatting': y}) + '\n')
+        if limit and num >= limit:
+            break
+
+
 def generate_r2c_input(out_file):
     lm = mirror.LocalMirror()
     for x in lm.list_packages():
@@ -155,7 +219,6 @@ def generate_r2c_input(out_file):
         if urls:
             record = {f'https://pypi.org/project/{x.name}': urls}
             out_file.write(json.dumps(record) + '\n')
-
 
 
 def r2c_scan(source, out_file, mode='generic'):
@@ -177,13 +240,15 @@ def r2c_scan(source, out_file, mode='generic'):
         assert len(source) == 1
         location = Path(source[0])
 
-        with open(location / 'metadata.json', "r") as fd:
-            pkg_metadata = json.loads(fd.read())
-            metadata.update({
-                'package_type': pkg_metadata.get('packagetype'),
-                'package_name': pkg_metadata.get('name'),
-                'python_version': pkg_metadata.get('python_version')
-            })
+        meta_loc = location / 'metadata.json'
+        if meta_loc.is_file():
+            with open(location / 'metadata.json', "r") as fd:
+                pkg_metadata = json.loads(fd.read())
+                metadata.update({
+                    'package_type': pkg_metadata.get('packagetype'),
+                    'package_name': pkg_metadata.get('name'),
+                    'python_version': pkg_metadata.get('python_version')
+                })
         source = [os.fspath(x.absolute()) for x in location.iterdir() if x.name != 'metadata.json']
     else:
         logger.info("R2C mode set to generic")
