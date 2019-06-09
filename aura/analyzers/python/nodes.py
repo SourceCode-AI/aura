@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import typing
 import inspect
+from enum import Enum
 from dataclasses import dataclass, InitVar
 from functools import partial
 
@@ -16,6 +17,21 @@ BASIC_ELEMENTS = (
     int,
 )
 
+class Taints(Enum):
+    SAFE = 1
+    UNKNOWN = 2
+    TAINTED = 3
+
+    def __add__(self, other):
+        if self == Taints.TAINTED or other == Taints.TAINTED:
+            return Taints.TAINTED
+
+        if self == Taints.UNKNOWN or other == Taints.UNKNOWN:
+            return Taints.UNKNOWN
+
+        return self
+
+
 
 class ASTNode(object):
     def __post_init__(self, *args, **kwargs):
@@ -25,13 +41,14 @@ class ASTNode(object):
         self.line_no = None
         self.tags = set()
         self._hash = None
+        self._taint_class = Taints.UNKNOWN
 
     @property
     def full_name(self):
         return self._full_name
 
     @property
-    def is_static(self):
+    def is_static(self):  # TODO: replace with taint analysis
         """
         Return true if the AST node is a purely static structure
         Examples: numbers, strings, None
@@ -39,6 +56,23 @@ class ASTNode(object):
         :return:
         """
         return False
+
+    @property
+    def json(self):
+        data = {
+            'AST_Type': self.__class__.__name__,
+        }
+        if self.full_name is not None:
+            data['full_name'] = self.full_name
+        if self.tags:
+            data['tags'] = list(self.tags)
+        if self.line_no is not None:
+            data['line_no'] = self.line_no
+
+        if self._taint_class != Taints.UNKNOWN:
+            data['taint'] = self._taint_class.name
+
+        return data
 
     def _visit_node(self, context):
         pass
@@ -77,18 +111,10 @@ class Dictionary(ASTNode):  # TODO: implement methods from ASTNode
 class Number(ASTNode):
     value: int
 
-    @property
-    def is_static(self):
-        return True
-
 
 @dataclass
 class String(ASTNode):
     value: str
-
-    @property
-    def is_static(self):
-        return True
 
     def __add__(self, other):
         if isinstance(other, String):
@@ -170,6 +196,14 @@ class Attribute(ASTNode):
             return f"{self.source.module}.{self.attr}"
         return None
 
+    @property
+    def json(self):
+        d = super().json
+        d['source'] = self.source
+        d['attr'] = self.attr,
+        d['action'] = self.action
+        return d
+
     def _visit_node(self, context):
         context.visit_child(
             node = self.source,
@@ -195,6 +229,51 @@ class FunctionDef(ASTNode):
     body: typing.List[ASTNode]
     decorator_list: typing.List[ASTNode]
     returns: ASTNode
+
+    @property
+    def json(self):
+        d = super().json
+        d['function_name'] = self.name
+        d['args'] = self.args
+        d['body'] = self.body
+        d['decorator_list'] = self.decorator_list
+        return d
+
+    @property
+    def default_args(self):
+        return dict()
+
+    def _visit_node(self, context):
+        for idx, arg in enumerate(self.args):
+            context.visit_child(
+                node = arg,
+                replace = partial(self.__replace_args, idx=idx, visitor=context.visitor)
+            )
+
+        for idx, b in enumerate(self.body):
+            context.visit_child(
+                node = b,
+                replace = partial(self.__replace_body, idx=idx, visitor=context.visitor)
+            )
+
+        for idx, dec, in enumerate(self.decorator_list):
+            context.visit_child(
+                node=dec,
+                replace = partial(self.__replace_decorator, idx=idx, visitor=context.visitor)
+            )
+
+
+    def __replace_args(self, value, idx, visitor):
+        visitor.modified = True
+        self.args[idx] = value
+
+    def __replace_body(self, value, idx, visitor):
+        visitor.modified = True
+        self.body[idx] = value
+
+    def __replace_decorator(self, value, idx, visitor):
+        visitor.modified = True
+        self.decorator_list[idx] = value
 
 
 @dataclass
@@ -294,12 +373,70 @@ class Call(ASTNode):
             aura_capture_kwargs = aura_capture_kwargs,
             **kwargs
         )
+        return self.bind(sig)
+
+    def bind(self, signature):
         if isinstance(self.kwargs, Dictionary):
             kw = self.kwargs.to_dict()
         else:
             kw = self.kwargs
 
-        return sig.bind(*self.args, **kw)
+        return signature.bind(*self.args, **kw)
+
+
+@dataclass
+class Arguments(ASTNode):  # TODO: not used yet
+    args: typing.List[str]
+    vararg: NodeType
+    kwonlyargs: typing.List[NodeType]
+    kwarg: NodeType
+    defaults: typing.List[NodeType]
+    kw_defaults: typing.List[NodeType]
+
+    def to_parameters(self):
+        params = []
+        offset = len(self.args) - len(self.defaults)
+        for idx, arg in enumerate(self.args):
+            default = inspect.Parameter.empty
+
+            if idx >= offset:
+                default = self.defaults[idx-offset]
+
+            params.append(inspect.Parameter(
+                name = arg,
+                kind = inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                default = default
+            ))
+
+        if self.vararg is not None:
+            params.append(inspect.Parameter(
+                name = self.vararg,
+                kind = inspect.Parameter.VAR_POSITIONAL
+            ))
+
+        offset = len(self.kwonlyargs) - len(self.kw_defaults)
+        for idx, kwarg in enumerate(self.kwonlyargs):
+            default = inspect.Parameter.empty
+
+            if idx >= offset:
+                default = self.kw_defaults[idx - offset]
+
+            params.append(inspect.Parameter(
+                name = kwarg,
+                kind = inspect.Parameter.KEYWORD_ONLY,
+                default = default
+            ))
+
+        if self.kwarg is not None:
+            params.append(inspect.Parameter(
+                name = self.kwarg,
+                kind = inspect.Parameter.VAR_KEYWORD
+            ))
+
+        return params
+
+    def to_signature(self):
+        return inspect.Signature(parameters=self.to_parameters())
 
 
 @dataclass

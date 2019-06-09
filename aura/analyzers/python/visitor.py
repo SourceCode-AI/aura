@@ -76,6 +76,8 @@ class Visitor:
         self.queue = deque()
 
         self.metadata = metadata
+        self.hits = []
+        self.path = metadata['path']
 
     @classmethod
     def from_cache(cls, *, source, **kwargs):

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from .. import rules
 from .rewrite_ast import ASTRewrite
+from .taint.visitor import TaintAnalysis
 from .visitor import Visitor
 from .nodes import Context
 from ...utils import lookup_lines, construct_path
@@ -13,14 +14,9 @@ from ...utils import lookup_lines, construct_path
 class ReadOnlyAnalyzer(Visitor):
     hooks = []
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.hits = []
-        self.path = kwargs['metadata']['path']
-
     def load_tree(self, source: Path):
         if self.tree is None:
-            cached = ASTRewrite.from_cache(source=source, metadata=self.metadata)
+            cached = TaintAnalysis.from_cache(source=source, metadata=self.metadata)
             if not cached.traversed:
                 cached.traverse()
 

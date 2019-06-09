@@ -12,6 +12,7 @@ from typing import Generator
 import requests
 from click import secho
 
+from .analyzers.python.nodes import ASTNode
 from . import config
 
 
@@ -119,6 +120,8 @@ def json_encoder(obj):
         return list(obj)
     elif isinstance(obj, Path):
         return os.fspath(obj.absolute())
+    elif isinstance(obj, ASTNode):
+        return obj.json
     elif dataclasses.is_dataclass(obj):
         if hasattr(obj, '_asdict'):
             return obj._asdict()

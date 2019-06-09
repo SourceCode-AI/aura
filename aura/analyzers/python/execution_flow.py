@@ -8,6 +8,7 @@ from fnmatch import fnmatch
 from ..base import NodeAnalyzerV2
 from ...utils import Analyzer
 from .rewrite_ast import ASTRewrite
+from .taint.visitor import TaintAnalysis
 from .nodes import *
 from ..rules import FunctionCall, ModuleImport
 from ... import config
@@ -22,7 +23,7 @@ class ExecutionFlow(NodeAnalyzerV2):
 
     def load_tree(self, source):
         if self.tree is None:
-            cached = ASTRewrite.from_cache(source=source, metadata=self.metadata)
+            cached = TaintAnalysis.from_cache(source=source, metadata=self.metadata)
             if not cached.traversed:
                 cached.traverse()
             self.tree = cached.tree

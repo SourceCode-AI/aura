@@ -1,5 +1,6 @@
 #-*- coding: utf-8 -*-
 import json
+import sys
 import difflib
 import itertools
 import xmlrpc.client
@@ -27,8 +28,7 @@ WHERE
       '%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY))
     AND FORMAT_DATE('%Y%m%d', CURRENT_DATE())
 GROUP BY package_name
-ORDER BY downloads DESC
-LIMIT 10000"""
+ORDER BY downloads DESC"""
 
 
 class TypoAnalyzer(object):
@@ -260,7 +260,7 @@ def check_name(name):
     return typos
 
 
-def generate_stats(output:click.File):
+def generate_stats(output:click.File, limit=None):
     try:
         from google.cloud import bigquery
         client = bigquery.Client()
@@ -268,9 +268,14 @@ def generate_stats(output:click.File):
         logger.error("Error creating BigQuery client, Aura is probably not correctly configured. Please consult docs.")
         sys.exit(1)
 
+    if limit:
+        q = PYPI_STATS_QUERY + f" LIMIT {int(limit)}"
+    else:
+        q = PYPI_STATS_QUERY
+
     logger.info("Running Query on PyPI download dataset")
     query_job = client.query(
-        PYPI_STATS_QUERY,
+        q,
         location = 'US',
     )
 

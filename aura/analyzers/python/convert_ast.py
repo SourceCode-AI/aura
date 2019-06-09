@@ -107,6 +107,19 @@ def visit_Compare(context):
     context.replace(new_node)
 
 
+def visit_FunctionDef(context):
+    new_node = FunctionDef(
+        name = context.node['name'],
+        args = context.node['args'],
+        body = context.node['body'],
+        decorator_list = context.node['decorator_list'],
+        returns = context.node.get('returns')
+    )
+    new_node._original = context.node
+    new_node.line_no = context.node['lineno']
+    context.replace(new_node)
+
+
 VISITORS = {
     'List': visit_List,
     'Tuple': visit_List,
@@ -123,6 +136,7 @@ VISITORS = {
     'Import': visit_Import,
     'Print': visit_Print,
     'Compare': visit_Compare,
+    'FunctionDef': visit_FunctionDef,
 }
 
 

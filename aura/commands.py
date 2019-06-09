@@ -125,17 +125,20 @@ def scan_uri(uri, metadata=None):
 
 
 def parse_ast(path):
-    from .analyzers.python import rewrite_ast
+    from .analyzers.python.taint.visitor import TaintAnalysis
 
     meta = {
         'path': path,
         'source': 'cli'
     }
 
-    analyzer = rewrite_ast.ASTRewrite.from_cache(source=path, metadata=meta)
+    analyzer = TaintAnalysis.from_cache(source=path, metadata=meta)
     if not analyzer.traversed:
         analyzer.traverse()
 
+    tree = json.dumps(analyzer.tree['ast_tree'], default=utils.json_encoder, indent=2)
+    print(tree)
+    print("\n\n---\n\n")
     pprint.pprint(analyzer.tree['ast_tree'])
 
     #traversal = execution_flow.ExecutionFlow.from_cache(source=path, metadata=meta)
