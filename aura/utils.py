@@ -122,6 +122,8 @@ def json_encoder(obj):
         return os.fspath(obj.absolute())
     elif isinstance(obj, ASTNode):
         return obj.json
+    elif isinstance(obj, bytes):
+        return obj.decode('utf-8')
     elif dataclasses.is_dataclass(obj):
         if hasattr(obj, '_asdict'):
             return obj._asdict()

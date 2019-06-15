@@ -1,4 +1,5 @@
 # Project Aura: Security audits for packages
+![build-status](https://travis-ci.com/RootLUG/aura.svg)
 
 # About the problem
 

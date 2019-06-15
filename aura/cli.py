@@ -51,12 +51,14 @@ def cli(ctx, **kwargs):
 @click.option('-a', '--analyzer', multiple=True, help="Specify analyzer to run")
 @click.option('-f', '--format', 'out_type', default='text', type=click.Choice(['text', 'json']), help="Output format")
 @click.option('--min-score', default=0, type=click.INT, help="Output only scans with at least minimum score")
-def scan(uri, verbose=0, analyzer=None, out_type='plain', min_score = 0):
+@click.option('--exclude-tests', is_flag=True)
+def scan(uri, verbose=0, analyzer=None, out_type='plain', min_score = 0, exclude_tests=False):
     meta = {
         'verbosity': verbose,
         'format': out_type,
         'min_score': min_score,
-        'analyzers': analyzer
+        'analyzers': analyzer,
+        'exclude_tests': exclude_tests
     }
 
     commands.scan_uri(uri, metadata=meta)

@@ -31,7 +31,9 @@ def check_requirement(pkg):
         metadata = {
             'uri_input': 'pkg_path',
             'source': 'package_manager',
-            'pm_data': pkg
+            'pm_data': pkg,
+            'format': 'plain',
+            'min_score': 0
         }
 
         for location in handler.get_paths():

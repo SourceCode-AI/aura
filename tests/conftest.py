@@ -25,22 +25,30 @@ class Fixtures(object):
         with open(self.path(path), 'r') as fp:
             return fp.read()
 
-    def scan_test_file(self, name):
+    def scan_test_file(self, name, decode=True):
+        pth = self.path(name)
+
+        result = self.get_cli_output(
+            ['scan', os.fspath(pth), '--format', 'json']
+        )
+        if decode:
+            return json.loads(result.output)
+        else:
+            return result
+
+    def get_cli_output(self, args):
         global cli
         if cli is None:
             from aura import cli
 
         runner = CliRunner()
-        pth = self.path(name)
-        result = runner.invoke(
-            cli.cli,
-            ['scan', os.fspath(pth), '--format', 'json'],
-        )
+        result = runner.invoke(cli.cli, args=args)
+
         if result.exception:
             raise result.exception
 
         assert result.exit_code == 0
-        return json.loads(result.output)
+        return result
 
 
 def match_rule(source, target):
@@ -57,13 +65,13 @@ def match_rule(source, target):
         if isinstance(target[x], dict):
             if not match_rule(source[x], target[x]):
                 return False
+        elif isinstance(target[x], list):
+            assert len(set(target[x]) - set(source[x])) == 0
         else:
             if target[x] != source[x]:
                 return False
 
     return True
-
-
 
 
 @pytest.fixture

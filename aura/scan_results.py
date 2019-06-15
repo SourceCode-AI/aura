@@ -1,4 +1,5 @@
 import copy
+import sqlite3
 from collections import defaultdict
 
 import click
@@ -27,9 +28,21 @@ class ScanResults():
             self.__imported_modules.add(sender.name)
 
     @property
+    def filtered(self):
+        hits = sorted(self.hits)
+
+        for x in hits:
+            if self.verbosity <2 and x.informational and x.score == 0:
+                continue
+            elif self.metadata.get('exclude_tests', False) and 'test_suite' in x.tags:
+                continue
+
+            yield x
+
+    @property
     def score(self):
         score = 0
-        for x in self.hits:
+        for x in self.filtered:
             if hasattr(x, 'tags') and isinstance(x.tags, set):
                 self._tags |= x.tags
 
@@ -57,10 +70,7 @@ class ScanResults():
 
         if self.hits and verbose:
             click.echo("- Rules hits:")
-            hits = sorted(self.hits)
-            for x in hits:
-                if x.informational and x.score == 0 and verbose < 2:
-                    continue
+            for x in self.filtered:
                 click.echo(f" * {x._asdict()}")
 
     @property
@@ -68,10 +78,7 @@ class ScanResults():
         data = copy.deepcopy(self.data)
         data['hits'] = []
 
-        for x in self.data['hits']:
-            if self.verbosity < 2 and x.informational and x.score == 0:
-                continue
-
+        for x in self.filtered:
             data['hits'].append(x._asdict())
 
         data['imported_modules'] = list(self.__imported_modules)
@@ -115,3 +122,29 @@ class ScanResults():
         score = stats['score'] + call_hit.score
         stats['score'] = score if score < max_score else max_score
         stats['hits'] += 1
+
+
+class SQLiteDump:
+    def __create_tables(self):
+        INPUT_SCHEMA = """
+        CREATE TABLE IF NOT EXISTS input (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            input TEXT UNIQUE NOT NULL,
+            metadata JSON,
+            parent INTEGER,
+            FOREIGN KEY (parent) REFERENCES input(id)
+            ON DELETE CASCADE ON UPDATE NO ACTION
+        )
+        """
+
+        HIT_SCHEMA = """
+        CREATE TABLE IF NOT EXISTS hit (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            signature VARCHAR(255) PRIMARY KEY,
+            score INTEGER,
+            type VARCHAR(64),
+            data JSON,
+            input INTEGER,
+            FOREIGN KEY (input) REFERENCES input(id)
+        )
+        """

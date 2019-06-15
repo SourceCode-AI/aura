@@ -32,4 +32,4 @@ cpx = 12 + 3j # complex number
 
 fabulous.pprint("Haealalaoa awaoaralada"[::2])  # String "Hello world" after slicing
 
-eval("print('Nasty malware')")
+eval("print('$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!')")

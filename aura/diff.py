@@ -16,7 +16,7 @@ from git import Repo, Diff, Blob
 from blinker import signal
 
 from . import utils
-from .package_analyzer import Unpacker
+# from .package_analyzer import Unpacker
 
 
 class DiffAnalyzer:
@@ -110,24 +110,27 @@ class DiffAnalyzer:
         a_mime = magic.from_file(os.fspath(a_path), mime=True)
         b_mime = magic.from_file(os.fspath(b_path), mime=True)
 
-        if a_mime in Unpacker.supported_mime_types and b_mime in Unpacker.supported_mime_types:
-            if ctx is None:
-                ctx = {}
-
-            a_archive = Unpacker(path=a_path, mime=a_mime)
-            b_archive = Unpacker(path=b_path, mime=b_mime)
-
-            a_ref = ctx.get('a_ref')
-            if (not a_ref) or (a_ref and not os.fspath(a_path).endswith(a_ref)):
-                a_ref = utils.construct_path(a_path, parent=a_ref)
-                ctx['a_ref'] = a_ref
-
-            b_ref = ctx.get('b_ref')
-            if (not b_ref) or (a_ref and not os.fspath(a_path).endswith(a_ref)):
-                b_ref = utils.construct_path(b_path, parent=a_ref)
-                ctx['b_ref'] = b_ref
-
-            self.compare(Path(a_archive.tmp_dir), Path(b_archive.tmp_dir), ctx=ctx)
+        if False:
+            pass
+        # TODO: refactor to use the archive unpacker as analyzer
+        # if a_mime in Unpacker.supported_mime_types and b_mime in Unpacker.supported_mime_types:
+        #     if ctx is None:
+        #         ctx = {}
+        #
+        #     a_archive = Unpacker(path=a_path, mime=a_mime)
+        #     b_archive = Unpacker(path=b_path, mime=b_mime)
+        #
+        #     a_ref = ctx.get('a_ref')
+        #     if (not a_ref) or (a_ref and not os.fspath(a_path).endswith(a_ref)):
+        #         a_ref = utils.construct_path(a_path, parent=a_ref)
+        #         ctx['a_ref'] = a_ref
+        #
+        #     b_ref = ctx.get('b_ref')
+        #     if (not b_ref) or (a_ref and not os.fspath(a_path).endswith(a_ref)):
+        #         b_ref = utils.construct_path(b_path, parent=a_ref)
+        #         ctx['b_ref'] = b_ref
+        #
+        #     self.compare(Path(a_archive.tmp_dir), Path(b_archive.tmp_dir), ctx=ctx)
         else:
             self._diff_git(a_path, b_path, ctx)
 

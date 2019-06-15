@@ -245,7 +245,7 @@ def enumerator(generator=None, method=None):
 
 
 def check_name(name):
-    pth = Path('pypi_download_stats.json')
+    pth = config.get_relative_path('pypi_stats')
     typos = []
     with pth.open() as fd:
         for line in fd:

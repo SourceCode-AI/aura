@@ -1,12 +1,13 @@
 #-*- coding: utf-8 -*-
 import urllib.parse
-import logging
+from dataclasses import dataclass, field
 from  pathlib import Path
 
 import pkg_resources
 
-logger = logging.getLogger(__name__)
+from .. import config
 
+logger = config.get_logger(__name__)
 HANDLERS = {}
 
 
@@ -63,8 +64,8 @@ class PackageProvider:
         raise NotImplementedError("Need to be re-implemented in child class")
 
 
+@dataclass
 class ScanLocation:
-    __slots__ = ('location', 'metadata')
-    def __init__(self, location, metadata=None):
-        self.location: Path = location
-        self.metadata = metadata or {}
+    location: Path
+    metadata: dict = field(default_factory=dict)
+    cleanup: bool = False
