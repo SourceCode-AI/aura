@@ -1,4 +1,6 @@
-# Project Aura: Security audits for packages
+![aura logo](files/logo/logotype.png)
+
+# Security Auditing and code introspection
 ![build-status](https://travis-ci.com/RootLUG/aura.svg)
 
 # About the problem
@@ -43,11 +45,12 @@ The core part of the Aura is analyzing the source code for anomalies or potentia
 - [Using and running Aura](docs/running_aura.md)
 
 
-## Authors
+## Authors & Contributors
 
-* **Martin Carnogursky** - *Initial work* - [Martin Carnogursky](https://is.muni.cz/person/410345)
+* **Martin Carnogursky** - *Initial work and project lead* - [Martin Carnogursky](https://is.muni.cz/person/410345)
+* **Mirza Zulfan** - *Logo Design* - [Mirza Zulfan](https://github.com/mirzazulfan)
+
 
 ## License
 
 This project is licensed under the GPLv3 License - see the [LICENSE.txt](LICENSE.txt) file for details. Parts of this framework contains (optional) integrations with other products such as the [r2c platform](https://returntocorp.com/), [libraries.io](https://libraries.io/api), etc.; which are subjected to their license and terms of usage.
-
