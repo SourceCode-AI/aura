@@ -32,24 +32,6 @@ def walk(location) -> Generator[Path, None, None]:
             yield x
 
 
-def construct_path(pth, strip_path=None, parent=None):
-    pth = os.fspath(pth)
-
-    if strip_path:
-        strip_path = os.fspath(strip_path)
-        if pth.startswith(strip_path):
-            size = len(strip_path)
-            if strip_path[-1] != '/':
-                size += 1
-
-            pth = pth[size:]
-
-    if parent:
-        pth = f'{parent}${pth}'
-
-    return pth
-
-
 def filter_empty_dict(data):
     for key, val in list(data.items()):
         if val is None:

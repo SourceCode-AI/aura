@@ -15,8 +15,9 @@ from .. import config
 
 SUPPORTED_MIME = (
     'application/x-gzip',
+    # FIXME: 'application/gzip',
     'application/x-bzip2',
-    'application/zip'
+    'application/zip',
 )
 
 logger = config.get_logger(__name__)
@@ -150,17 +151,22 @@ def archive_analyzer(pth:Path, metadata, **kwargs):
     if mime not in SUPPORTED_MIME:
         return
 
+
     max_size = int(config.CFG['aura']['rlimit-fsize'])
     tmp_dir = tempfile.mkdtemp(prefix='aura_pkg__sandbox', suffix=os.path.basename(pth))
-    logger.info("Extracting to: {}".format(tmp_dir))
+    logger.info("Extracting to: '{}' [{}]".format(tmp_dir, mime))
 
-    yield base.ScanLocation(
+    location = base.ScanLocation(
         location = tmp_dir,
         cleanup=True,
+        strip_path=tmp_dir,
+        parent=pth,
         metadata = {
             'depth': metadata.get('depth', 0) + 1
-        }
+        },
     )
+
+    yield location
 
     if mime == 'application/zip':
         members = []
@@ -174,7 +180,7 @@ def archive_analyzer(pth:Path, metadata, **kwargs):
 
             fd.extractall(path=tmp_dir, members=members)
 
-    elif mime in ('application/x-gzip', 'application/x-bzip2'):
+    elif mime in SUPPORTED_MIME:
         members = []
 
         with tarfile.TarFile(name=pth, mode='r') as fd:

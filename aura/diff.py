@@ -61,7 +61,7 @@ class DiffAnalyzer:
             else:
                 a_fs_path = ctx['a_path'] / sender.a_path
 
-            data['a_ref'] = utils.construct_path(sender.a_path, parent=ctx.get('a_ref'))
+            data['a_ref'] = os.fspath(sender.a_path)
             data['a_md5'] = utils.md5(a_fs_path)
             data['a_mime'] = magic.from_file(os.fspath(a_fs_path), mime=True)
             data['a_ssdeep'] = ssdeep.hash_from_file(os.fspath(a_fs_path))
@@ -75,7 +75,8 @@ class DiffAnalyzer:
             else:
                 b_fs_path = ctx['b_path'] / sender.b_path
 
-            data['b_ref'] = utils.construct_path(sender.b_path, parent=ctx.get('b_ref'))
+            # FIXME: parent $  ref when unpacking data['b_ref'] = utils.construct_path(sender.b_path, parent=ctx.get('b_ref'))
+            data['b_ref'] = os.fspath(b_fs_path)
             data['b_md5'] = utils.md5(b_fs_path)
             data['b_mime'] = magic.from_file(os.fspath(b_fs_path), mime=True)
             data['b_ssdeep'] = ssdeep.hash_from_file(os.fspath(b_fs_path))

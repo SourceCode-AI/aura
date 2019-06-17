@@ -1,4 +1,5 @@
 #-*- coding: utf-8 -*-
+import os
 import urllib.parse
 from dataclasses import dataclass, field
 from  pathlib import Path
@@ -69,3 +70,29 @@ class ScanLocation:
     location: Path
     metadata: dict = field(default_factory=dict)
     cleanup: bool = False
+    parent: str = None
+    strip_path: str = ''
+
+    def create_child(self, new_location):
+        child = self.__class__(
+            location = new_location,
+            metadata = self.metadata,
+            strip_path = self.strip_path,
+            parent = self.parent,
+        )
+        return child
+
+    def strip(self, target):
+        target = os.fspath(target)
+
+        if self.strip_path and target.startswith(self.strip_path):
+            size = len(self.strip_path)
+            if self.strip_path[-1] != '/':
+                size += 1
+
+            target = target[size:]
+
+        if self.parent:
+            target = os.fspath(self.parent) + '$' + target
+
+        return target

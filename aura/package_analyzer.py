@@ -51,29 +51,27 @@ class Analyzer(object):
         cleanup = m.Queue()
         results = []
 
-        files_queue.put({'path': location})
+        files_queue.put(base.ScanLocation(location=location))
 
         try:
             while files_queue.qsize() or sum([not x.ready() for x in results]):
                 try:
-                    item = files_queue.get(False, 1)
-                    item_path = Path(item['path'])
+                    item = files_queue.get(False, 1)  # type: base.ScanLocation
+                    item_path = Path(item.location)
+
                     if item_path.is_dir():
                         for f in utils.walk(item_path):
-                            item['path'] = f
-                            files_queue.put(item)
+                            files_queue.put(item.create_child(f))
                         continue
 
                     kwargs = {
+                        'location': item,
                         'queue': files_queue,
                         'hits': hits,
                         'cleanup': cleanup,
-                        'strip_path': strip_path,
-                        'parent': parent,
                         'metadata': metadata
                     }
 
-                    kwargs.update(item)
                     if self.fork:
                         results.append(worker_pool.apply_async(func=self._worker, kwds=kwargs))
                     else:
@@ -109,16 +107,16 @@ class Analyzer(object):
 
     @classmethod
     def _worker(cls,
-                 path: Path,
+                 location: base.ScanLocation,
                  queue:multiprocessing.Queue,
                  hits:multiprocessing.Array,
                  cleanup: multiprocessing.Array,
-                 strip_path=None,
-                 parent=None,
                  metadata=None):
         try:
             if metadata is None:
                 metadata = {}
+
+            path = location.location
 
             if not isinstance(metadata.get('flags'), set):
                 metadata['flags'] = set()
@@ -128,6 +126,8 @@ class Analyzer(object):
 
             if 'path' not in metadata:
                 metadata['path'] = path
+            if 'parent' not in metadata:
+                metadata['parent'] = path
 
             m = magic.from_file(os.fspath(path), mime=True)
 
@@ -142,21 +142,15 @@ class Analyzer(object):
 
             analyzers = plugins.get_analyzer_group(metadata.get('analyzers', []))
 
-            for x in analyzers(path=path, strip_path=strip_path, parent=parent, mime=m, metadata=metadata):
+            for x in analyzers(path=path, mime=m, metadata=metadata):
                 if isinstance(x, base.ScanLocation):
-                    scan_data = {'path': x.location}
-
-                    for attr in ('strip_path', 'parent'):
-                        if attr in x.metadata:
-                            scan_data[attr] = x.metadata.pop(attr)
-
-                    scan_data['metadata'] = x.metadata
-
                     if x.cleanup:
                         cleanup.put(x.location)
 
-                    queue.put(scan_data)
+                    queue.put(x)
                 else:
+                    if x.location:
+                        x.location = location.strip(x.location)
                     x.tags |= metadata['flags']  #  TODO: remove once moved somewhere else
                     hits.put(x)
         finally:

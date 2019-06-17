@@ -8,7 +8,7 @@ from .rewrite_ast import ASTRewrite
 from .taint.visitor import TaintAnalysis
 from .visitor import Visitor
 from .nodes import Context
-from ...utils import lookup_lines, construct_path
+from ...utils import lookup_lines
 
 
 class ReadOnlyAnalyzer(Visitor):
@@ -38,11 +38,7 @@ class ReadOnlyAnalyzer(Visitor):
             lines_lookup = lookup_lines(pth, lines)
             for x in self.hits:
                 if x.location is None:
-                    x.location = construct_path(
-                        pth,
-                        self.kwargs.get('strip_path'),
-                        parent=self.kwargs.get('parent')
-                    )
+                    x.location = os.fspath(pth)
 
                 if x.line_no in lines_lookup and not x.line:
                     x.line = lines_lookup[x.line_no]
