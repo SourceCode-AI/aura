@@ -75,7 +75,7 @@ def md5(data, hex=True, block_size=2**20):
 
 def normalize_name(name):
     """
-    Normalize package name as descibed in PEP-503
+    Normalize package name as described in PEP-503
     https://www.python.org/dev/peps/pep-0503/#normalized-names
 
     :return:

@@ -1,25 +1,14 @@
+import pprint
+import fnmatch
 from pathlib import Path
 
 from ..nodes import *
 from ..visitor import Visitor
 from ..rewrite_ast import ASTRewrite
-
-
-TAINT_SOURCES = (
-    'flask.request',
-)
-
-TAINT_SINKS = (
-    'flask.make_response',
-    'flask.jsonify',
-    'json.dumps',
-    'os.system',
-    'subprocess.Popen',
-)
+from .... import config
 
 
 class TaintAnalysis(Visitor):
-
     def load_tree(self, source: Path):
         if self.tree is None:
             cached = ASTRewrite.from_cache(source=source, metadata=self.metadata)
@@ -36,7 +25,6 @@ class TaintAnalysis(Visitor):
             self.__mark_flask_route,
             self.__mark_sinks,
             self.__mark_sources,
-            self.__mark_safe_constants,
             self.__propagate_taint,
         )
 
@@ -64,22 +52,20 @@ class TaintAnalysis(Visitor):
         if f_name is None:
             return
 
-        if f_name in TAINT_SINKS and 'taint_sink' not in context.node.tags:
+        if f_name in config.SEMANTIC_RULES.get('taint_sinks', []) and 'taint_sink' not in context.node.tags:
             context.node.tags.add('taint_sink')
             context.visitor.modified = True
 
     def __mark_sources(self, context):
         f_name = context.node.full_name
 
-        if f_name in TAINT_SOURCES and 'taint_source' not in context.node.tags:
-            context.node.tags.add('taint_source')
-            context.visitor.modified = True
+        if not (isinstance(f_name, str) and 'taint_source' not in context.node.tags):
             return
 
-    def __mark_safe_constants(self, context):
-        if isinstance(context.node, (String, Number)):
-            if context.node._taint_class != Taints.SAFE:
-                context.node._taint_class = Taints.SAFE
+        for source in config.SEMANTIC_RULES.get('taint_sources', []):
+            if source == f_name or fnmatch.fnmatch(f_name, source):
+                context.node.tags.add('taint_source')
+                context.node._taint_class = Taints.TAINTED
                 context.visitor.modified = True
                 return
 
@@ -93,5 +79,30 @@ class TaintAnalysis(Visitor):
                 return
             elif t != Taints.UNKNOWN and t != context.node._taint_class:
                 context.node._taint_class = t
+                context.visitor.modified = True
+                return
+        elif isinstance(context.node, Call):
+            args_taints = []
+            for x in context.node.args:
+                args_taints.append(x._taint_class)
+            for x in context.node.kwargs.values():
+                args_taints.append(x._taint_class)
+
+            if not args_taints:
+                return
+
+            call_taint = max(args_taints)
+            if call_taint != context.node._taint_class:
+                context.node._taint_class = call_taint
+                context.visitor.modified = True
+                return
+        elif isinstance(context.node, Var):
+            var_taint = max(
+                context.node._taint_class,
+                getattr(context.node.value, '_taint_class', Taints.UNKNOWN)
+            )
+
+            if var_taint != context.node._taint_class:
+                context.node._taint_class = var_taint
                 context.visitor.modified = True
                 return

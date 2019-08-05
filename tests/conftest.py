@@ -15,6 +15,10 @@ os.environ['AURA_CFG'] = cfg_path
 assert os.environ.get('AURA_CFG') == cfg_path
 
 
+class MatchFound(ValueError):
+    pass
+
+
 class Fixtures(object):
     BASE_PATH = Path(__file__).parent / 'files'
 
@@ -29,7 +33,7 @@ class Fixtures(object):
         pth = self.path(name)
 
         result = self.get_cli_output(
-            ['scan', os.fspath(pth), '--format', 'json']
+            ['scan', os.fspath(pth), '--format', 'json', '-v']
         )
         if decode:
             return json.loads(result.output)

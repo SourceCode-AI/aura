@@ -6,9 +6,10 @@ from __future__ import annotations
 import typing
 import inspect
 from enum import Enum
-from dataclasses import dataclass, InitVar
-from functools import partial
+from dataclasses import dataclass, InitVar, field
+from functools import partial, total_ordering
 
+from ...stack import Stack
 from ... import exceptions
 
 
@@ -17,10 +18,23 @@ BASIC_ELEMENTS = (
     int,
 )
 
+
+@total_ordering
 class Taints(Enum):
     SAFE = 1
     UNKNOWN = 2
     TAINTED = 3
+
+    def __lt__(self, other):
+        if not isinstance(other, Taints):
+            return NotImplemented
+
+        if self == Taints.SAFE and other != Taints.SAFE:
+            return True
+        elif self == Taints.UNKNOWN and other == Taints.TAINTED:
+            return True
+        else:
+            return False
 
     def __add__(self, other):
         if self == Taints.TAINTED or other == Taints.TAINTED:
@@ -89,6 +103,37 @@ class Dictionary(ASTNode):  # TODO: implement methods from ASTNode
     keys: list
     values: list
 
+    def _visit_node(self, context):
+        for idx, key in enumerate(self.keys):
+            context.visit_child(
+                node = key,
+                replace = partial(self.__replace_key, idx=idx, visitor=context.visitor)
+            )
+
+        for idx, value in enumerate(self.values):
+            if isinstance(value, str) and value in context.stack:
+                value = context.stack[value]
+                self.values[idx] = value
+
+            context.visit_child(
+                node = value,
+                replace = partial(self.__replace_value, idx=idx, visitor=context.visitor)
+            )
+
+    def __replace_key(self, value, idx, visitor):
+        visitor.modified = True
+        self.keys[idx] = value
+
+    def __replace_value(self, value, idx, visitor):
+        visitor.modified = True
+        self.values[idx] = value
+
+    @property
+    def json(self):
+        d = super().json
+        d['items'] = list(zip(self.keys, self.values))
+        return d
+
     @property
     def is_static(self):
         for x in self.keys:
@@ -111,10 +156,18 @@ class Dictionary(ASTNode):  # TODO: implement methods from ASTNode
 class Number(ASTNode):
     value: int
 
+    def __post_init__(self):
+        super().__post_init__()
+        self._taint_class = Taints.SAFE
+
 
 @dataclass
 class String(ASTNode):
     value: str
+
+    def __post_init__(self):
+        super().__post_init__()
+        self._taint_class = Taints.SAFE
 
     def __add__(self, other):
         if isinstance(other, String):
@@ -131,6 +184,13 @@ class String(ASTNode):
 
     def __str__(self):
         return str(self.value)
+
+    @property
+    def json(self):
+        d = super().json
+        d['value'] = self.value
+        return d
+
 
 @dataclass
 class Var(ASTNode):
@@ -156,10 +216,18 @@ class Var(ASTNode):
     def full_name(self):
         if self._full_name:
             return self._full_name
-        elif hasattr(self.value, 'fullname'):
-            return self.value.fullname
+        elif hasattr(self.value, 'full_name'):
+            return self.value.full_name
         else:
             return self.value
+
+    @property
+    def json(self):
+        d = super().json
+        d['var_name'] = self.var_name
+        d['value'] = self.value
+        d['var_type'] = self.var_type
+        return d
 
     def _visit_node(self, context):
         context.visit_child(
@@ -171,6 +239,8 @@ class Var(ASTNode):
             node = self.value,
             replace = partial(self.__replace_value, visitor=context.visitor)
         )
+        if self.var_type == 'assign' and isinstance(self.var_name, str):
+            context.stack[self.var_name] = self
 
     def __replace_value(self, value, visitor):
         visitor.modified = True
@@ -194,6 +264,8 @@ class Attribute(ASTNode):
     def full_name(self):
         if isinstance(self.source, Import):
             return f"{self.source.module}.{self.attr}"
+        elif isinstance(self.source, (Attribute, Call)):
+            return f"{self.source.full_name}.{self.attr}"
         return None
 
     @property
@@ -205,6 +277,17 @@ class Attribute(ASTNode):
         return d
 
     def _visit_node(self, context):
+        if isinstance(self.source, str):
+            try:
+                target = context.stack[self.source]
+                if isinstance(target, Var) and target.var_type == 'assign':
+                    self.source = target.value
+                else:
+                    self.source = target
+                context.visitor.modified = True
+            except (KeyError, TypeError):
+                pass
+
         context.visit_child(
             node = self.source,
             replace = partial(self.__replace_source, visitor=context.visitor)
@@ -244,16 +327,12 @@ class FunctionDef(ASTNode):
         return dict()
 
     def _visit_node(self, context):
+        context.stack.push()
+
         for idx, arg in enumerate(self.args):
             context.visit_child(
                 node = arg,
                 replace = partial(self.__replace_args, idx=idx, visitor=context.visitor)
-            )
-
-        for idx, b in enumerate(self.body):
-            context.visit_child(
-                node = b,
-                replace = partial(self.__replace_body, idx=idx, visitor=context.visitor)
             )
 
         for idx, dec, in enumerate(self.decorator_list):
@@ -262,6 +341,13 @@ class FunctionDef(ASTNode):
                 replace = partial(self.__replace_decorator, idx=idx, visitor=context.visitor)
             )
 
+        for idx, b in enumerate(self.body):
+            context.visit_child(
+                node = b,
+                replace = partial(self.__replace_body, idx=idx, visitor=context.visitor)
+            )
+
+        context.stack.pop()
 
     def __replace_args(self, value, idx, visitor):
         visitor.modified = True
@@ -296,6 +382,15 @@ class Call(ASTNode):
 
     def _visit_node(self, context: Context):
         for idx in range(len(self.args)):
+            try:
+                arg = self.args[idx]
+                if isinstance(arg, str):
+                    arg = context.stack[arg]
+                    self.args[idx] = arg
+                    context.visitor.modified = True
+            except (TypeError, KeyError):
+                pass
+
             context.visit_child(
                 node = self.args[idx],
                 replace = partial(self.__replace_arg, idx=idx, visitor=context.visitor)
@@ -307,17 +402,42 @@ class Call(ASTNode):
                 replace = partial(self.__replace_kwargs, key=key, visitor=context.visitor)
             )
 
+        # Replace call to functions by their targets from defined variables, e.g.
+        # x = open
+        # x("test.txt") will be replaced to open("test.txt")
+        try:
+            if isinstance(self.func, Var):
+                source = self._full_name
+            else:
+                source = self.func
+
+            name = context.stack[source].full_name
+            if isinstance(name, str) and self._full_name != name:
+                self._full_name = name
+                context.visitor.modified = True
+        except (TypeError, KeyError, AttributeError):
+            pass
+
         context.visit_child(
             node = self.func,
             replace = partial(self.__replace_func, visitor=context.visitor),
         )
 
     @property
+    def json(self):
+        d = super().json
+        d['function'] = self.func
+        d['args'] = self.args
+        d['kwargs'] = self.kwargs
+        return d
+
+    @property
     def full_name(self):
         if self._full_name is not None:
             return self._full_name
 
-        f_name = getattr(self.func, 'full_name', None)
+
+        f_name = self.func.full_name
         if f_name is not None:
             return f_name
         else:
@@ -447,6 +567,9 @@ class Import(ASTNode):
 
     allow_lookup: InitVar[bool] = True
 
+    def _visit_node(self, context):
+        context.stack[self.alias] = self
+
     def name(self):
         return self.alias
 
@@ -479,6 +602,7 @@ class Context:
     # can_replace: bool = True
     replace: typing.Callable[[NodeType], None] = lambda x: None
     visitor: typing.Any = None  # FIXME typing
+    stack: Stack = field(default_factory=Stack)
     depth: int = 0
     modified: bool = False
 
@@ -488,7 +612,8 @@ class Context:
             node = node,
             depth = self.depth + 1,
             visitor = self.visitor,
-            replace = replace
+            replace = replace,
+            stack = self.stack
         )
 
     def visit_child(self, *args, **kwargs):

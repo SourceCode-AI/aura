@@ -15,7 +15,7 @@ from .. import config
 
 SUPPORTED_MIME = (
     'application/x-gzip',
-    # FIXME: 'application/gzip',
+    'application/gzip',
     'application/x-bzip2',
     'application/zip',
 )
@@ -183,7 +183,7 @@ def archive_analyzer(pth:Path, metadata, **kwargs):
     elif mime in SUPPORTED_MIME:
         members = []
 
-        with tarfile.TarFile(name=pth, mode='r') as fd:
+        with tarfile.open(name=pth, mode='r:*') as fd:
             for x in filter_tar(arch=fd, path=pth, max_size=max_size):
                 if isinstance(x, tarfile.TarInfo):
                     members.append(x)

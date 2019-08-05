@@ -2,6 +2,7 @@
 
 # Security Auditing and code introspection
 ![build-status](https://travis-ci.com/RootLUG/aura.svg)
+[![codecov](https://codecov.io/gh/RootLUG/aura/branch/master/graph/badge.svg)](https://codecov.io/gh/RootLUG/aura)
 
 # About the problem
 

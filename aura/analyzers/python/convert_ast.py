@@ -22,6 +22,10 @@ def visit_Dict(context):
     context.replace(Dictionary(context.node['keys'], context.node['values']))
 
 
+def visit_Expr(context):
+    context.replace(context.node['value'])
+
+
 def visit_Call(context):
     keyword = {}
     for x in context.node['keywords']:
@@ -72,7 +76,11 @@ def visit_ImportFrom(context):
     for x in context.node['names']:
         alias = x['asname'] if x.get('asname') else x['name']
         full_name = f"{context.node['module']}.{x['name']}"
-        new_node = Import(full_name, alias, import_type='from')
+        new_node = Import(
+            module=full_name,
+            alias=alias,
+            import_type='from'
+        )
         new_node._original = context.node
         new_node.line_no = context.node.get('lineno')
         context.replace(new_node)
@@ -83,7 +91,10 @@ def visit_Import(context):
     # FIXME when array len > 1
     for x in context.node['names']:
         alias = x['asname'] if x.get('asname') else x['name']
-        new_node = Import(x['name'], alias)
+        new_node = Import(
+            module=x['name'],
+            alias=alias
+        )
         new_node._original = context.node
         new_node.line_no = context.node.get('lineno')
 
@@ -127,6 +138,7 @@ VISITORS = {
     'Str': visit_Str,
     'Num': visit_Num,
     'Dict': visit_Dict,
+    'Expr': visit_Expr,
     'Call': visit_Call,
     'Assign': visit_Assign,
     'BinOp': visit_BinOp,

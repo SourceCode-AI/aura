@@ -124,10 +124,10 @@ class Analyzer(object):
             if metadata.get('depth') is None:
                 metadata['depth'] = 0  # TODO: add depth support for archive unpacker
 
-            if 'path' not in metadata:
-                metadata['path'] = path
             if 'parent' not in metadata:
                 metadata['parent'] = path
+
+            metadata['path'] = path
 
             m = magic.from_file(os.fspath(path), mime=True)
 

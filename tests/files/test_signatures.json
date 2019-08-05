@@ -11,5 +11,11 @@
   ],
   "modules": [
 
+  ],
+  "taint_sinks": [
+    "flask.make_response"
+  ],
+  "taint_sources": [
+    "flask.request.args.get"
   ]
 }

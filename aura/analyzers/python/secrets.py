@@ -10,6 +10,7 @@ from ...utils import Analyzer
 class LeakingSecret(rules.Rule):
     pass
 
+
 URL_REGEX = re.compile(r'^(https?|ftp)://.{5,}\?.{3,}')
 SECRET_REGEX = re.compile(r'.*(pass(wd|word)?|pwd|token|secrete?).*')
 TOKEN_FILTER_REGEX = re.compile(r'[a-z\d_\.-]{8,}', flags=re.IGNORECASE)
@@ -92,7 +93,7 @@ class SecretsAnalyzer(base.NodeAnalyzerV2):
         elif not context.node.ops[0]['_type'] == 'Eq':
             return
 
-        if context.node.left['_type'] == 'Name':
+        if isinstance(context.node.left, dict) and context.node.left['_type'] == 'Name':
             var = context.node.left['id']
             if not isinstance(context.node.comparators[0], (str, String)):
                 return
