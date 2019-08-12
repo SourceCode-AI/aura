@@ -16,6 +16,11 @@
     "flask.make_response"
   ],
   "taint_sources": [
-    "flask.request.args.get"
+    "flask.request.args.*",
+    "flask.request.form.*",
+    "flask.request.path",
+    "flask.request.headers.*",
+    "flask.request.files.*",
+    "flask.request.cookies.*"
   ]
 }

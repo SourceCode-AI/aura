@@ -28,12 +28,14 @@ def test_flask_app(fixtures, fuzzy_rule_match):
     output = fixtures.scan_test_file('flask_app.py')
     assert len(output['hits']) > 0, output
 
+    lines = [13, 15, 24, 32, 39]
+
     matches = [
         {
             'type': 'TaintAnomaly',
-            'line_no': 8,
+            'line_no': x,
             'message': 'Tainted input is passed to the sink'
-        }
+        } for x in lines
     ]
 
     for x in matches:

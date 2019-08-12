@@ -11,7 +11,6 @@ import pprint
 from pathlib import Path
 
 import magic
-import ssdeep
 from git import Repo, Diff, Blob
 from blinker import signal
 
@@ -64,7 +63,6 @@ class DiffAnalyzer:
             data['a_ref'] = os.fspath(sender.a_path)
             data['a_md5'] = utils.md5(a_fs_path)
             data['a_mime'] = magic.from_file(os.fspath(a_fs_path), mime=True)
-            data['a_ssdeep'] = ssdeep.hash_from_file(os.fspath(a_fs_path))
             data['a_size'] = a_fs_path.stat().st_size
         else:
             data['a_size'] = 0
@@ -79,16 +77,9 @@ class DiffAnalyzer:
             data['b_ref'] = os.fspath(b_fs_path)
             data['b_md5'] = utils.md5(b_fs_path)
             data['b_mime'] = magic.from_file(os.fspath(b_fs_path), mime=True)
-            data['b_ssdeep'] = ssdeep.hash_from_file(os.fspath(b_fs_path))
             data['b_size'] = b_fs_path.stat().st_size
         else:
             data['b_size'] = 0
-
-        if data.get('a_ssdeep') and data.get('b_ssdeep'):
-            data['diff'] = sender.diff.decode()
-            data['similarity'] = ssdeep.compare(data['a_ssdeep'], data['b_ssdeep'])
-        else:
-            data['similarity'] = 0.0
 
         self.diffs.append(data)
 

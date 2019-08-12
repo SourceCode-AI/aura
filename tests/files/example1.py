@@ -3,7 +3,30 @@ This goal of this file/module is to contain all possible AST expressions in Pyth
 """
 from __future__ import print_function
 
-import requests
+import requests, module1, module2
+import base64 as b64
+from dataclasses import dataclass, field
+from . import submodule
+from .. import ssmodule
+
+
+@dataclass
+class Klazz(object):
+    description: str = field(default_factory=lambda : 'N/A')
+
+    def __init__(self):
+        super().__init__()
+
+    @property
+    def prop(self):
+        return 'this_is_a_property'
+
+    @classmethod
+    def clsm(cls):
+        return 'this_is_a_classmethod'
+
+    def normal_method(self):
+        return 'this_is_a_normal_object_method'
 
 
 # block comment

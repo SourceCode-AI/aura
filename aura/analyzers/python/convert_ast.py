@@ -68,38 +68,40 @@ def visit_Attribute(context):
     if isinstance(target, Var) and target.var_type == "name":
         target = target.name()
 
-    context.replace(Attribute(target, context.node['attr'], context.node['ctx']['_type']))
+    new_node = Attribute(
+        target,
+        context.node['attr'],
+        context.node['ctx']['_type']
+    )
+    new_node.line_no = context.node['lineno']
+    new_node.col = context.node['col_offset']
+
+    context.replace(new_node)
 
 
 def visit_ImportFrom(context):
-    # FIXME when array len > 1
+    new_node = Import()
+    new_node.level = context.node.get('level')
+    new_node.line_no = context.node['lineno']
+    new_node.col = context.node['col_offset']
+
     for x in context.node['names']:
-        alias = x['asname'] if x.get('asname') else x['name']
-        full_name = f"{context.node['module']}.{x['name']}"
-        new_node = Import(
-            module=full_name,
-            alias=alias,
-            import_type='from'
-        )
-        new_node._original = context.node
-        new_node.line_no = context.node.get('lineno')
-        context.replace(new_node)
-        return
+        alias = x['asname'] if x['asname'] else x['name']
+        new_node.names[alias] = f"{context.node['module']}.{x['name']}"
+
+    context.replace(new_node)
 
 
 def visit_Import(context):
-    # FIXME when array len > 1
+    new_node = Import()
+    new_node.line_no = context.node['lineno']
+    new_node.col = context.node['col_offset']
+
     for x in context.node['names']:
         alias = x['asname'] if x.get('asname') else x['name']
-        new_node = Import(
-            module=x['name'],
-            alias=alias
-        )
-        new_node._original = context.node
-        new_node.line_no = context.node.get('lineno')
+        new_node.names[alias] = x['name']
 
-        context.replace(new_node)
-        return
+    context.replace(new_node)
 
 
 def visit_Print(context):
@@ -131,6 +133,33 @@ def visit_FunctionDef(context):
     context.replace(new_node)
 
 
+def visit_ClassDef(context):
+    new_node = ClassDef(
+        name = context.node.get('name'),
+        body = context.node.get('body'),
+        bases = context.node.get('bases')
+    )
+    new_node.line_no = context.node.get('lineno')
+    new_node.col = context.node.get('col_offset', 0)
+    context.replace(new_node)
+
+
+def visit_Return(context):
+    new_node = ReturnStmt(value=context.node['value'])
+    new_node.line_no = context.node['lineno']
+    context.replace(new_node)
+
+
+def visit_Subscript(context):
+    new_node = Subscript(
+        value = context.node.get('value'),
+        slice = context.node.get('slice'),
+        ctx = context.node['ctx']['_type']
+    )
+    new_node.line_no = context.node['lineno']
+    context.replace(new_node)
+
+
 VISITORS = {
     'List': visit_List,
     'Tuple': visit_List,
@@ -149,6 +178,9 @@ VISITORS = {
     'Print': visit_Print,
     'Compare': visit_Compare,
     'FunctionDef': visit_FunctionDef,
+    'ClassDef': visit_ClassDef,
+    'Return': visit_Return,
+    'Subscript': visit_Subscript,
 }
 
 

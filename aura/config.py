@@ -20,6 +20,13 @@ SEMANTIC_RULES = None
 LOG_FMT = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 LOG_STREAM = logging.StreamHandler()
 LOG_ERR = None
+# This is used to trigger breakpoint during AST traversing of specific lines
+DEBUG_LINES = []
+
+if "AURA_DEBUG_LINES" in os.environ:
+    DEBUG_LINES = [int(x.strip()) for x in os.environ['AURA_DEBUG_LINES'].split(',')]
+
+
 # Check if the log file can be created otherwise it will crash here
 if os.access("aura_errors.log", os.W_OK):
     LOG_ERR = RotatingFileHandler("aura_errors.log", maxBytes=1024**2, backupCount=5)

@@ -8,7 +8,6 @@ from functools import partial
 from pathlib import Path
 
 import click
-import ssdeep
 import dateutil.parser
 
 from . import diff
@@ -71,7 +70,8 @@ class TypoAnalyzer(object):
     def analyze_info_data(self):
         sum1 = self.pkg1.package['info']['summary'] or ''
         sum2 = self.pkg2.package['info']['summary'] or ''
-        self.flags['similar_description'] = (ssdeep.compare(ssdeep.hash(sum1), ssdeep.hash(sum2)) > 80)
+        #TODO: migrate as ssdeep is no longer a dependency of Aura
+        #self.flags['similar_description'] = (ssdeep.compare(ssdeep.hash(sum1), ssdeep.hash(sum2)) > 80)
 
         page1 = self.pkg1.package['info']['home_page'] or ''
         page2 = self.pkg2.package['info']['home_page'] or ''

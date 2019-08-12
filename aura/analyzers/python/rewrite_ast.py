@@ -91,6 +91,7 @@ class ASTRewrite(Visitor):
                 return
 
             if target:
+                context.node._original = context.node.source
                 if isinstance(target, Var):
                     context.node.source = target.value
                 else:
@@ -119,3 +120,11 @@ class ASTRewrite(Visitor):
         except Exception:
             raise
         return
+
+    def resolve_class(self, context):
+        node = context.node
+        if not isinstance(node, Attribute):
+            return
+        elif not (isinstance(node.func, str) and node.func == 'self'):
+            # TODO
+            return

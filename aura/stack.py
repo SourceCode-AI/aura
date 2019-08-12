@@ -1,9 +1,8 @@
 
 class Frame:
-    __slots__ = ('locals', 'globals', 'previous')
+    __slots__ = ('locals', 'previous')
     def __init__(self):
         self.locals = {}
-        self.globals = None
         self.previous = None  # type: Frame
 
     def _lookup(self, key):
@@ -11,8 +10,6 @@ class Frame:
             return (self, self.locals[key])
         elif self.previous is not None:
             return self.previous._lookup(key)
-        elif self.globals:
-            return (self, self.globals[key])
         else:
             raise KeyError("No such variable in stack frames: '{}'".format(key))
 
@@ -20,9 +17,7 @@ class Frame:
         return self._lookup(key)[1]
 
     def __setitem__(self, key, value):
-        if self.globals and key in self.globals:
-            self.globals[key] = value
-        elif key in self.locals:
+        if key in self.locals:
             self.locals[key] = value
 
         try:
@@ -31,11 +26,15 @@ class Frame:
         except (TypeError, KeyError):
             self.locals[key] = value
 
+    def copy(self):  # type: Frame
+        l = self.locals.copy()
+        frame_copy = Frame()
+        frame_copy.locals = l.copy()
+        return frame_copy
+
     @property
     def variables(self):
         l = list(self.locals.keys())
-        if self.globals:
-            l.extend(self.globals.keys())
 
         if self.previous:
             l.extend(self.previous.variables)
@@ -46,7 +45,6 @@ class Stack:
 
     def __init__(self):
         self.bottom = Frame()
-        self.bottom.globals = {}
         self.frame = self.bottom
 
     def __contains__(self, item):
@@ -74,3 +72,18 @@ class Stack:
 
         self.frame = top.previous
         del top
+
+    def copy(self):
+        frames = []
+        frame = self.frame
+        while frame:
+            new_frame = frame.copy()
+            if frames:
+                new_frame.previous = frames[-1]
+            frames.append(new_frame)
+            frame = frame.previous
+
+        new_stack = self.__class__()
+        new_stack.frame = frames[-1]
+        new_stack.bottom = frames[0]
+        return new_stack

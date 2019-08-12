@@ -20,6 +20,8 @@ class TaintAnalysis(Visitor):
     def _visit_node(self, context:Context):
         if not isinstance(context.node, ASTNode):
             return
+        elif isinstance(context.node, Import):
+            return
 
         funcs = (
             self.__mark_flask_route,
@@ -63,7 +65,7 @@ class TaintAnalysis(Visitor):
             return
 
         for source in config.SEMANTIC_RULES.get('taint_sources', []):
-            if source == f_name or fnmatch.fnmatch(f_name, source):
+            if source.rstrip('.*') == f_name or fnmatch.fnmatch(f_name, source):
                 context.node.tags.add('taint_source')
                 context.node._taint_class = Taints.TAINTED
                 context.visitor.modified = True
@@ -84,15 +86,20 @@ class TaintAnalysis(Visitor):
         elif isinstance(context.node, Call):
             args_taints = []
             for x in context.node.args:
-                args_taints.append(x._taint_class)
+                if isinstance(x, ASTNode):
+                    args_taints.append(x._taint_class)
             for x in context.node.kwargs.values():
-                args_taints.append(x._taint_class)
+                if isinstance(x, ASTNode):
+                    args_taints.append(x._taint_class)
+
+            if isinstance(context.node.func, ASTNode):
+                args_taints.append(context.node.func._taint_class)
 
             if not args_taints:
                 return
 
             call_taint = max(args_taints)
-            if call_taint != context.node._taint_class:
+            if call_taint > context.node._taint_class:
                 context.node._taint_class = call_taint
                 context.visitor.modified = True
                 return
@@ -104,5 +111,33 @@ class TaintAnalysis(Visitor):
 
             if var_taint != context.node._taint_class:
                 context.node._taint_class = var_taint
+                context.visitor.modified = True
+                return
+
+        elif isinstance(context.node, Subscript):
+            if not isinstance(context.node.value, ASTNode):
+                return
+
+            if context.node.value._taint_class > context.node._taint_class:
+                context.node._taint_class = context.node.value._taint_class
+                context.visitor.modified = True
+                return
+        elif isinstance(context.node, ReturnStmt) and isinstance(context.node.value, ASTNode):
+            if context.node.value._taint_class > context.node._taint_class:
+                context.node._taint_class = context.node.value._taint_class
+                context.visitor.modified = True
+                return
+        elif isinstance(context.node, BinOp):
+            taints = []
+            if isinstance(context.node.left, ASTNode):
+                taints.append(context.node.left._taint_class)
+            if isinstance(context.node.right, ASTNode):
+                taints.append(context.node.right._taint_class)
+            if not taints:
+                return
+
+            op_taint = max(taints)
+            if op_taint > context.node._taint_class:
+                context.node._taint_class = op_taint
                 context.visitor.modified = True
                 return

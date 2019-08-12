@@ -1,5 +1,6 @@
 import os
 import json
+import tempfile
 import contextlib
 from pathlib import Path
 
@@ -53,6 +54,30 @@ class Fixtures(object):
 
         assert result.exit_code == 0
         return result
+
+    def get_raw_ast(self, src):
+        from aura.analyzers.python import visitor as rvisitor
+        out = rvisitor.get_ast_tree('-', bytes(src, 'utf-8'))
+        return out['ast_tree']['body']
+
+    def get_full_ast(self, src):
+        """
+        Get a full AST tree after all stages has been applied, e.g. rewrite & taint analysis
+        """
+        from aura.analyzers.python.taint.visitor import TaintAnalysis
+
+        with tempfile.NamedTemporaryFile() as fd:
+            fd.write(bytes(src, 'utf-8'))
+            meta = {
+                'path': fd.name,
+                'source': 'cli'
+            }
+            analyzer = TaintAnalysis.from_cache(source=fd.name, metadata=meta)
+            if not analyzer.traversed:
+                analyzer.traverse()
+ß
+            return analyzer.tree['ast_tree']
+
 
 
 def match_rule(source, target):

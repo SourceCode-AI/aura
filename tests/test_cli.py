@@ -38,7 +38,7 @@ def test_complex_cli_analysis(fixtures, fuzzy_rule_match):
     ]
 
     for x in hits:
-        assert any(fuzzy_rule_match(h, x) for h in output['hits'])
+        assert any(fuzzy_rule_match(h, x) for h in output['hits']), x
 
 
 def test_custom_analyzer(fixtures):

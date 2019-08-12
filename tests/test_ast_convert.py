@@ -17,7 +17,7 @@ def get_raw_ast(source_code):
     return out['ast_tree']['body']
 
 
-def test_list_types():
+def test_list_types(fixtures):
     test_table = {
         'List': '[5, 7, 11]',
         'Set': '{5, 7, 11}',
@@ -25,7 +25,7 @@ def test_list_types():
     }
 
     for t, d in test_table.items():
-        raw = get_raw_ast(d)[0]
+        raw = fixtures.get_raw_ast(d)[0]
         #print(raw)
         assert isinstance(raw, dict)
         assert raw['_type'] == 'Expr'
@@ -40,8 +40,8 @@ def test_list_types():
         assert out == list_ast['elts']
 
 
-def test_string():
-    raw = get_raw_ast('"Hello world"')[0]['value']
+def test_string(fixtures):
+    raw = fixtures.get_raw_ast('"Hello world"')[0]['value']
     assert isinstance(raw, dict)
     assert raw['_type'] == 'Str'
     ctx = create_context(raw)
@@ -53,8 +53,8 @@ def test_string():
     assert out[0].value == 'Hello world'
 
 
-def test_dict():
-    raw = get_raw_ast('{"key": "value"}')[0]['value']
+def test_dict(fixtures):
+    raw = fixtures.get_raw_ast('{"key": "value"}')[0]['value']
     assert isinstance(raw, dict)
     assert raw['_type'] == 'Dict'
     out = []

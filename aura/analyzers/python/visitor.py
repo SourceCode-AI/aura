@@ -99,14 +99,14 @@ class Visitor:
 
         self.tree = get_ast_tree(source)
 
-    def _replace_generic(self, new_node, parent, key, context):
+    def _replace_generic(self, new_node, key, context):
         """
         This is a very simple helper that only sets dict/list value
         It's used in a combination of functools.partial to free some of it's arguments
         """
         self.modified = True
         context.modified = True
-        parent[key] = new_node
+        context.node[key] = new_node
 
     def _replace_root(self, new_node, context):
         """
@@ -155,7 +155,7 @@ class Visitor:
             processed_nodes = set()
 
             while (self.queue):
-                ctx = self.queue.popleft()
+                ctx = self.queue.popleft()  # type: Context
 
                 # Keep track of processed object ID's
                 # This is to prevent infinite loops where processed object will add themselves back to queue
@@ -189,6 +189,11 @@ class Visitor:
 
     @ignore_error
     def __process_context(self, context: Context):
+        if isinstance(context.node, dict) and context.node.get('lineno')  in config.DEBUG_LINES:
+            breakpoint()
+        elif isinstance(context.node, ASTNode) and context.node.line_no in config.DEBUG_LINES:
+            breakpoint()
+
         self._visit_node(context)
 
         if context.modified:
@@ -199,13 +204,13 @@ class Visitor:
             for key in keys:
                 context.visit_child(
                     node = context.node[key],
-                    replace = partial(self._replace_generic, parent=context.node, key=key, context=context)
+                    replace = partial(self._replace_generic, key=key, context=context)
                 )
         elif type(context.node) == list:
             for idx, node_item in enumerate(context.node):
                 context.visit_child(
                     node = node_item,
-                    replace = partial(self._replace_generic, parent=context.node, key=idx, context=context)
+                    replace = partial(self._replace_generic, key=idx, context=context)
                 )
         elif isinstance(context.node, ASTNode):
             context.node._visit_node(context)

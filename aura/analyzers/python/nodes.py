@@ -53,6 +53,7 @@ class ASTNode(object):
         self._original = None
         self._docs = None
         self.line_no = None
+        self.col = None
         self.tags = set()
         self._hash = None
         self._taint_class = Taints.UNKNOWN
@@ -60,16 +61,6 @@ class ASTNode(object):
     @property
     def full_name(self):
         return self._full_name
-
-    @property
-    def is_static(self):  # TODO: replace with taint analysis
-        """
-        Return true if the AST node is a purely static structure
-        Examples: numbers, strings, None
-        E.g. it is not/does not contain a variable or some function calls that depends on variable input
-        :return:
-        """
-        return False
 
     @property
     def json(self):
@@ -90,6 +81,10 @@ class ASTNode(object):
 
     def _visit_node(self, context):
         pass
+
+    def pprint(self):
+        from pprint import pprint as pp
+        pp(to_json(self))
 
 
 NodeType = typing.NewType(
@@ -133,20 +128,6 @@ class Dictionary(ASTNode):  # TODO: implement methods from ASTNode
         d = super().json
         d['items'] = list(zip(self.keys, self.values))
         return d
-
-    @property
-    def is_static(self):
-        for x in self.keys:
-            if isinstance(x, BASIC_ELEMENTS):
-                continue
-            elif not x.is_static:
-                return False
-        for x in self.values:
-            if isinstance(x, BASIC_ELEMENTS):
-                continue
-            elif not x.is_static:
-                return False
-        return True
 
     def to_dict(self):
         return dict(zip(self.keys, self.values))
@@ -239,6 +220,7 @@ class Var(ASTNode):
             node = self.value,
             replace = partial(self.__replace_value, visitor=context.visitor)
         )
+
         if self.var_type == 'assign' and isinstance(self.var_name, str):
             context.stack[self.var_name] = self
 
@@ -263,16 +245,18 @@ class Attribute(ASTNode):
     @property
     def full_name(self):
         if isinstance(self.source, Import):
-            return f"{self.source.module}.{self.attr}"
+            return f"{self.source.names[self._original]}.{self.attr}"
         elif isinstance(self.source, (Attribute, Call)):
             return f"{self.source.full_name}.{self.attr}"
-        return None
+        elif isinstance(self.source, str):
+            return f"{self.source}.{self.attr}"
+        return f"{repr(self.source)}.{self.attr}"
 
     @property
     def json(self):
         d = super().json
         d['source'] = self.source
-        d['attr'] = self.attr,
+        d['attr'] = self.attr
         d['action'] = self.action
         return d
 
@@ -280,12 +264,15 @@ class Attribute(ASTNode):
         if isinstance(self.source, str):
             try:
                 target = context.stack[self.source]
+                self._original = self.source
                 if isinstance(target, Var) and target.var_type == 'assign':
                     self.source = target.value
                 else:
                     self.source = target
                 context.visitor.modified = True
             except (KeyError, TypeError):
+                #context.node.pprint()
+                #print(context.stack.frame.variables)
                 pass
 
         context.visit_child(
@@ -295,6 +282,7 @@ class Attribute(ASTNode):
 
     def __replace_source(self, value, visitor):
         visitor.modified = True
+        self._original = self.source
         self.source = value
 
 
@@ -303,6 +291,14 @@ class Compare(ASTNode):
     left: str
     ops: typing.List[ASTNode]
     comparators: typing.List[ASTNode]
+
+    @property
+    def json(self):
+        d = super().json
+        d['left'] = self.left
+        d['ops'] = self.ops
+        d['comparators'] = self.comparators
+        return d
 
 
 @dataclass
@@ -326,8 +322,13 @@ class FunctionDef(ASTNode):
     def default_args(self):
         return dict()
 
+    @property
+    def full_name(self):
+        return self.name
+
     def _visit_node(self, context):
         context.stack.push()
+        #context.stack = context.stack.copy()
 
         for idx, arg in enumerate(self.args):
             context.visit_child(
@@ -361,6 +362,35 @@ class FunctionDef(ASTNode):
         visitor.modified = True
         self.decorator_list[idx] = value
 
+
+@dataclass
+class ClassDef(ASTNode):
+    name: str
+    body: list
+    bases:list = field(default_factory=list)
+
+    def _visit_node(self, context):
+        for idx, b in enumerate(self.body):
+            context.visit_child(
+                node = b,
+                replace = partial(self.__replace_body, idx=idx, visitor=context.visitor)
+            )
+
+    def __replace_body(self, value, idx, visitor):
+        visitor.modified = True
+        self.body[idx] = value
+
+    @property
+    def json(self):
+        d = super().json
+        d['name'] = self.name
+        d['body'] = self.body
+        d['bases'] = self.bases
+        return d
+
+    @property
+    def full_name(self):
+        return self.name
 
 @dataclass
 class Call(ASTNode):
@@ -411,7 +441,11 @@ class Call(ASTNode):
             else:
                 source = self.func
 
-            name = context.stack[source].full_name
+            name = context.stack[source]
+            if isinstance(name, Import):
+                name = name.names[source]
+            else:
+                name = name.full_name
             if isinstance(name, str) and self._full_name != name:
                 self._full_name = name
                 context.visitor.modified = True
@@ -436,9 +470,10 @@ class Call(ASTNode):
         if self._full_name is not None:
             return self._full_name
 
-
-        f_name = self.func.full_name
-        if f_name is not None:
+        f_name = getattr(self.func, 'full_name', None)
+        if isinstance(self._original, str) and isinstance(self.func, Import):
+            return self.func.names[self._original]
+        elif f_name is not None:
             return f_name
         else:
             return self.func
@@ -453,6 +488,7 @@ class Call(ASTNode):
 
     def __replace_func(self, value, visitor):
         visitor.modified = True
+        self._original = self.func
         self.func = value
 
     def get_signature(
@@ -561,21 +597,27 @@ class Arguments(ASTNode):  # TODO: not used yet
 
 @dataclass
 class Import(ASTNode):
-    module: str
-    alias: str
-    import_type: str = 'import' # Or could be 'from'
-
-    allow_lookup: InitVar[bool] = True
+    names: dict = field(default_factory=dict)
+    level = None
 
     def _visit_node(self, context):
-        context.stack[self.alias] = self
+        for name, target in self.names.items():
+            context.stack[name] = self
 
-    def name(self):
-        return self.alias
+    def get_modules(self) -> typing.List[str]:
+        m = list(self.names.values())
+        return m
 
     @property
     def full_name(self):
-        return self.module
+        return None
+    @property
+    def json(self):
+        d = super().json
+        d['names'] = self.names
+        if self.level is not None:
+            d['level'] = self.level
+        return d
 
 
 @dataclass
@@ -584,21 +626,103 @@ class BinOp(ASTNode):
     left: NodeType
     right: NodeType
 
-    @property
-    def is_static(self):
-        return self.left.is_static and self.right.is_static
+    def _visit_node(self, context):
+        context.visit_child(
+            node = self.left,
+            replace = partial(self.__replace_left, visitor=context.visitor)
+        )
+        context.visit_child(
+            node = self.right,
+            replace = partial(self.__replace_right, visitor=context.visitor)
+        )
 
+    def __replace_left(self, value, visitor):
+        self.left = value
+        visitor.modified = True
+
+    def __replace_right(self, value, visitor):
+        self.right = value
+        visitor.modified = True
+
+    @property
+    def json(self):
+        d = super().json
+        d['op'] = self.op
+        d['left'] = self.left
+        d['right'] = self.right
+        return d
 
 @dataclass
 class Print(ASTNode):
     values: typing.List[NodeType]
     dest: typing.Any
 
+    @property
+    def json(self):
+        d = super().json
+        d['values'] = self.values
+        d['dest'] = self.dest
+        return d
+
+
+@dataclass
+class ReturnStmt(ASTNode):
+    value: NodeType
+
+    def _visit_node(self, context):
+        try:
+            if isinstance(self.value, str):
+                target = context.stack[self.value]
+                self.value = target
+                context.visitor.modified = True
+        except (TypeError, KeyError):
+            pass
+
+        context.visit_child(
+            node = self.value,
+            replace = partial(self.__replace_value, visitor=context.visitor)
+        )
+
+    @property
+    def json(self):
+        d = super().json
+        d['value'] = self.value
+        return d
+
+    def __replace_value(self, value, visitor):
+        self.value = value
+        visitor.modified = True
+
+
+@dataclass
+class Subscript(ASTNode):
+    value: ASTNode
+    slice: ASTNode
+    ctx: str
+
+    def _visit_node(self, context):
+        context.visit_child(
+            node = self.value,
+            replace = partial(self.__replace_value, visitor=context.visitor)
+        )
+
+    @property
+    def json(self):
+        d = super().json
+        d['value'] = self.value
+        d['slice'] = self.slice
+        d['ctx'] = self.ctx
+        return d
+
+    def __replace_value(self, value, visitor):
+        self.value = value
+        visitor.modified = True
+
 
 @dataclass
 class Context:
     node: NodeType
-    parent: NodeType
+    parent: Context
     # can_replace: bool = True
     replace: typing.Callable[[NodeType], None] = lambda x: None
     visitor: typing.Any = None  # FIXME typing
@@ -613,9 +737,22 @@ class Context:
             depth = self.depth + 1,
             visitor = self.visitor,
             replace = replace,
-            stack = self.stack
+            stack = self.stack,
         )
 
     def visit_child(self, *args, **kwargs):
         new_context = self.as_child(*args, **kwargs)
         new_context.visitor.queue.append(new_context)
+
+
+def to_json(element):
+    if not isinstance(element, ASTNode):
+        return element
+
+    output = element.json
+    if isinstance(output, dict):
+        return {k: to_json(v) for k, v in output.items()}
+    elif isinstance(output, (list, tuple)):
+        return [to_json(x) for x in output]
+    else:
+        return output

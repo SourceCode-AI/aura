@@ -28,3 +28,26 @@ def test_stack_operations():
     assert s.bottom is s.frame
     with pytest.raises(KeyError):
         _ = s['x']
+
+
+def test_stack_copy():
+    s1 = Stack()
+    s1['var'] = 'value1'
+    assert s1['var'] == 'value1'
+
+    s1.push()
+    s1['another'] = 'value2'
+    assert s1['var'] == 'value1'
+    assert s1['another'] == 'value2'
+
+    s2 = s1.copy()
+    assert s1 is not s2
+    assert s2.frame is not s1.frame
+    assert s2.bottom is not s1.bottom
+    assert s2.frame is not s2.bottom
+    assert s2['var'] == 'value1'
+    assert s2['another'] == 'value2'
+
+    s2['var'] = 'new_value'
+    assert s2['var'] == 'new_value'
+    assert s1['var'] == 'value1'
