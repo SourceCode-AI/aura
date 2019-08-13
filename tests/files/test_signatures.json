@@ -13,9 +13,17 @@
 
   ],
   "taint_sinks": [
-    "flask.make_response"
+    "flask.make_response",
+    "flask.jsonify",
+    "json.dumps",
+    "os.system",
+    "subprocess.Popen",
+    "eval",
+    "exec",
+    "open"
   ],
   "taint_sources": [
+    "flask.request.url",
     "flask.request.args.*",
     "flask.request.form.*",
     "flask.request.path",

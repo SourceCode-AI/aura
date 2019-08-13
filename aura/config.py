@@ -122,5 +122,9 @@ def load_config():
         fsize = int(CFG['aura']['rlimit-fsize'])
         resource.setrlimit(resource.RLIMIT_FSIZE, (fsize, fsize))
 
+    if CFG['aura'].get('python-recursion-limit'):
+        rec_limit = int(CFG['aura']['python-recursion-limit'])
+        sys.setrecursionlimit(rec_limit)
+
 
 load_config()

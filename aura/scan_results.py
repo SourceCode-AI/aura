@@ -9,9 +9,9 @@ from .analyzers import rules
 
 
 class ScanResults():
-    def __init__(self, name, verbosity=1, metadata=None):
+    def __init__(self, name, metadata=None):
         self.name = name
-        self.verbosity = verbosity
+        self.verbosity = metadata.get('verbosity', 1)
         self.metadata = metadata
         self.hits = set()
 
@@ -65,8 +65,11 @@ class ScanResults():
         if self._tags:
             click.echo(f"Tags: {', '.join(self._tags)}")
 
-        click.echo("Imported modules:")
-        click.echo(utils.pprint_imports(utils.imports_to_tree(self.__imported_modules)))
+        if self.__imported_modules:
+            click.echo("Imported modules:")
+            click.echo(utils.pprint_imports(utils.imports_to_tree(self.__imported_modules)))
+        else:
+            click.secho("No imported modules detected", fg='red')
 
         if self.hits and verbose:
             click.echo("- Rules hits:")

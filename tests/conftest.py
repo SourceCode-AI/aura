@@ -75,7 +75,6 @@ class Fixtures(object):
             analyzer = TaintAnalysis.from_cache(source=fd.name, metadata=meta)
             if not analyzer.traversed:
                 analyzer.traverse()
-ß
             return analyzer.tree['ast_tree']
 
 

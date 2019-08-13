@@ -28,7 +28,7 @@ def test_flask_app(fixtures, fuzzy_rule_match):
     output = fixtures.scan_test_file('flask_app.py')
     assert len(output['hits']) > 0, output
 
-    lines = [13, 15, 24, 32, 39]
+    lines = [13, 30, 32, 41, 49, 56]
 
     matches = [
         {

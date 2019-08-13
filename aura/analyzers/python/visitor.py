@@ -194,6 +194,10 @@ class Visitor:
         elif isinstance(context.node, ASTNode) and context.node.line_no in config.DEBUG_LINES:
             breakpoint()
 
+        # if isinstance(context.node, ASTNode):
+        #     print(context.stack.frame.variables)
+        #     context.node.pprint()
+
         self._visit_node(context)
 
         if context.modified:

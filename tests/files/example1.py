@@ -57,6 +57,9 @@ await big_brother(*x_list, **x_dict)
 list_comprehension = [x for x in range(10)]
 generator_comprehension = (x for x in range(10))
 
+for x in []:
+    self_assign = x['val1'] if x['something'] else x['alternative']
+
 
 def generate_powers(top=20, power=2):
     for x in range(1, top):

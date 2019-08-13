@@ -77,7 +77,7 @@ class ASTRewrite(Visitor):
         new_node = String(value=sliced_str)
         context.replace(new_node)
 
-    def resolve_variable(self, context):
+    def resolve_variable(self, context:Context):
         """
         Transformation for constant propagation
         """
@@ -88,6 +88,9 @@ class ASTRewrite(Visitor):
             try:
                 target = context.stack[source]
             except (TypeError, KeyError):
+                return
+
+            if target.line_no == context.node.line_no:
                 return
 
             if target:

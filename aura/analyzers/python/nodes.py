@@ -179,8 +179,6 @@ class Var(ASTNode):
     value: NodeType = None
     var_type: str = "assign"
 
-    allow_lookup: InitVar[bool] = True
-
     def __repr__(self):
         if self.value:
             return f"Var({repr(self.var_name)} = {repr(self.value)})"
@@ -218,7 +216,8 @@ class Var(ASTNode):
 
         context.visit_child(
             node = self.value,
-            replace = partial(self.__replace_value, visitor=context.visitor)
+            replace = partial(self.__replace_value, visitor=context.visitor),
+            stack = context.stack.copy()
         )
 
         if self.var_type == 'assign' and isinstance(self.var_name, str):
@@ -247,7 +246,7 @@ class Attribute(ASTNode):
         if isinstance(self.source, Import):
             return f"{self.source.names[self._original]}.{self.attr}"
         elif isinstance(self.source, (Attribute, Call)):
-            return f"{self.source.full_name}.{self.attr}"
+                return f"{self.source.full_name}.{self.attr}"
         elif isinstance(self.source, str):
             return f"{self.source}.{self.attr}"
         return f"{repr(self.source)}.{self.attr}"
@@ -265,7 +264,7 @@ class Attribute(ASTNode):
             try:
                 target = context.stack[self.source]
                 self._original = self.source
-                if isinstance(target, Var) and target.var_type == 'assign':
+                if isinstance(target, Var) and target.var_type == 'assign' and target.line_no != self.line_no:
                     self.source = target.value
                 else:
                     self.source = target
@@ -327,6 +326,7 @@ class FunctionDef(ASTNode):
         return self.name
 
     def _visit_node(self, context):
+        context.stack[self.name] = self
         context.stack.push()
         #context.stack = context.stack.copy()
 
@@ -370,11 +370,15 @@ class ClassDef(ASTNode):
     bases:list = field(default_factory=list)
 
     def _visit_node(self, context):
+        context.stack.push()
+
         for idx, b in enumerate(self.body):
             context.visit_child(
                 node = b,
                 replace = partial(self.__replace_body, idx=idx, visitor=context.visitor)
             )
+
+        context.stack.pop()
 
     def __replace_body(self, value, idx, visitor):
         visitor.modified = True
@@ -408,7 +412,7 @@ class Call(ASTNode):
         else:
             f_args = f"*{repr(self.args)}, **{repr(self.kwargs)}"
 
-        return f"Call({repr(self.full_name)})({f_args})"
+        return f"Call({repr(self.func)})({f_args})"
 
     def _visit_node(self, context: Context):
         for idx in range(len(self.args)):
@@ -416,8 +420,9 @@ class Call(ASTNode):
                 arg = self.args[idx]
                 if isinstance(arg, str):
                     arg = context.stack[arg]
-                    self.args[idx] = arg
-                    context.visitor.modified = True
+                    if arg.line_no != self.line_no:
+                        self.args[idx] = arg
+                        context.visitor.modified = True
             except (TypeError, KeyError):
                 pass
 
@@ -441,12 +446,12 @@ class Call(ASTNode):
             else:
                 source = self.func
 
-            name = context.stack[source]
-            if isinstance(name, Import):
-                name = name.names[source]
+            target = context.stack[source]
+            if isinstance(target, Import):
+                name = target.names[source]
             else:
-                name = name.full_name
-            if isinstance(name, str) and self._full_name != name:
+                name = target.full_name
+            if isinstance(name, str) and self._full_name != name and target.line_no != self.line_no:
                 self._full_name = name
                 context.visitor.modified = True
         except (TypeError, KeyError, AttributeError):
@@ -729,6 +734,10 @@ class Context:
     stack: Stack = field(default_factory=Stack)
     depth: int = 0
     modified: bool = False
+    call_graph: dict = field(
+        default_factory = lambda : {'functions': dict(), 'classes': dict()}
+    )
+
 
     def as_child(self, node:NodeType, replace=lambda x: None) -> Context:
         return self.__class__(
@@ -740,8 +749,10 @@ class Context:
             stack = self.stack,
         )
 
-    def visit_child(self, *args, **kwargs):
+    def visit_child(self, stack=None, *args, **kwargs):
         new_context = self.as_child(*args, **kwargs)
+        if stack is not None:
+            new_context.stack = stack
         new_context.visitor.queue.append(new_context)
 
 

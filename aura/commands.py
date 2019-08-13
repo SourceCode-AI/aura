@@ -65,7 +65,7 @@ def scan_worker(item, metadata):
 
     scan = ScanResults(
         item.location.name,
-        metadata=item_metadata
+        metadata=item_metadata,
     )
 
     sandbox = Analyzer(location=item.location)
