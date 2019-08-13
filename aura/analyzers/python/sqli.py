@@ -1,0 +1,79 @@
+import re
+
+from .. import base
+from .. import rules
+from .nodes import *
+from ...utils import Analyzer
+
+
+SQL_REGEX = re.compile(
+    r'^(SELECT\s.*FROM|'
+    r'DELETE\s.*FROM|'
+    r'INSERT\s+INTO\s.*VALUES\s|'
+    r'UPDATE\s.*SET\s).*'
+    , flags=re.I
+)
+
+
+def is_sql(data):
+    return bool(SQL_REGEX.match(data))
+
+
+class SQLInjection(rules.Rule):
+    pass
+
+
+
+@Analyzer.ID('sql_injection')
+@Analyzer.description("Finds possible SQL injections via direct string manipulations")
+class SQLi(base.NodeAnalyzerV2):
+    def node_BinOp(self, context):
+        """
+        Query:
+        "SELECT * FROM users WHERE id = %d" % uid
+        AST:
+        BinOp(op='mod', left='uid', right=String(value='SELECT * FROM users WHERE id = %d'))
+
+        and
+
+        "SELECT * FROM users where id = " + uid
+        AST:
+        BinOp(op='add', left='uid', right=String(value='SELECT * FROM users where id = '))
+        """
+        n = context.node
+        yield from []
+        if not (isinstance(n.right, String) and n.op in ('mod', 'add')):
+            return
+
+        if not is_sql(n.right.value):
+            return
+
+        yield SQLInjection(
+            score = 50,
+            message = "Possible SQL injection found",
+            signature = f"vuln#{context.visitor.path}#{context.node.line_no}",
+            line_no = context.node.line_no
+        )
+
+    def node_Call(self, context):
+        """
+        Query:
+        "SELECT * FROM users WHERE id = {}".format(uid)
+        AST:
+        Call(Attribute(String(value='SELECT * FROM users WHERE id = {}') . 'format'))(*['uid'])
+        """
+        n = context.node
+        if not (isinstance(n.func, Attribute) and isinstance(n.func.source, String) and n.func.attr == 'format'):
+            return
+        if not is_sql(n.func.source.value):
+            return
+
+        yield SQLInjection(
+            score = 50,
+            message = "Possible SQL injection found",
+            signature=f"vuln#{context.visitor.path}#{context.node.line_no}",
+            line_no=context.node.line_no
+        )
+
+
+

@@ -269,10 +269,14 @@ def r2c_scan(source, out_file, mode='generic'):
 
             for loc in data:
                 for hit in loc['hits']:
-                    out['results'].append({
+                    rhit = {
                         'check_id': hit.pop('type'),
                         'extra': hit
-                    })
+                    }
+                    if 'line_no' in hit:
+                        rhit['start'] = {'line': hit['line_no']}
+
+                    out['results'].append(rhit)
 
         except Exception as exc:
             out['errors'].append({
