@@ -19,7 +19,7 @@ fi
 
 if [ $1 == "run_tests" ]; then
     cd /analyzer
-    exec pytest --cov aura tests/
+    exec pytest --cov aura tests/ -k "not extended"
 fi;
 
 export AURA_CFG

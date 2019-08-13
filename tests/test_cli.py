@@ -1,6 +1,7 @@
 import os
 import json
 
+import pytest
 from click.testing import CliRunner
 
 from aura import cli
@@ -15,6 +16,7 @@ def test_simple_cli_analysis(fixtures):
     assert 'url' in output['tags']
 
 
+@pytest.mark.extended
 def test_complex_cli_analysis(fixtures, fuzzy_rule_match):
     output = fixtures.scan_test_file('obfuscated.py')
 
@@ -41,6 +43,7 @@ def test_complex_cli_analysis(fixtures, fuzzy_rule_match):
         assert any(fuzzy_rule_match(h, x) for h in output['hits']), x
 
 
+@pytest.mark.extended
 def test_custom_analyzer(fixtures):
     runner = CliRunner()
     pth = fixtures.path('obfuscated.py')
