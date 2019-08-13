@@ -281,7 +281,7 @@ def r2c_scan(source, out_file, mode='generic'):
         except Exception as exc:
             out['errors'].append({
                 "message": f"An exception occurred: {str(exc)}",
-                "path": str(src)
+                'data': {"path": str(src)}
             })
 
     pprint.pprint(out)
