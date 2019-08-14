@@ -632,6 +632,21 @@ class BinOp(ASTNode):
     right: NodeType
 
     def _visit_node(self, context):
+        try:
+            if isinstance(self.left, str) and self.left in context.stack:
+                self.left = context.stack[self.left]
+                context.visitor.modified = True
+        except (TypeError, KeyError):
+            pass
+
+        try:
+            if isinstance(self.right, str) and self.right in context.stack:
+                self.right = context.stack[self.right]
+                context.visitor.modified = True
+        except (TypeError, KeyError):
+            pass
+
+
         context.visit_child(
             node = self.left,
             replace = partial(self.__replace_left, visitor=context.visitor)

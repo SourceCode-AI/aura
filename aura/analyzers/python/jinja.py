@@ -28,6 +28,7 @@ class JinjaAnalyzer(base.NodeAnalyzerV2):
             hit = JinjaVulnerability(
                 message = "Detected jinja environment with autoescaping explicitly disabled",
                 score = 100,
+                line_no= context.node.line_no,
                 signature = f"jinja#xss#{context.visitor.path}#{context.node.line_no}"
             )
             yield hit

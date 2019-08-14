@@ -53,10 +53,21 @@ class TaintAnalysis(Visitor):
         f_name = context.node.full_name
         if f_name is None:
             return
+        elif 'taint_sink' in context.node.tags:
+            return
+        elif not isinstance(f_name, str):
+            return
 
-        if f_name in config.SEMANTIC_RULES.get('taint_sinks', []) and 'taint_sink' not in context.node.tags:
-            context.node.tags.add('taint_sink')
-            context.visitor.modified = True
+        for sink in config.SEMANTIC_RULES.get('taint_sinks', []):
+            if sink == f_name or fnmatch.fnmatch(f_name, sink):
+                context.node.tags.add('taint_sink')
+                context.visitor.modified = True
+                return
+
+        # if f_name in config.SEMANTIC_RULES.get('taint_sinks', []) and 'taint_sink' not in context.node.tags:
+        #     context.node.tags.add('taint_sink')
+        #     context.visitor.modified = True
+        #     return
 
     def __mark_sources(self, context):
         f_name = context.node.full_name
