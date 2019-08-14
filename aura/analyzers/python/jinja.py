@@ -18,13 +18,14 @@ class JinjaAnalyzer(base.NodeAnalyzerV2):
 
         try:
             signature = context.node.apply_signature(
+                aura_capture_args='args',
                 aura_capture_kwargs='kwargs',
                 autoescape=True
             )
         except TypeError:
             return
 
-        if signature.args[0] is False or signature.args[0] == 'False':
+        if signature.arguments['autoescape'] is False:
             hit = JinjaVulnerability(
                 message = "Detected jinja environment with autoescaping explicitly disabled",
                 score = 100,

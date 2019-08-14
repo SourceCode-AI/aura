@@ -64,11 +64,6 @@ class TaintAnalysis(Visitor):
                 context.visitor.modified = True
                 return
 
-        # if f_name in config.SEMANTIC_RULES.get('taint_sinks', []) and 'taint_sink' not in context.node.tags:
-        #     context.node.tags.add('taint_sink')
-        #     context.visitor.modified = True
-        #     return
-
     def __mark_sources(self, context):
         f_name = context.node.full_name
 
@@ -95,6 +90,8 @@ class TaintAnalysis(Visitor):
                 context.visitor.modified = True
                 return
         elif isinstance(context.node, Call):
+            f_name = context.node.full_name
+
             args_taints = []
             for x in context.node.args:
                 if isinstance(x, ASTNode):
@@ -114,6 +111,13 @@ class TaintAnalysis(Visitor):
                 context.node._taint_class = call_taint
                 context.visitor.modified = True
                 return
+
+            if isinstance(f_name, str) and f_name in context.call_graph.definitions:
+                func_def = context.call_graph.definitions[f_name]
+                for x in context.node.args:
+                    func_def.set_taint(x.full_name, x._taint_class, context)
+                    pass
+
         elif isinstance(context.node, Var):
             var_taint = max(
                 context.node._taint_class,
@@ -140,10 +144,23 @@ class TaintAnalysis(Visitor):
                 return
         elif isinstance(context.node, BinOp):
             taints = []
-            if isinstance(context.node.left, ASTNode):
+
+            if isinstance(context.node.left, Arguments):
+                t_arg = context.node.left.taints.get(context.node._orig_left, Taints.SAFE)
+                if t_arg > context.node._taint_class:
+                    context.node._taint_class = t_arg
+                    context.visitor.modified = True
+            elif isinstance(context.node.left, ASTNode):
                 taints.append(context.node.left._taint_class)
-            if isinstance(context.node.right, ASTNode):
+
+            if isinstance(context.node.right, Arguments):
+                t_arg = context.node.right.taints.get(context.node._orig_right, Taints.SAFE)
+                if t_arg > context.node._taint_class:
+                    context.node._taint_class = t_arg
+                    context.visitor.modified = True
+            elif isinstance(context.node.right, ASTNode):
                 taints.append(context.node.right._taint_class)
+
             if not taints:
                 return
 
@@ -152,3 +169,11 @@ class TaintAnalysis(Visitor):
                 context.node._taint_class = op_taint
                 context.visitor.modified = True
                 return
+
+        elif isinstance(context.node, FunctionDef):
+            f_name = context.node.full_name
+
+            if f_name in context.call_graph:
+                callers = context.call_graph[f_name]
+                for c in callers:
+                    pass # TODO

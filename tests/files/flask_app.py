@@ -78,4 +78,4 @@ def vuln6():
     return "Hello world"
 
 
-app.run()
+app.run(debug=True)

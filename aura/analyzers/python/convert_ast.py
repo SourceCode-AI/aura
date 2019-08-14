@@ -133,6 +133,28 @@ def visit_FunctionDef(context):
     context.replace(new_node)
 
 
+def visit_arguments(context):
+    if context.node.get('args'):
+        args = []
+        for x in context.node['args']:
+            if isinstance(x, str):
+                args.append(x)
+            else:
+                args.append(x['arg'])
+    else:
+        args = None
+
+    new_node = Arguments(
+        args = args,
+        vararg = context.node.get('varargs'),
+        kwonlyargs = context.node.get('kwonlyarg'),
+        kwarg = context.node.get('kwarg'),
+        defaults = context.node.get('defaults'),
+        kw_defaults = context.node.get('kw_defaults'),
+    )
+    context.replace(new_node)
+
+
 def visit_ClassDef(context):
     new_node = ClassDef(
         name = context.node.get('name'),
@@ -181,6 +203,7 @@ VISITORS = {
     'ClassDef': visit_ClassDef,
     'Return': visit_Return,
     'Subscript': visit_Subscript,
+    'arguments': visit_arguments,
 }
 
 

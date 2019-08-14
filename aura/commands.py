@@ -19,6 +19,7 @@ from . import utils
 from . import mirror
 from . import plugins
 from . import typos
+from .package import PypiPackage
 
 logger = config.get_logger(__name__)
 
@@ -213,17 +214,49 @@ def generate_typosquatting(out, distance=2, limit=None):
 
 
 def generate_r2c_input(out_file):
-    lm = mirror.LocalMirror()
-    for x in lm.list_packages():
-        pkg = lm.get_json(x.name)
+    inputs = []
 
-        urls = []
-        for u in pkg.get('urls', []):
-            urls.append(u['url'])
+    for pkg_name in PypiPackage.list_packages():
+        try:
+            pkg = PypiPackage.from_pypi(pkg_name)
+        except exceptions.NoSuchPackage:
+            continue
+        targets = []
 
-        if urls:
-            record = {f'https://pypi.org/project/{x.name}': urls}
-            out_file.write(json.dumps(record) + '\n')
+        input_definition = {
+            'metadata': {'package': pkg_name},
+            'input_type': 'AuraInput'
+        }
+
+        for url in pkg.info['urls']:
+            targets.append({
+                'url': url['url'],
+                'metadata': url
+            })
+
+
+        input_definition['targets'] = json.dumps(targets)
+        inputs.append(input_definition)
+
+    out_file.write(json.dumps({
+        'name': 'aura',
+        'version': '0.0.1',
+        'description': 'This is a set of all PyPI packages',
+        'inputs': inputs
+    }))
+
+
+    # lm = mirror.LocalMirror()
+    # for x in lm.list_packages():
+    #     pkg = lm.get_json(x.name)
+    #
+    #     urls = []
+    #     for u in pkg.get('urls', []):
+    #         urls.append(u['url'])
+    #
+    #     if urls:
+    #         record = {f'https://pypi.org/project/{x.name}': urls}
+    #         out_file.write(json.dumps(record) + '\n')
 
 
 def r2c_scan(source, out_file, mode='generic'):
@@ -275,6 +308,7 @@ def r2c_scan(source, out_file, mode='generic'):
                     }
                     if 'line_no' in hit:
                         rhit['start'] = {'line': hit['line_no']}
+                        rhit['path'] = os.path.relpath(hit['location'], source[0])
 
                     out['results'].append(rhit)
 

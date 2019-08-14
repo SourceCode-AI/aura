@@ -29,6 +29,20 @@ def sqli3():
     cur.execute("SELECT * FROM users WHERE id =" + data)
 
 
+def sqli4(parameter):
+    con = pymysql.connect()
+    cur = con.cursor()
+    cur.execute("SELECT * FROM users WHERE id =" + parameter)
+
+
+def something():
+    """
+    Test if the taint propagates via call graph
+    """
+    p = input("in4")
+    sqli4(p)
+
+
 def query(uid):
     q1 = "SELECT * FROM users WHERE id = 1"
     q2 = "SELECT * FROM users WHERE id = %d" % uid

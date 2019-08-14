@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 
 class Frame:
     __slots__ = ('locals', 'previous')
@@ -39,6 +41,7 @@ class Frame:
         if self.previous:
             l.extend(self.previous.variables)
         return l
+
 
 class Stack:
     __slots__ = ('bottom', 'frame')
@@ -87,3 +90,33 @@ class Stack:
         new_stack.frame = frames[-1]
         new_stack.bottom = frames[0]
         return new_stack
+
+
+class CallGraph:
+    __slots__ = (
+        'references',
+        'definitions'
+    )
+
+    def __init__(self):
+        self.definitions = dict()
+        self.references = defaultdict(set)
+
+    def __setitem__(self, key, value):
+        self.references[key].add(value)
+
+    def __getitem__(self, key):
+        return self.references[key]
+
+    def __contains__(self, item):
+        return item in self.references
+
+    def pprint(self):
+        import pprint
+        print("Callers:")
+        pprint.pprint({
+            k: [x.json for x in v]
+            for k, v in self.references.items()
+        })
+        print("Definitions:")
+        pprint.pprint({k: v.json for k,v in self.definitions.items()})

@@ -65,6 +65,9 @@ def analyze_suspicious(pth: Path, **kwargs):
         f_type = 'hidden'
 
     elif name.endswith('.pyc'):
+        if '__pycache__' in pth.parts:
+            return
+
         f_type = 'python_bytecode'
     else:
         return

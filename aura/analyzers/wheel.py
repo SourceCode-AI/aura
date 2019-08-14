@@ -50,7 +50,11 @@ def analyze_wheel(pth:Path, **kwargs):
             if full_pth.samefile(dist_info/'RECORD'):
                 continue
 
-            alg, checksum = record[1].split('=')
+            try:
+                alg, checksum = record[1].split('=')
+            except ValueError: # not enough values to unpack
+                continue
+
             target_checksum = get_checksum(alg, full_pth)
             if target_checksum != checksum:
                 hit = Wheel(

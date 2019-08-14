@@ -9,7 +9,7 @@ from enum import Enum
 from dataclasses import dataclass, InitVar, field
 from functools import partial, total_ordering
 
-from ...stack import Stack
+from ...stack import Stack, CallGraph
 from ... import exceptions
 
 
@@ -303,7 +303,7 @@ class Compare(ASTNode):
 @dataclass
 class FunctionDef(ASTNode):
     name: str
-    args: typing.List[ASTNode]
+    args: typing.Any
     body: typing.List[ASTNode]
     decorator_list: typing.List[ASTNode]
     returns: ASTNode
@@ -318,23 +318,22 @@ class FunctionDef(ASTNode):
         return d
 
     @property
-    def default_args(self):
-        return dict()
-
-    @property
     def full_name(self):
         return self.name
 
+    def set_taint(self, *args, **kwargs):
+        return self.args.set_taint(*args, **kwargs)
+
     def _visit_node(self, context):
         context.stack[self.name] = self
+        context.call_graph.definitions[self.name] = self
         context.stack.push()
         #context.stack = context.stack.copy()
 
-        for idx, arg in enumerate(self.args):
-            context.visit_child(
-                node = arg,
-                replace = partial(self.__replace_args, idx=idx, visitor=context.visitor)
-            )
+        context.visit_child(
+            node = self.args,
+            replace = partial(self.__replace_args, visitor=context.visitor)
+        )
 
         for idx, dec, in enumerate(self.decorator_list):
             context.visit_child(
@@ -350,9 +349,9 @@ class FunctionDef(ASTNode):
 
         context.stack.pop()
 
-    def __replace_args(self, value, idx, visitor):
+    def __replace_args(self, value, visitor):
         visitor.modified = True
-        self.args[idx] = value
+        self.args = value
 
     def __replace_body(self, value, idx, visitor):
         visitor.modified = True
@@ -401,6 +400,7 @@ class Call(ASTNode):
     func: NodeType
     args: list
     kwargs: dict
+    taints: dict = field(default_factory=dict)
 
     def __repr__(self):
         if len(self.args) == 0 and len(self.kwargs) == 0:
@@ -414,7 +414,17 @@ class Call(ASTNode):
 
         return f"Call({repr(self.func)})({f_args})"
 
+    def __hash__(self):
+        h = hash((
+            self.full_name,
+            self.line_no,
+        ))
+        return h
+
     def _visit_node(self, context: Context):
+        if isinstance(self.full_name, str):
+            context.call_graph[self.full_name] = self
+
         for idx in range(len(self.args)):
             try:
                 arg = self.args[idx]
@@ -553,6 +563,37 @@ class Arguments(ASTNode):  # TODO: not used yet
     kwarg: NodeType
     defaults: typing.List[NodeType]
     kw_defaults: typing.List[NodeType]
+    taints: typing.Dict[str, Taints] = field(default_factory=dict)
+
+    def _visit_node(self, context):
+        if self.args:
+            for x in self.args:
+                context.stack[x] = self
+
+        # TODO: add to stack other arguments
+
+    @property
+    def json(self):
+        d = super().json
+        d['args'] = self.args
+        d['vararg'] = self.vararg
+        d['kwonlyargs'] = self.kwonlyargs
+        d['kwarg'] = self.kwarg
+        d['defaults'] = self.defaults
+        d['kw_defaults'] = self.kw_defaults
+        d['taints'] = self.taints
+        return d
+
+    def set_taint(self, name, taint_level, context):
+        if name in self.taints:
+            t = self.taints[name]
+            if taint_level > t:
+                self.taints[name] = taint_level
+                context.visitor.modified = True
+            return
+        else:
+            self.taints[name] = taint_level
+            context.visitor.modified = True
 
     def to_parameters(self):
         params = []
@@ -631,9 +672,15 @@ class BinOp(ASTNode):
     left: NodeType
     right: NodeType
 
+    def __post_init__(self):
+        super().__post_init__()
+        self._orig_left = None
+        self._orig_right = None
+
     def _visit_node(self, context):
         try:
             if isinstance(self.left, str) and self.left in context.stack:
+                self._orig_left = self.left
                 self.left = context.stack[self.left]
                 context.visitor.modified = True
         except (TypeError, KeyError):
@@ -641,11 +688,11 @@ class BinOp(ASTNode):
 
         try:
             if isinstance(self.right, str) and self.right in context.stack:
+                self._orig_right = self.right
                 self.right = context.stack[self.right]
                 context.visitor.modified = True
         except (TypeError, KeyError):
             pass
-
 
         context.visit_child(
             node = self.left,
@@ -657,10 +704,12 @@ class BinOp(ASTNode):
         )
 
     def __replace_left(self, value, visitor):
+        self._orig_left = self.left
         self.left = value
         visitor.modified = True
 
     def __replace_right(self, value, visitor):
+        self._orig_right = self.right
         self.right = value
         visitor.modified = True
 
@@ -749,9 +798,7 @@ class Context:
     stack: Stack = field(default_factory=Stack)
     depth: int = 0
     modified: bool = False
-    call_graph: dict = field(
-        default_factory = lambda : {'functions': dict(), 'classes': dict()}
-    )
+    call_graph: dict = field(default_factory=CallGraph)
 
 
     def as_child(self, node:NodeType, replace=lambda x: None) -> Context:
@@ -762,6 +809,7 @@ class Context:
             visitor = self.visitor,
             replace = replace,
             stack = self.stack,
+            call_graph=self.call_graph,
         )
 
     def visit_child(self, stack=None, *args, **kwargs):

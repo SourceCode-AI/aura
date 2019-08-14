@@ -1,6 +1,7 @@
 #-*- coding: utf-8 -*-
 import tempfile
 import functools
+import xmlrpc.client
 from urllib.parse import urlparse, ParseResult
 from pathlib import Path
 from contextlib import contextmanager
@@ -57,6 +58,11 @@ class PypiPackage():
         kwargs['info'] = cls.mirror.get_json(name)
 
         return cls(name, *args, **kwargs)
+
+    @classmethod
+    def list_packages(cls):
+        repo = xmlrpc.client.ServerProxy('https://pypi.python.org/pypi', use_builtin_types=True)
+        return list(repo.list_packages())
 
     def __getitem__(self, item):
         return self.info[item]
