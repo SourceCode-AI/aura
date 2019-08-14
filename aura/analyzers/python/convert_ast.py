@@ -137,10 +137,10 @@ def visit_arguments(context):
     if context.node.get('args'):
         args = []
         for x in context.node['args']:
-            if isinstance(x, str):
-                args.append(x)
-            else:
+            if isinstance(x, dict) and 'arg' in x:
                 args.append(x['arg'])
+            else:
+                args.append(x)
     else:
         args = None
 
