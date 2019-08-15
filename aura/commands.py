@@ -313,8 +313,10 @@ def r2c_scan(source, out_file, mode='generic'):
                     out['results'].append(rhit)
 
         except Exception as exc:
+            exc_tb = sys.exc_info()[-1]
+
             out['errors'].append({
-                "message": f"An exception occurred: {str(exc)}",
+                "message": f"[{exc_tb.tb_lineno}] An exception occurred: {str(exc)}",
                 'data': {"path": str(src)}
             })
 

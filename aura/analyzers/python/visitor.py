@@ -11,7 +11,7 @@ from pathlib import Path
 
 import simplejson as json
 
-from . nodes import Context, ASTNode
+from . nodes import Context, ASTNode, CallGraph
 from .. import python_src_inspector
 from ... import config
 
@@ -74,6 +74,7 @@ class Visitor:
         self.iteration = 0
         self.convergence = 1
         self.queue = deque()
+        self.call_graph = CallGraph()
 
         self.metadata = metadata
         self.hits = []

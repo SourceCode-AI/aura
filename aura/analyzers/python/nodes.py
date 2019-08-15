@@ -324,6 +324,9 @@ class FunctionDef(ASTNode):
     def set_taint(self, *args, **kwargs):
         return self.args.set_taint(*args, **kwargs)
 
+    def get_signature(self):
+        return self.args.get_signature()
+
     def _visit_node(self, context):
         context.stack[self.name] = self
         context.call_graph.definitions[self.name] = self
@@ -441,7 +444,15 @@ class Call(ASTNode):
                 replace = partial(self.__replace_arg, idx=idx, visitor=context.visitor)
             )
 
-        for key in list(self.kwargs.keys()):
+        for key, value in list(self.kwargs.items()):
+            try:
+                if isinstance(value, str):
+                    target = context.stack[value]
+                    self.kwargs[key] = target
+                    context.visitor.modified = True
+            except (TypeError, KeyError):
+                pass
+
             context.visit_child(
                 node = self.kwargs[key],
                 replace = partial(self.__replace_kwargs, key=key, visitor=context.visitor)
@@ -568,7 +579,8 @@ class Arguments(ASTNode):  # TODO: not used yet
     def _visit_node(self, context):
         if self.args:
             for x in self.args:
-                context.stack[x] = self
+                if isinstance(x, str):
+                    context.stack[x] = self
 
         # TODO: add to stack other arguments
 
@@ -583,6 +595,43 @@ class Arguments(ASTNode):  # TODO: not used yet
         d['kw_defaults'] = self.kw_defaults
         d['taints'] = self.taints
         return d
+
+    def get_signature(self):
+        params = []  # TODO add defaults
+        default_diff = len(self.args) - len(self.defaults)
+        for idx, x in enumerate(self.args):
+            if isinstance(x, str):
+                if idx >= default_diff:
+                    default = self.defaults[idx-default_diff]
+                else:
+                    default = inspect.Parameter.empty
+
+                params.append(
+                    inspect.Parameter(name=x, default=default, kind=inspect.Parameter.POSITIONAL_OR_KEYWORD)
+                )
+
+        if self.vararg:
+            params.append(
+                inspect.Parameter(name=self.vararg, kind=inspect.Parameter.VAR_POSITIONAL)
+            )
+
+        default_diff = len(self.kwonlyargs) - len(self.kw_defaults)
+        for idx, x in enumerate(self.kwonlyargs):
+            if idx >= default_diff:
+                default = self.kw_defaults[idx-default_diff]
+            else:
+                default = inspect.Parameter.empty
+
+            params.append(
+                inspect.Parameter(name=x, default=default, kind=inspect.Parameter.KEYWORD_ONLY)
+            )
+
+        if self.kwarg:
+            params.append(
+                inspect.Parameter(name=self.kwarg, kind=inspect.Parameter.VAR_KEYWORD)
+            )
+
+        return inspect.Signature(parameters=params)
 
     def set_taint(self, name, taint_level, context):
         if name in self.taints:
@@ -798,8 +847,10 @@ class Context:
     stack: Stack = field(default_factory=Stack)
     depth: int = 0
     modified: bool = False
-    call_graph: dict = field(default_factory=CallGraph)
 
+    @property
+    def call_graph(self):
+        return self.visitor.call_graph
 
     def as_child(self, node:NodeType, replace=lambda x: None) -> Context:
         return self.__class__(
@@ -808,8 +859,7 @@ class Context:
             depth = self.depth + 1,
             visitor = self.visitor,
             replace = replace,
-            stack = self.stack,
-            call_graph=self.call_graph,
+            stack = self.stack
         )
 
     def visit_child(self, stack=None, *args, **kwargs):

@@ -134,23 +134,21 @@ def visit_FunctionDef(context):
 
 
 def visit_arguments(context):
+    args = []
     if context.node.get('args'):
-        args = []
         for x in context.node['args']:
             if isinstance(x, dict) and 'arg' in x:
                 args.append(x['arg'])
             else:
                 args.append(x)
-    else:
-        args = None
 
     new_node = Arguments(
         args = args,
         vararg = context.node.get('varargs'),
-        kwonlyargs = context.node.get('kwonlyarg'),
+        kwonlyargs = context.node.get('kwonlyarg', []),
         kwarg = context.node.get('kwarg'),
-        defaults = context.node.get('defaults'),
-        kw_defaults = context.node.get('kw_defaults'),
+        defaults = context.node.get('defaults', []),
+        kw_defaults = context.node.get('kw_defaults', []),
     )
     context.replace(new_node)
 

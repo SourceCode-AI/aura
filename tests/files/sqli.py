@@ -29,7 +29,7 @@ def sqli3():
     cur.execute("SELECT * FROM users WHERE id =" + data)
 
 
-def sqli4(parameter):
+def sqli4(unused=5, parameter=''):
     con = pymysql.connect()
     cur = con.cursor()
     cur.execute("SELECT * FROM users WHERE id =" + parameter)
@@ -40,7 +40,7 @@ def something():
     Test if the taint propagates via call graph
     """
     p = input("in4")
-    sqli4(p)
+    sqli4(parameter=p)
 
 
 def query(uid):

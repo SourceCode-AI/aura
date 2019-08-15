@@ -115,8 +115,8 @@ class TaintAnalysis(Visitor):
             if isinstance(f_name, str) and f_name in context.call_graph.definitions:
                 func_def = context.call_graph.definitions[f_name]
                 for x in context.node.args:
-                    func_def.set_taint(x.full_name, x._taint_class, context)
-                    pass
+                    if isinstance(x, ASTNode) and isinstance(x.full_name, str):
+                        func_def.set_taint(x.full_name, x._taint_class, context)
 
         elif isinstance(context.node, Var):
             var_taint = max(
@@ -175,5 +175,15 @@ class TaintAnalysis(Visitor):
 
             if f_name in context.call_graph:
                 callers = context.call_graph[f_name]
+                sig = context.node.get_signature()
                 for c in callers:
-                    pass # TODO
+                    try:
+                        call_params = sig.bind(*c.args, **c.kwargs)
+                        for param_name, param_value in call_params.arguments.items():
+                            if not isinstance(param_value, ASTNode):
+                                continue
+                            t_param = param_value._taint_class
+                            context.node.set_taint(param_name, t_param, context)
+
+                    except (TypeError,):
+                        pass
