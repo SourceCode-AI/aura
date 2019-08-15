@@ -33,6 +33,7 @@
     "flask.request.path",
     "flask.request.headers.*",
     "flask.request.files.*",
-    "flask.request.cookies.*"
+    "flask.request.cookies.*",
+    "flask.request.get_json"
   ]
 }
