@@ -34,7 +34,7 @@ class ScanResults():
         for x in hits:
             if self.verbosity <2 and x.informational and x.score == 0:
                 continue
-            elif self.metadata.get('exclude_tests', False) and 'test_suite' in x.tags:
+            elif self.metadata.get('exclude_tests', False) and 'test-code' in x.tags:
                 continue
 
             yield x

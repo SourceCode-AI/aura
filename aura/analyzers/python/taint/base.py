@@ -24,6 +24,10 @@ class TaintDetection(NodeAnalyzerV2):
         if 'taint_sink' not in context.node.tags:
             return
 
+        if context.node._taint_class == Taints.TAINTED:
+            yield self.__generate_hit(context=context)
+            return
+
         for x in context.node.args:  # type: NodeType
             if not isinstance(x, ASTNode):
                 continue

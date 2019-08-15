@@ -77,6 +77,15 @@ class TaintAnalysis(Visitor):
                 context.visitor.modified = True
                 return
 
+        if isinstance(context.node, FunctionDef):  # Mark arguments as sources for flask routes
+            if 'flask_route' in context.node.tags and isinstance(context.node.args, Arguments):
+                if context.node.args._taint_class < Taints.TAINTED:
+                    context.node.args._taint_class = Taints.TAINTED
+                    context.visitor.modified = True
+
+                for arg in context.node.args.args:
+                    context.node.set_taint(arg, Taints.TAINTED, context)
+
     def __propagate_taint(self, context):
         if isinstance(context.node, Attribute) and isinstance(context.node.source, ASTNode):
             t = context.node.source._taint_class
@@ -93,30 +102,55 @@ class TaintAnalysis(Visitor):
             f_name = context.node.full_name
 
             args_taints = []
-            for x in context.node.args:
-                if isinstance(x, ASTNode):
+            # Extract taints from arguments
+            for idx, x in enumerate(context.node.args):
+                if isinstance(x, Arguments) and isinstance(context.node._orig_args[idx], str):
+                    arg_name = context.node._orig_args[idx]
+                    args_taints.append(x.taints.get(arg_name, Taints.SAFE))
+                elif isinstance(x, ASTNode):
                     args_taints.append(x._taint_class)
             for x in context.node.kwargs.values():
                 if isinstance(x, ASTNode):
                     args_taints.append(x._taint_class)
-
+            # Extract taint if the function itself is tainted
             if isinstance(context.node.func, ASTNode):
                 args_taints.append(context.node.func._taint_class)
 
             if not args_taints:
                 return
-
+            # Choose the highest taint from the extracted taints
             call_taint = max(args_taints)
             if call_taint > context.node._taint_class:
                 context.node._taint_class = call_taint
                 context.visitor.modified = True
-                return
 
+                # Mark built-in objects for example [].append(<tainted>)
+                if isinstance(context.node.func, Attribute) and isinstance(context.node.func.source, (List,)):
+                    if call_taint > context.node.func.source._taint_class:
+                        context.node.func.source._taint_class = call_taint
+                        context.visitor.modified = True
+
+                return
+            # Lookup in a call graph if the function was defined
             if isinstance(f_name, str) and f_name in context.call_graph.definitions:
                 func_def = context.call_graph.definitions[f_name]
-                for x in context.node.args:
-                    if isinstance(x, ASTNode) and isinstance(x.full_name, str):
-                        func_def.set_taint(x.full_name, x._taint_class, context)
+
+                # Propagate taint from the function definition
+                if func_def._taint_class > context.node._taint_class:
+                    context.node._taint_class = func_def._taint_class
+                    context.visitor.modified = True
+
+                # Apply taint from called arguments to the function definition
+                for idx, x in enumerate(context.node.args):
+                    if not isinstance(x, ASTNode):
+                        continue
+                    if x.full_name is None:
+                        arg_index = idx
+                    elif isinstance(x.full_name, str):
+                        arg_index = x.full_name
+                    else:
+                        continue
+                    func_def.set_taint(arg_index, x._taint_class, context)
 
         elif isinstance(context.node, Var):
             var_taint = max(
@@ -137,11 +171,13 @@ class TaintAnalysis(Visitor):
                 context.node._taint_class = context.node.value._taint_class
                 context.visitor.modified = True
                 return
-        elif isinstance(context.node, ReturnStmt) and isinstance(context.node.value, ASTNode):
-            if context.node.value._taint_class > context.node._taint_class:
-                context.node._taint_class = context.node.value._taint_class
-                context.visitor.modified = True
-                return
+        elif isinstance(context.node, (ReturnStmt, Yield, YieldFrom)):
+            if isinstance(context.node.value, ASTNode):
+                if context.node.value._taint_class > context.node._taint_class:
+                    context.node._taint_class = context.node.value._taint_class
+                    context.visitor.modified = True
+                    return
+
         elif isinstance(context.node, BinOp):
             taints = []
 
@@ -173,10 +209,25 @@ class TaintAnalysis(Visitor):
         elif isinstance(context.node, FunctionDef):
             f_name = context.node.full_name
 
+            return_taints = []
+
+            for r in context.node.return_nodes.values():  # type: ASTNode
+                return_taints.append(r._taint_class)
+
+            if return_taints:
+                rt = max(return_taints)
+                if rt > context.node._taint_class:
+                    context.node._taint_class = rt
+                    context.visitor.modified = True
+
             if f_name in context.call_graph:
                 callers = context.call_graph[f_name]
                 sig = context.node.get_signature()
-                for c in callers:
+                for c in callers:  # type: ASTNode
+                    if c._taint_class < context.node._taint_class:
+                        c._taint_class = context.node._taint_class
+                        context.visitor.modified= True
+
                     try:
                         call_params = sig.bind(*c.args, **c.kwargs)
                         for param_name, param_value in call_params.arguments.items():

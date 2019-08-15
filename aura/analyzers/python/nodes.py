@@ -174,10 +174,35 @@ class String(ASTNode):
 
 
 @dataclass
+class List(ASTNode):
+    elts: typing.List[ASTNode]
+    ctx: ASTNode
+
+    def _visit_node(self, context):
+        for idx, e in enumerate(self.elts):
+            context.visit_child(
+                node = e,
+                replace = partial(self.__replace_elt, idx=idx, visitor=context.visitor)
+            )
+
+    def __replace_elt(self, value, idx, visitor):
+        self.elts[idx] = value
+        visitor.modified = True
+
+    @property
+    def json(self):
+        d = super().json
+        d['elts'] = self.elts
+        d['ctx'] = self.ctx
+        return d
+
+
+@dataclass
 class Var(ASTNode):
     var_name: str
     value: NodeType = None
     var_type: str = "assign"
+    typing = None
 
     def __repr__(self):
         if self.value:
@@ -209,6 +234,17 @@ class Var(ASTNode):
         return d
 
     def _visit_node(self, context):
+        if isinstance(self.value, list) and self.value == []:
+            self.typing = 'list'
+        elif isinstance(self.value, str):
+            try:
+                target = context.stack[self.value]
+                self._original = self.value
+                self.value = target
+                context.visitor.modified = True
+            except (TypeError, KeyError):
+                pass
+
         context.visit_child(
             node = self.var_name,
             replace = partial(self.__replace_name, visitor=context.visitor)
@@ -308,6 +344,10 @@ class FunctionDef(ASTNode):
     decorator_list: typing.List[ASTNode]
     returns: ASTNode
 
+    def __post_init__(self):
+        super().__post_init__()
+        self.return_nodes = {}
+
     @property
     def json(self):
         d = super().json
@@ -398,12 +438,17 @@ class ClassDef(ASTNode):
     def full_name(self):
         return self.name
 
+
 @dataclass
 class Call(ASTNode):
     func: NodeType
     args: list
     kwargs: dict
     taints: dict = field(default_factory=dict)
+
+    def __post_init__(self):
+        super().__post_init__()
+        self._orig_args = [None]*len(self.args)
 
     def __repr__(self):
         if len(self.args) == 0 and len(self.kwargs) == 0:
@@ -434,6 +479,7 @@ class Call(ASTNode):
                 if isinstance(arg, str):
                     arg = context.stack[arg]
                     if arg.line_no != self.line_no:
+                        self._orig_args[idx] = self.args[idx]
                         self.args[idx] = arg
                         context.visitor.modified = True
             except (TypeError, KeyError):
@@ -506,6 +552,8 @@ class Call(ASTNode):
 
     def __replace_arg(self, value, idx, visitor):
         visitor.modified = True
+        if isinstance(self.args[idx], str):
+            self._orig_args[idx] = self.args[idx]
         self.args[idx] = value
 
     def __replace_kwargs(self, value, key, visitor):
@@ -634,6 +682,9 @@ class Arguments(ASTNode):  # TODO: not used yet
         return inspect.Signature(parameters=params)
 
     def set_taint(self, name, taint_level, context):
+        if isinstance(name, int):
+            name = self.args[name]
+
         if name in self.taints:
             t = self.taints[name]
             if taint_level > t:
@@ -787,7 +838,14 @@ class Print(ASTNode):
 class ReturnStmt(ASTNode):
     value: NodeType
 
-    def _visit_node(self, context):
+    def _visit_node(self, context:Context):
+        parent = context.parent
+        while parent:
+            if isinstance(parent.node, FunctionDef):
+                parent.node.return_nodes[self.line_no] = self
+                break
+            parent = parent.parent
+
         try:
             if isinstance(self.value, str):
                 target = context.stack[self.value]
@@ -810,6 +868,16 @@ class ReturnStmt(ASTNode):
     def __replace_value(self, value, visitor):
         self.value = value
         visitor.modified = True
+
+
+@dataclass
+class Yield(ReturnStmt):
+    pass
+
+
+@dataclass
+class YieldFrom(Yield):
+    pass
 
 
 @dataclass

@@ -14,15 +14,19 @@
   ],
   "taint_sinks": [
     "flask.make_response",
+    "flask.make_response.set_cookie",
     "flask.jsonify",
-    "json.dumps",
+    "flask.send_file",
     "os.system",
     "subprocess.Popen",
+    "subprocess.call",
     "eval",
     "exec",
     "open"
   ],
   "taint_sources": [
+    "input",
+    "raw_input",
     "flask.request.url",
     "flask.request.args.*",
     "flask.request.form.*",

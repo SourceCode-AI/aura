@@ -77,6 +77,12 @@ class Fixtures(object):
                 analyzer.traverse()
             return analyzer.tree['ast_tree']
 
+    def scan_and_match(self, input_file, matches):
+        output = self.scan_test_file(input_file)
+        for x in matches:
+            assert any(match_rule(h, x) for h in output['hits']), x
+
+
 
 
 def match_rule(source, target):

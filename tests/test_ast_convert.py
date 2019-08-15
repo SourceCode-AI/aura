@@ -17,29 +17,6 @@ def get_raw_ast(source_code):
     return out['ast_tree']['body']
 
 
-def test_list_types(fixtures):
-    test_table = {
-        'List': '[5, 7, 11]',
-        'Set': '{5, 7, 11}',
-        'Tuple': '(5, 7, 11)'
-    }
-
-    for t, d in test_table.items():
-        raw = fixtures.get_raw_ast(d)[0]
-        #print(raw)
-        assert isinstance(raw, dict)
-        assert raw['_type'] == 'Expr'
-        list_ast = raw['value']
-        assert list_ast['_type'] == t
-        ctx = create_context(list_ast)
-
-        out = []
-        replace = lambda x: out.extend(x)
-        ctx.replace = replace
-        convert_ast.VISITORS[t](ctx)
-        assert out == list_ast['elts']
-
-
 def test_string(fixtures):
     raw = fixtures.get_raw_ast('"Hello world"')[0]['value']
     assert isinstance(raw, dict)

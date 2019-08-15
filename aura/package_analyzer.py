@@ -133,7 +133,7 @@ class Analyzer(object):
 
             for x in path.parts:  # TODO: move this somewhere else
                 if TEST_REGEX.match(x):
-                    metadata['flags'].add('test_suite')
+                    metadata['flags'].add('test-code')
                     break
 
             logger.debug(f"Analyzing file '{path}' {m}")

@@ -3,18 +3,26 @@ from .nodes import *
 
 
 def visit_List(context):
-    context.replace([x for x in context.node['elts']])
+    new_node = List(
+        elts = context.node.get('elts', []),
+        ctx = context.node.get('ctx')
+    )
+    new_node.line_no = context.node['lineno']
+    new_node.col = context.node['col_offset']
+    context.replace(new_node)
 
 
 def visit_Str(context):
     node = String(context.node['s'])
-    node.line_no = context.node.get('lineno')
+    node.line_no = context.node['lineno']
+    node.col = context.node['col_offset']
     context.replace(node)
 
 
 def visit_Num(context):
     node = Number(context.node['n'])
-    node.line_no = context.node.get('lineno')
+    node.line_no = context.node['lineno']
+    node.col = context.node['col_offset']
     context.replace(node)
 
 
@@ -33,6 +41,7 @@ def visit_Call(context):
 
     new_node = Call(context.node['func'], context.node['args'], keyword)
     new_node.line_no = context.node['lineno']
+    new_node.col = context.node['col_offset']
     new_node._docs = context.node.get('_doc_string')
     context.replace(new_node)
 
@@ -170,6 +179,20 @@ def visit_Return(context):
     context.replace(new_node)
 
 
+def visit_Yield(context):
+    new_node = Yield(value=context.node['value'])
+    new_node.line_no = context.node['lineno']
+    new_node.col = context.node['col_offset']
+    context.replace(new_node)
+
+
+def visit_YieldFrom(context):
+    new_node = YieldFrom(value=context.node['value'])
+    new_node.line_no = context.node['lineno']
+    new_node.col = context.node['col_offset']
+    context.replace(new_node)
+
+
 def visit_Subscript(context):
     new_node = Subscript(
         value = context.node.get('value'),
@@ -200,6 +223,8 @@ VISITORS = {
     'FunctionDef': visit_FunctionDef,
     'ClassDef': visit_ClassDef,
     'Return': visit_Return,
+    'Yield': visit_Yield,
+    'YieldFrom': visit_YieldFrom,
     'Subscript': visit_Subscript,
     'arguments': visit_arguments,
 }
