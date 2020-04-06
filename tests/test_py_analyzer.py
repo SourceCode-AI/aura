@@ -9,12 +9,12 @@ from aura.analyzers.python import visitor
 
 def test_basic_ast(fixtures):
     pth = fixtures.path('basic_ast.py')
-    data = visitor.get_ast_tree(pth)
 
-    assert data['implementation'] == 'CPython'
-    assert data['ast_tree']['_type'] == 'Module'
-    assert isinstance(data['ast_tree']['body'], list)
-    assert len(data['ast_tree']['body']) == 9  # Top level lines with python code
+    with Path(pth).open('r') as fd:
+        data = fixtures.get_raw_ast(fd.read())
+
+    assert isinstance(data, list)
+    assert len(data) == 9  # Top level lines with python code
 
 
 def test_interpreters():
@@ -30,6 +30,8 @@ def test_interpreters():
 
 def test_py2k(fixtures):
     pth = fixtures.path('py2k.py')
-    data = visitor.get_ast_tree(pth)
 
-    assert isinstance(data, dict)
+    with Path(pth).open('r') as fd:
+        data = fixtures.get_raw_ast(fd.read())
+
+    assert data

@@ -16,8 +16,8 @@ def load_entrypoint(name) -> dict:
         return PLUGIN_CACHE[name]
 
     data = {
-        'entrypoints': {},
-        'disabled': [],
+        "entrypoints": {},
+        "disabled": [],
     }
     for x in pkg_resources.iter_entry_points(name):
         try:
@@ -25,41 +25,44 @@ def load_entrypoint(name) -> dict:
 
             if inspect.isclass(plugin) and issubclass(plugin, NodeAnalyzerV2):
                 plugin = plugin()
-                data['entrypoints'][x.name] = plugin
+                data["entrypoints"][x.name] = plugin
                 ReadOnlyAnalyzer.hooks.append(plugin)
                 continue
             # If it is a class then make an instance of it
             elif inspect.isclass(plugin):
                 plugin = plugin()
 
-            data['entrypoints'][x.name] = plugin
+            data["entrypoints"][x.name] = plugin
 
         except exceptions.PluginDisabled as exc:
             msg = exc.args[0]
-            data['disabled'].append((x, msg))
+            data["disabled"].append((x, msg))
 
     PLUGIN_CACHE[name] = data
     return data
 
 
 def get_analyzers(names):
-    data = load_entrypoint('aura.analyzers')
+    data = load_entrypoint("aura.analyzers")
     if not names:
-        return list(data['entrypoints'].values())
+        return list(data["entrypoints"].values())
 
     analyzers = []
 
     for x in names:
-        if x in data['entrypoints']:
-            analyzers.append(data['entrypoints'][x])
+        if x in data["entrypoints"]:
+            analyzers.append(data["entrypoints"][x])
             continue
 
-        modname, target = x.split(':')
+        modname, target = x.split(":")
         module = importlib.import_module(modname)
         analyzer = getattr(module, target)
+
         if inspect.isclass(analyzer) and issubclass(analyzer, NodeAnalyzerV2):
             analyzer = analyzer()
             ReadOnlyAnalyzer.hooks.append(analyzer)
+            analyzers.append(analyzer)
+        elif callable(analyzer):
             analyzers.append(analyzer)
 
     return analyzers
@@ -67,6 +70,7 @@ def get_analyzers(names):
 
 def get_analyzer_group(names):
     analyzers = get_analyzers(names)
+
     def _run_analyzers(path, **kwargs):
         ast_analysis = False
         for x in analyzers:

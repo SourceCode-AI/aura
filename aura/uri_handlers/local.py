@@ -1,4 +1,4 @@
-#-*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 import pathlib
 from urllib.parse import ParseResult
 
@@ -6,7 +6,7 @@ from .base import URIHandler, ScanLocation
 
 
 class LocalFileHandler(URIHandler):
-    scheme = 'file'
+    scheme = "file"
     help = """
     Local file handler:\n
     Default URI handler, any given URI that is not specifically handled by other handlers is considered to be a local path
@@ -27,10 +27,12 @@ class LocalFileHandler(URIHandler):
         self.opts = {}
 
     def get_paths(self):
-        yield ScanLocation(
-            location = self.path
-        )
+        yield ScanLocation(location=self.path)
+
+    @property
+    def exists(self) -> bool:
+        return self.path.exists()
 
 
-# Set this a the default handler
+# Set this as the default handler
 LocalFileHandler.default = True

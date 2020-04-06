@@ -28,7 +28,9 @@ def test_flask_app(fixtures, fuzzy_rule_match):
     output = fixtures.scan_test_file('flask_app.py')
     assert len(output['hits']) > 0, output
 
-    lines = [13, 30, 32, 41, 49, 56]
+    # TODO: also perhaps 24? `eval(self.code)`
+    # TODO: cover the case at vuln5:72
+    lines = [17, 34, 36, 45, 53, 61, 88]
 
     matches = [
         {
@@ -38,5 +40,50 @@ def test_flask_app(fixtures, fuzzy_rule_match):
         } for x in lines
     ]
 
+    output_line_nos = {x['line_no'] for x in output['hits']} - set(lines)
+
     for x in matches:
-        assert any(fuzzy_rule_match(h, x) for h in output['hits']), x
+        assert any(fuzzy_rule_match(h, x) for h in output['hits']), (output_line_nos, x)
+
+    excluded = [105, 111]
+    for hit in output['hits']:
+        if hit.get('type') != 'TaintAnomaly':
+            continue
+
+        assert hit.get('line_no') not in excluded, hit
+
+
+def test_taint_log_flask_app(fixtures, fuzzy_rule_match):
+    match_log = [
+        {
+            "line_no": 44,
+            "message": "AST node marked as source using semantic rules",
+            "taint_level": "TAINTED"
+        },
+        {
+            "line_no": 44,
+            "message": "Taint propagated via variable subscript",
+            "taint_level": "TAINTED"
+        },
+        {
+            "line_no": 44,
+            "message": "Taint propagated via variable assignment",
+            "taint_level": "TAINTED"
+        },
+        {
+            "line_no": 45,
+            "message": "Taint propagated by return/yield statement",
+            "taint_level": "TAINTED"
+        }
+    ]
+
+    output = fixtures.scan_test_file('flask_app.py')
+
+    for h in output['hits']:
+        if h['line_no'] == 45:
+            log = h['extra']['taint_log']
+            break
+    else:
+        raise AssertionError("Taint log hit not found")
+
+    assert fuzzy_rule_match(log, match_log)

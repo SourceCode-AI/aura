@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-#-*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 PIP wrapper for aura security project
 It hijacks the pip install process via monkeypatching and when forwards data to the aura framework for analysis
@@ -14,6 +14,7 @@ import sys
 import fnmatch
 import logging
 import json
+import shlex
 import subprocess
 
 import pip
@@ -27,8 +28,7 @@ except NameError:
     text_input = input
 
 
-
-SUPPORTED_PIP_VERSIONS = ('19.*', '10.*')
+SUPPORTED_PIP_VERSIONS = ("19.*", "10.*", "20.*")
 logger = logging.getLogger("apip")
 
 
@@ -44,8 +44,8 @@ def check_version():
 
 
 def get_dependency_chain(
-        req # type: InstallRequirement
-    ):
+    req,  # type: InstallRequirement
+):
     chain = []
     while req:
         chain.append(req.name)
@@ -58,9 +58,12 @@ def ask_user(label):
     Helper function that asks user for a confirmation
     This is used for interactively aborting installation
     """
+    if not sys.stdin.isatty():
+        return True
+
     answer = text_input("{} [y/N]:".format(label)).strip().lower()
 
-    if answer in ('y', 'yes'):
+    if answer in ("y", "yes"):
         return True
     else:
         return False
@@ -74,49 +77,59 @@ def check_package(pkg):
     :return:
     """
     import pprint
+
     pprint.pprint(pkg)
 
     print("\n*** Installation interrupted by apip ***")
 
     payload = json.dumps(pkg)
 
-    subprocess.run(
-        [os.environ['AURA_PATH'], 'check_requirement'],
+    p = subprocess.run(
+        shlex.split(os.environ["AURA_PATH"]) + ["check_requirement"],
         # check=True,
         input=payload,
-        text=True
+        text=True,
     )
 
-    if not ask_user("Would you like to proceed with installation?"):
+    if (p.returncode > 0) or not ask_user(
+        "Would you like to proceed with installation?"
+    ):
         raise EnvironmentError("Installation aborted by user")
 
-    raise EnvironmentError("Install")
 
 def mp_install_requirement(
-        self,  # type: InstallRequirement
-        *args, **kwargs
-    ):
+    self,  # type: InstallRequirement
+    *args,
+    **kwargs
+):
     """
     Monkey patch for the InstallRequirement.install method
     It collects the package information and sends it to aura for security audit
     User then has a choice to proceed or abort the installation process based on audit results
     """
     # subprocess.call(['tree', self.setup_py_dir])
+    # import pprint
+    # pprint.pprint(kwargs)
+    # pprint.pprint(self.__dict__)
+    #
+    # print(f'Home: {kwargs["home"]}')
+    # print(f'root: {kwargs["root"]}')
+    # raise EnvironmentError(pth)
 
     data = {
-        'format': '0.1',
-        'cmd': sys.argv,
-        'name': self.name,
-        'path': self.setup_py_dir,
-        'wheel': self.is_wheel,
-        'is_pinned': self.is_pinned,
-        'editable': self.editable,
-        'update': self.update,
-        'url': self.req.url,
-        'dependency_chain': get_dependency_chain(self),
+        "format": "0.1",
+        "cmd": sys.argv,
+        "name": self.name,
+        "path": self.source_dir,
+        "wheel": self.is_wheel,
+        "is_pinned": self.is_pinned,
+        "editable": self.editable,
+        "update": self.update,
+        "url": self.req.url,
+        "dependency_chain": get_dependency_chain(self),
     }
-
     check_package(data)
+    InstallRequirement._orig_install(self, *args, **kwargs)
 
 
 def monkey_patch():
@@ -127,18 +140,29 @@ def monkey_patch():
 def main():
     if not check_version():
         logger.error("Unsupported pip version: '{}'".format(pip.__version__))
-        logger.error("Use one of the supported versions: {}".format(', '.join(SUPPORTED_PIP_VERSIONS)))
+        logger.error(
+            "Use one of the supported versions: {}".format(
+                ", ".join(SUPPORTED_PIP_VERSIONS)
+            )
+        )
 
         if not ask_user("Do you really want to continue?"):
             sys.exit(1)
 
-    if not os.environ.get('AURA_PATH'):
-        logger.error("You need to set AURA_PATH environment variable that points to the AURA framework executable")
+    if not os.environ.get("AURA_PATH"):
+        logger.error(
+            "You need to set AURA_PATH environment variable that points to the AURA framework executable"
+        )
 
     logger.debug("Monkey patching pip...")
     monkey_patch()
-    sys.exit(pip_main())
+    if callable(pip_main):
+        ret_code = pip_main()
+    else:
+        ret_code = pip_main.main()
+
+    sys.exit(ret_code)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

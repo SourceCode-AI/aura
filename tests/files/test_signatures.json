@@ -1,16 +1,46 @@
 {
-  "function_calls": [
+  "function_definitions": [
     {
-      "call": "eval",
-      "score": 42,
-      "tags": ["eval_tag"]
+      "_id": "mktemp_racecond",
+      "name": "tempfile.mktemp",
+      "score": 20,
+      "message": "Usage of tempfile.mktemp is susceptible to race conditions!"
+    },
+    {
+      "_id": "os_system_execution",
+      "name": {
+        "type": "regex",
+        "pattern": "^os\\.(system|popen[234]?|startfile)$"
+      },
+      "score": 50,
+      "message": "Code is performing system command execution",
+      "tags": ["system_execution"]
+    },
+    {
+      "_id": "python_code_execution",
+      "name": {
+        "type": "regex",
+        "pattern": "^(eval|exec)$"
+      },
+      "score": 100,
+      "tags": ["obfuscation", "code_execution"],
+      "message": "eval/exec usage found in a source code"
     }
   ],
   "sensitive_filenames": [
     "my_passwords.txt"
   ],
   "modules": [
-
+    {
+      "name": "network",
+      "score": 10,
+      "modules": [
+        "requests"
+      ]
+    }
+  ],
+  "django_modules": [
+    "django.shortcuts.render"
   ],
   "taint_sinks": [
     "flask.make_response",
@@ -22,7 +52,8 @@
     "subprocess.call",
     "eval",
     "exec",
-    "open"
+    "open",
+    "django.shortcuts.render"
   ],
   "taint_sources": [
     "input",
@@ -35,5 +66,9 @@
     "flask.request.files.*",
     "flask.request.cookies.*",
     "flask.request.get_json"
+  ],
+  "taint_clean": [
+    "int",
+    "flask.Markup.escape"
   ]
 }

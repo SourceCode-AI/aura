@@ -8,12 +8,13 @@ class ASTRewrite(Visitor):
     """
     Visitor to transform the AST tree for deobfuscation purposes
     """
+
     def __init__(self, **kwargs):
         self.__mutations = (
             self.binop,
             self.resolve_variable,
             self.string_slice,
-            self.decode_inline_base64
+            self.decode_inline_base64,
         )
         super().__init__(**kwargs)
 
@@ -38,50 +39,52 @@ class ASTRewrite(Visitor):
         if not isinstance(node, BinOp):
             return
 
-        if node.op == 'add':
+        if node.op == "add":
             if isinstance(node.left, String) and isinstance(node.right, String):
                 new_str = node.right.value + node.left.value
                 new_node = String(value=new_str)
                 # new_node._original = context.node
                 context.replace(new_node)
                 return True
-        # TODO cover other cases
+        #  TODO cover other cases
 
     def string_slice(self, context):
         if not isinstance(context.node, dict):
             return
-        elif context.node.get('_type') != 'Subscript':
+        elif context.node.get("_type") != "Subscript":
             return
-        elif not isinstance(context.node['value'], String):
+        elif not isinstance(context.node["value"], String):
             return
 
-        lower = context.node['slice'].get('lower')
+        lower = context.node["slice"].get("lower")
         if lower:
             lower = lower.value
         else:
             lower = 0
 
-        upper = context.node['slice'].get('upper')
+        upper = context.node["slice"].get("upper")
         if upper:
             upper = upper.value
         else:
-            upper = len(context.node['value'].value)
+            upper = len(context.node["value"].value)
 
-        step = context.node['slice'].get('step')
+        step = context.node["slice"].get("step")
         if step:
             step = step.value
         else:
             step = 1
 
-        sliced_str = context.node['value'].value[lower:upper:step]
+        sliced_str = context.node["value"].value[lower:upper:step]
         new_node = String(value=sliced_str)
         context.replace(new_node)
 
-    def resolve_variable(self, context:Context):
+    def resolve_variable(self, context: Context):
         """
         Transformation for constant propagation
         """
-        if type(context.node) == Attribute:  # TODO: transition inside the visit_node of Attr
+        if (
+            type(context.node) == Attribute
+        ):  #  TODO: transition inside the visit_node of Attr
             # Replace attributes such as x.decode("base64") to "test".decode("base64")
 
             source = context.node.source
@@ -104,15 +107,19 @@ class ASTRewrite(Visitor):
         node = context.node
         if not isinstance(node, Call):
             return
-        #check if it is calling <str>.decode(something)
-        elif not (isinstance(node.func, Attribute) and isinstance(node.func.source, String) and node.func.attr == 'decode'):
+        # check if it is calling <str>.decode(something)
+        elif not (
+            isinstance(node.func, Attribute)
+            and isinstance(node.func.source, String)
+            and node.func.attr == "decode"
+        ):
             return
-        #check if the decode attribute is base64
+        # check if the decode attribute is base64
         elif not (len(node.args) == 1 and isinstance(node.args[0], (String, str))):
             return
 
         codec = str(node.args[0])
-        if codec != 'base64':
+        if codec != "base64":
             return
 
         try:
@@ -128,6 +135,6 @@ class ASTRewrite(Visitor):
         node = context.node
         if not isinstance(node, Attribute):
             return
-        elif not (isinstance(node.func, str) and node.func == 'self'):
+        elif not (isinstance(node.func, str) and node.func == "self"):
             # TODO
             return

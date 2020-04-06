@@ -6,7 +6,7 @@ class NodeAnalyzerV2:
     def reset_hook(self):
         pass
 
-    def post_analysis(self, analyzer:ReadOnlyAnalyzer):
+    def post_analysis(self, analyzer: ReadOnlyAnalyzer):
         pass
 
 

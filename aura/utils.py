@@ -6,8 +6,8 @@ import shutil
 import importlib
 import dataclasses
 from pathlib import Path
-from functools import partial
-from typing import Generator
+from functools import partial, wraps
+from typing import Generator, Union, List
 
 import requests
 from click import secho
@@ -25,27 +25,14 @@ def walk(location) -> Generator[Path, None, None]:
 
     location = location.absolute()
 
-    for x in location.rglob('*'):
+    for x in location.rglob("*"):
         if x.is_dir():
             continue
         else:
             yield x
 
 
-def filter_empty_dict(data):
-    for key, val in list(data.items()):
-        if val is None:
-            del data[key]
-        elif isinstance(val, str) and len(val) == 0:
-            del data[key]
-        elif type(val) is list and len(val) == 0:
-            del data[key]
-        elif type(val) is int and val == 0:
-            del data[key]
-    return data
-
-
-def print_tty(msg, *args, **kwargs):
+def print_tty(msg: str, *args, **kwargs) -> None:
     """
     Print string to stdout only if it's not a pipe or redirect (e.g. tty)
     Additional *args and **kwargs are passed to the `click.secho` function
@@ -57,33 +44,33 @@ def print_tty(msg, *args, **kwargs):
         secho(msg, *args, **kwargs)
 
 
-def md5(data, hex=True, block_size=2**20):
+def md5(
+    data: Union[str, bytes, Path], hex=True, block_size=2 ** 20
+) -> Union[str, bytes]:
     ctx = hashlib.md5()
 
     if isinstance(data, Path):
-        with  data.open('rb') as fd:
+        with data.open("rb") as fd:
             while True:
                 file_data = fd.read(block_size)
                 if not file_data:
                     break
                 ctx.update(file_data)
     else:
-        ctx.update(data)
+        ctx.update(bytes(data))
 
     return ctx.hexdigest() if hex else ctx.digest()
 
 
-def normalize_name(name):
+def normalize_name(name: str) -> str:
     """
     Normalize package name as described in PEP-503
     https://www.python.org/dev/peps/pep-0503/#normalized-names
-
-    :return:
     """
-    return re.sub(r'[-_.]+', '-', name).lower()
+    return re.sub(r"[-_.]+", "-", name).lower()
 
 
-def download_file(url, fd):
+def download_file(url: str, fd) -> None:
     """
     Download data from given URL and write it to the file descriptor
     This function is designed for speed as other approaches are not able to utilize full network speed
@@ -92,7 +79,9 @@ def download_file(url, fd):
     :param fd: Open file-like descriptor
     """
     with requests.get(url, stream=True) as r:
-        r.raw.read = partial(r.raw.read, decode_content=True)  # https://github.com/requests/requests/issues/2155
+        r.raw.read = partial(
+            r.raw.read, decode_content=True
+        )  #  https://github.com/requests/requests/issues/2155
         shutil.copyfileobj(r.raw, fd)  # https://stackoverflow.com/a/39217788
     fd.flush()
 
@@ -105,23 +94,23 @@ def json_encoder(obj):
     elif isinstance(obj, ASTNode):
         return obj.json
     elif isinstance(obj, bytes):
-        return obj.decode('utf-8')
+        return obj.decode("utf-8")
     elif dataclasses.is_dataclass(obj):
-        if hasattr(obj, '_asdict'):
+        if hasattr(obj, "_asdict"):
             return obj._asdict()
         else:
             return dataclasses.asdict(obj)
 
 
-def lookup_lines(pth, line_nos:list, strip=True):
+def lookup_lines(pth, line_nos: list, strip=True):
     line_nos = sorted(line_nos)
     lines = {}
     if not line_nos:
         return lines
 
-    with open(pth, 'r') as fd:
+    with open(pth, "r") as fd:
         for ix, line in enumerate(fd):
-            if ix > line_nos[-1]+1:
+            if ix > line_nos[-1] + 1:
                 break
 
             line_no = ix + 1
@@ -133,12 +122,12 @@ def lookup_lines(pth, line_nos:list, strip=True):
     return lines
 
 
-def import_hook(name):
-    if ':' in name:
-        modname, target = name.split(':')
+def import_hook(name: str):
+    if ":" in name:
+        modname, target = name.split(":")
     else:
         modname = name
-        target = modname.split('.')[-1]
+        target = modname.split(".")[-1]
 
     module = importlib.import_module(modname)
     return getattr(module, target)
@@ -148,17 +137,22 @@ def set_function_attr(**kwargs):
     """
     Simple decorator that adds attributes to the function as defined by kwargs
     """
+
     def attr_decor(func):
         for n, v in kwargs.items():
             setattr(func, n, v)
         return func
+
     return attr_decor
 
 
-def imports_to_tree(items):
+def imports_to_tree(items: list) -> dict:
+    """
+    Transform a list of imported modules into a module tree
+    """
     root = {}
     for x in items:
-        parts = x.split('.')
+        parts = x.split(".")
         current = root
         for x in parts:
             if x not in current:
@@ -169,6 +163,9 @@ def imports_to_tree(items):
 
 
 def pprint_imports(tree, indent=""):
+    """
+    pretty print the module tree
+    """
     last = len(tree) - 1
     for ix, x in enumerate(tree.keys()):
         subitems = tree.get(x, {})
@@ -182,7 +179,6 @@ def pprint_imports(tree, indent=""):
         else:
             char += "├"
 
-
         print(f"{indent}{char}{x}")
         if subitems:
             new_indent = " " if ix == last else "│"
@@ -190,18 +186,18 @@ def pprint_imports(tree, indent=""):
 
 
 class Analyzer:
+    """
+    Helper class to set the analyzer metadata
+    """
+
     @classmethod
     def name(cls, name):
         return set_function_attr(name=name)
 
     @classmethod
     def ID(cls, identity):
-        return set_function_attr(analyzer_id = identity)
+        return set_function_attr(analyzer_id=identity)
 
     @classmethod
     def type(cls, atype):
-        return set_function_attr(analyzer_type = atype)
-
-    @classmethod
-    def description(cls, desc):
-        return set_function_attr(analyzer_description = desc)
+        return set_function_attr(analyzer_type=atype)

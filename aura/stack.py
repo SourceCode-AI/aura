@@ -2,7 +2,8 @@ from collections import defaultdict
 
 
 class Frame:
-    __slots__ = ('locals', 'previous')
+    __slots__ = ("locals", "previous")
+
     def __init__(self):
         self.locals = {}
         self.previous = None  # type: Frame
@@ -44,7 +45,7 @@ class Frame:
 
 
 class Stack:
-    __slots__ = ('bottom', 'frame')
+    __slots__ = ("bottom", "frame")
 
     def __init__(self):
         self.bottom = Frame()
@@ -93,14 +94,12 @@ class Stack:
 
 
 class CallGraph:
-    __slots__ = (
-        'references',
-        'definitions'
-    )
+    __slots__ = ("references", "definitions", "object_access")
 
     def __init__(self):
         self.definitions = dict()
         self.references = defaultdict(set)
+        self.object_access = defaultdict(list)
 
     def __setitem__(self, key, value):
         self.references[key].add(value)
@@ -113,10 +112,8 @@ class CallGraph:
 
     def pprint(self):
         import pprint
+
         print("Callers:")
-        pprint.pprint({
-            k: [x.json for x in v]
-            for k, v in self.references.items()
-        })
+        pprint.pprint({k: [x.json for x in v] for k, v in self.references.items()})
         print("Definitions:")
-        pprint.pprint({k: v.json for k,v in self.definitions.items()})
+        pprint.pprint({k: v.json for k, v in self.definitions.items()})

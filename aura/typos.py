@@ -1,4 +1,4 @@
-#-*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 import json
 import sys
 import difflib
@@ -17,7 +17,7 @@ from .uri_handlers.base import URIHandler
 
 
 logger = config.get_logger(__name__)
-WAREHOUSE_XML_RPC = 'https://pypi.python.org/pypi'
+WAREHOUSE_XML_RPC = "https://pypi.python.org/pypi"
 PYPI_STATS_QUERY = """
 SELECT file.project as package_name, count(file.project) as downloads
 FROM `the-psf.pypi.downloads*`
@@ -42,7 +42,7 @@ class TypoAnalyzer(object):
 
         self.mirror = None  # local_mirror
         self.flags = {}
-        # self.__order()
+        #  self.__order()
         # self.analyze()
 
     def __order(self):
@@ -53,8 +53,14 @@ class TypoAnalyzer(object):
 
         Some analysis methods require this order that the pkg2 is the potentionally offending package
         """
-        releases1 = [dateutil.parser.parse(x['upload_time']) for x in itertools.chain(*self.pkg1.package['releases'].values())]
-        releases2 = [dateutil.parser.parse(x['upload_time']) for x in itertools.chain(*self.pkg2.package['releases'].values())]
+        releases1 = [
+            dateutil.parser.parse(x["upload_time"])
+            for x in itertools.chain(*self.pkg1.package["releases"].values())
+        ]
+        releases2 = [
+            dateutil.parser.parse(x["upload_time"])
+            for x in itertools.chain(*self.pkg2.package["releases"].values())
+        ]
 
         self.releases1 = (min(releases1), max(releases1)) if releases1 else (None, None)
         self.releases2 = (min(releases2), max(releases2)) if releases2 else (None, None)
@@ -68,44 +74,52 @@ class TypoAnalyzer(object):
         self.analyze_info_data()
 
     def analyze_info_data(self):
-        sum1 = self.pkg1.package['info']['summary'] or ''
-        sum2 = self.pkg2.package['info']['summary'] or ''
-        #TODO: migrate as ssdeep is no longer a dependency of Aura
-        #self.flags['similar_description'] = (ssdeep.compare(ssdeep.hash(sum1), ssdeep.hash(sum2)) > 80)
+        sum1 = self.pkg1.package["info"]["summary"] or ""
+        sum2 = self.pkg2.package["info"]["summary"] or ""
+        # TODO: migrate as ssdeep is no longer a dependency of Aura
+        # self.flags['similar_description'] = (ssdeep.compare(ssdeep.hash(sum1), ssdeep.hash(sum2)) > 80)
 
-        page1 = self.pkg1.package['info']['home_page'] or ''
-        page2 = self.pkg2.package['info']['home_page'] or ''
-        self.flags['same_homepage'] = (page1 == page2)
+        page1 = self.pkg1.package["info"]["home_page"] or ""
+        page2 = self.pkg2.package["info"]["home_page"] or ""
+        self.flags["same_homepage"] = page1 == page2
 
-        docs1 = self.pkg1.package['info']['docs_url'] or ''
-        docs2 = self.pkg2.package['info']['docs_url'] or ''
-        self.flags['same_docs'] = (docs1 == docs2)
+        docs1 = self.pkg1.package["info"]["docs_url"] or ""
+        docs2 = self.pkg2.package["info"]["docs_url"] or ""
+        self.flags["same_docs"] = docs1 == docs2
 
-        releases1 = set(self.pkg1.package['releases'].keys())
-        releases2 = set(self.pkg2.package['releases'].keys())
-        self.flags['has_subreleases'] = (releases2.issubset(releases1))
+        releases1 = set(self.pkg1.package["releases"].keys())
+        releases2 = set(self.pkg2.package["releases"].keys())
+        self.flags["has_subreleases"] = releases2.issubset(releases1)
 
     def diff_releases(self, original_release=None, other_release=None):
-        ver = self.pkg2.package['info']['version'] if other_release is None else other_release
+        ver = (
+            self.pkg2.package["info"]["version"]
+            if other_release is None
+            else other_release
+        )
 
         if original_release is None:
             # Check if there are any releases
             if ver is None:
                 return
 
-            if ver in self.pkg1.package['releases']:  # If there's a matching release, diff against it
+            if (
+                ver in self.pkg1.package["releases"]
+            ):  #  If there's a matching release, diff against it
                 self.diff_releases(original_release=ver)
             # Diff against latest release
             # self.diff_releases(original_release=self.pkg1['info']['version'])
             return
 
-        for x in self.pkg1.package['releases'][original_release]:
-            for y in self.pkg2.package['releases'][ver]:
-                if x['packagetype'] != y['packagetype']:
+        for x in self.pkg1.package["releases"][original_release]:
+            for y in self.pkg2.package["releases"][ver]:
+                if x["packagetype"] != y["packagetype"]:
                     continue
 
-                with self.pkg1.package.url2local(x['url']) as pth1, self.pkg2.package.url2local(y['url']) as pth2:
-                    ctx = {'a_ref': x['filename'], 'b_ref': y['filename']}
+                with self.pkg1.package.url2local(
+                    x["url"]
+                ) as pth1, self.pkg2.package.url2local(y["url"]) as pth2:
+                    ctx = {"a_ref": x["filename"], "b_ref": y["filename"]}
                     da = diff.DiffAnalyzer()
                     da.compare(pth1, pth2, ctx=ctx)
                     da.pprint()
@@ -172,7 +186,9 @@ def damerau_levenshtein(s1, s2, max_distance=3, cap=None):
         for colNum in range(1, l1 + 1):
             insertionCost = curRow[colNum - 1] + 1
             deletionCost = prevRow[colNum] + 1
-            changeCost = prevRow[colNum - 1] + (0 if s1[colNum - 1] == s2[rowNum - 1] else 1)
+            changeCost = prevRow[colNum - 1] + (
+                0 if s1[colNum - 1] == s2[rowNum - 1] else 1
+            )
             #  set the cell value - min distance to reach this
             #  position
             curRow[colNum] = min(insertionCost, deletionCost, changeCost)
@@ -181,8 +197,13 @@ def damerau_levenshtein(s1, s2, max_distance=3, cap=None):
             #  check to see if we have at least 2 characters
             if 1 < rowNum <= colNum:
                 #  test for possible transposition
-                if s1[colNum - 1] == s2[colNum - 2] and s2[colNum - 1] == s1[colNum - 2]:
-                    curRow[colNum] = min(curRow[colNum], transpositionRow[colNum - 2] + 1)
+                if (
+                    s1[colNum - 1] == s2[colNum - 2]
+                    and s2[colNum - 1] == s1[colNum - 2]
+                ):
+                    curRow[colNum] = min(
+                        curRow[colNum], transpositionRow[colNum - 2] + 1
+                    )
 
     #  the last cell of the matrix is ALWAYS the shortest distance between the two strings
     distance = curRow[-1]
@@ -212,7 +233,7 @@ def diff_distance(s1, s2, cutoff=0.8, cut_return=None):
 
     ratios = (s.real_quick_ratio(), s.quick_ratio(), s.ratio())
 
-    if all(map(lambda x: x>=cutoff, ratios)):
+    if all(map(lambda x: x >= cutoff, ratios)):
         return ratios
     else:
         return cut_return
@@ -225,13 +246,13 @@ def generate_popular(json_path, full_list=None):
 
     if full_list is None:
         full_list = get_all_pypi_packages()
-    # We need to convert generator to tuple because we run it in multiple loops
+    #  We need to convert generator to tuple because we run it in multiple loops
     full_list = tuple(full_list)
 
-    with open(json_path, 'r') as fd:
+    with open(json_path, "r") as fd:
         for line in fd:
             x = json.loads(line)
-            pkg1 = normalize_name(x['package_name'])
+            pkg1 = normalize_name(x["package_name"])
             for pkg2 in full_list:
                 if pkg1 != pkg2:
                     yield (pkg1, pkg2)
@@ -245,27 +266,30 @@ def enumerator(generator=None, method=None):
 
 
 def check_name(name):
-    pth = config.get_relative_path('pypi_stats')
+    pth = config.get_relative_path("pypi_stats")
     typos = []
     with pth.open() as fd:
         for line in fd:
             line = json.loads(line)
-            if name == line['package_name']:
+            if name == line["package_name"]:
                 continue
 
-            dist = damerau_levenshtein(name, line['package_name'])
+            dist = damerau_levenshtein(name, line["package_name"])
             if dist and dist < 3:
-                typos.append(line['package_name'])
+                typos.append(line["package_name"])
 
     return typos
 
 
-def generate_stats(output:click.File, limit=None):
+def generate_stats(output: click.File, limit=None):
     try:
         from google.cloud import bigquery
+
         client = bigquery.Client()
     except Exception:
-        logger.error("Error creating BigQuery client, Aura is probably not correctly configured. Please consult docs.")
+        logger.error(
+            "Error creating BigQuery client, Aura is probably not correctly configured. Please consult docs."
+        )
         sys.exit(1)
 
     if limit:
@@ -274,13 +298,9 @@ def generate_stats(output:click.File, limit=None):
         q = PYPI_STATS_QUERY
 
     logger.info("Running Query on PyPI download dataset")
-    query_job = client.query(
-        q,
-        location = 'US',
-    )
+    query_job = client.query(q, location="US",)
 
     for row in query_job:
-        output.write(json.dumps(dict(row)) + '\n')
+        output.write(json.dumps(dict(row)) + "\n")
 
     logger.info("PyPI download stats generation finished")
-

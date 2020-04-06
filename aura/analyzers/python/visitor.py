@@ -1,29 +1,41 @@
 """
 This module contains Visitor class for traversing the parsed AST tree
 """
+from __future__ import annotations
+
 import os
+import copy
 import time
 import typing
 import subprocess
 from functools import partial, wraps
 from collections import deque
 from pathlib import Path
+from warnings import warn
 
+import pkg_resources
 import simplejson as json
 
-from . nodes import Context, ASTNode, CallGraph
+from .nodes import Context, ASTNode, CallGraph
 from .. import python_src_inspector
+from ... import python_executor
 from ... import config
 
 
 INSPECTOR_PATH = os.path.abspath(python_src_inspector.__file__)
+
+DEFAULT_STAGES = ("convert", "rewrite", "taint_analysis", "readonly")
+
+VISITORS = None
+
 logger = config.get_logger(__name__)
 
 
 def ignore_error(func):
     """
-    Dummy decorator to silence the errors
+    Dummy decorator to silence the recursion errors
     """
+
     @wraps(func)
     def wrapper(*args, **kwargs):
         try:
@@ -34,43 +46,19 @@ def ignore_error(func):
     return wrapper
 
 
-def get_ast_tree(path:str, stdin=None) -> typing.Dict:
-    """
-    Enumerate configured interpreters to find the one that is able to parse the given source code
-    Source code is parsed into AST tree, serialized to JSON and passed back to framework via stdout
-    """
-    interpreters = list(config.CFG['interpreters'].items())
-    for name, interpreter in interpreters:
-        proc = subprocess.run(
-            [interpreter,  INSPECTOR_PATH, path],
-            stdout=subprocess.PIPE,
-            #stderr=subprocess.PIPE,
-            shell=False,
-            input=stdin
-        )
-        if proc.returncode == 0:
-            payload = None
-            try:
-                payload = proc.stdout
-                return json.loads(payload)
-            except Exception:
-                logger.exception(f"Error decoding JSON AST: {repr(payload)}")
-
-
 class Visitor:
     """
     Main class for traversing the parsed AST tree with support for hooks to call functions
     when nodes are visited as well as modification via the passed context
     """
 
-    _lru_cache = []
+    _lru_cache = {}
 
-    def __init__(self, *, metadata, max_iterations=250, **kwargs):
+    def __init__(self, *, metadata, **kwargs):
         self.kwargs = kwargs
         self.tree = None
         self.traversed = False
         self.modified = False
-        self.max_iterations = max_iterations
         self.iteration = 0
         self.convergence = 1
         self.queue = deque()
@@ -78,27 +66,88 @@ class Visitor:
 
         self.metadata = metadata
         self.hits = []
-        self.path = metadata['path']
+        self.path = metadata["path"]
+        self.normalized_path = metadata.get("normalized_path", self.path)
+        self.max_iterations = int(config.CFG["aura"].get("max-ast-iterations", 500))
+        self.max_queue_size = int(config.CFG["aura"].get("max-ast-queue-size", 10000))
 
     @classmethod
     def from_cache(cls, *, source, **kwargs):
-        cache_id = f"{cls.__name__}#{os.fspath(source)}"
-
-        for x, t in cls._lru_cache:
-            if x == cache_id:
-                logger.info(f"Loading AST tree from cache: {cache_id}")
-                return t
-
+        # TODO: remove, deprecated by from_visitor
         obj = cls(path=source, **kwargs)
         obj.load_tree(source)
         obj.traverse()
         return obj
 
+    @classmethod
+    def from_visitor(cls, visitor: Visitor):
+        cache_id = f"{cls.__name__}#{os.fspath(visitor.path)}"
+
+        if cache_id not in cls._lru_cache:
+            obj = cls(
+                metadata=visitor.metadata,
+                **visitor.kwargs,
+            )
+            obj.tree = copy.deepcopy(visitor.tree)
+            obj.traverse()
+            cls._lru_cache[cache_id] = obj
+
+        return cls._lru_cache[cache_id]
+
+    @classmethod
+    def run_stages(cls, *, metadata, stages=DEFAULT_STAGES, **kwargs):
+        if not stages:
+            stages = DEFAULT_STAGES
+
+        v = None
+        path = os.fspath(metadata["path"])
+        previous = Visitor(metadata=metadata, **kwargs)
+        previous.load_tree(path)
+        previous.traverse()
+
+        visitors = cls.get_visitors()
+
+        for stage in stages:
+            assert previous.tree is not None, stage
+            if stage not in visitors:
+                raise ValueError("Unknown AST stage: " + stage)
+            v = visitors[stage].from_visitor(previous)
+            previous = v
+
+        return v
+
+    @classmethod
+    def get_visitors(cls):
+        global VISITORS
+        if VISITORS is None:
+            VISITORS = {
+                x.name: x.load()
+                for x in pkg_resources.iter_entry_points("aura.ast_visitors")
+            }
+
+        return VISITORS
+
     def load_tree(self, source: Path):
         if isinstance(source, Path):
             source = os.fspath(source)
 
-        self.tree = get_ast_tree(source)
+        cmd = [INSPECTOR_PATH, source]
+
+        if self.metadata.get('interpreter_path'):
+            self.tree = python_executor.execute_interpreter(
+                command = cmd,
+                interpreter = self.metadata['interpreter_path'],
+            )
+        else:
+            self.tree, iname, icmd = python_executor.run_with_interpreters(command=cmd)
+            self.metadata['interpreter_name'] = iname
+            self.metadata['interpreter_path'] = icmd
+
+    def push(self, context):
+        if len(self.queue) >= self.max_queue_size:
+            warn("AST Queue size exceeded, dropping traversal node", stacklevel=2)
+            return False
+        self.queue.append(context)
 
     def _replace_generic(self, new_node, key, context):
         """
@@ -117,7 +166,7 @@ class Visitor:
         context.modified = True
         self.tree = new_node
 
-    def traverse(self):
+    def traverse(self, _id=id):
         """
         Traverse the AST tree from root
         Visited nodes are placed in a FIFO queue as context to be processed by hook and functions
@@ -134,34 +183,32 @@ class Visitor:
                 # Convergence attribute defines how many extra passes through the tree are made
                 # after it was not modified, this is a safety mechanism as some badly
                 # written plugins might not have set modified attribute after modifying the tree
+                # Or you know, might be a bug and the tree was not marked as modified when it should
                 if (not self.modified) and self.convergence > 0:
                     self.convergence -= 1
                 else:
-                    # Reset convergence if the tree was modified
+                    #  Reset convergence if the tree was modified
                     self.convergence = 1
 
             self.modified = False
 
-            #logger.debug(f"Tree '{self.__class__.__name__}' iteration {self.iteration}")
+            # logger.debug(f"Tree '{self.__class__.__name__}' iteration {self.iteration}")
 
             new_ctx = Context(
-                node=self.tree,
-                parent=None,
-                replace=self._replace_root,
-                visitor=self
+                node=self.tree, parent=None, replace=self._replace_root, visitor=self
             )
             self.queue.append(new_ctx)
             self._init_visit(new_ctx)
 
             processed_nodes = set()
 
-            while (self.queue):
+            while self.queue:
                 ctx = self.queue.popleft()  # type: Context
 
                 # Keep track of processed object ID's
                 # This is to prevent infinite loops where processed object will add themselves back to queue
                 # This works on python internal ID as we are only concerned about the same objects
-                if id(ctx.node) in processed_nodes:
+                if _id(ctx.node) in processed_nodes:
                     continue
 
                 # logger.debug(f"Processing context: {ctx.node}")
@@ -169,59 +216,73 @@ class Visitor:
                 processed_nodes.add(id(ctx.node))
 
             self.iteration += 1
-            if self.iteration >= self.max_iterations:
+            if self.iteration >= self.max_iterations:  # TODO: report this as a result so we can collect this data
                 break
 
-        logger.debug(f"Tree visitor '{type(self).__name__}' converged in {self.iteration} iterations")
+        self._post_analysis()
+
+        logger.debug(
+            f"Tree visitor '{type(self).__name__}' converged in {self.iteration} iterations"
+        )
         self.traversed = True
 
         end = time.time() - start
         if end >= 3:
             # Log message if the tree traversal took loner then 3s
-            logger.info(f"[{self.__class__.__name__}] Convergence of {self.metadata.get('path')} took {end}s in {self.iteration} iterations")
+            logger.info(
+                f"[{self.__class__.__name__}] Convergence of {self.metadata.get('path')} took {end}s in {self.iteration} iterations"
+            )
 
-        if self.metadata.get('path'):
-            cache_id = f"{self.__class__.__name__}#{os.fspath(self.kwargs['path'])}"
-            self._lru_cache.append((cache_id, self))
-            if len(self._lru_cache) > 15:
-                self._lru_cache = self._lru_cache[-15:]
+        if self.path:
+            cache_id = f"{self.__class__.__name__}#{os.fspath(self.path)}"
+            self._lru_cache[cache_id] = self
 
         return self.tree
 
     @ignore_error
-    def __process_context(self, context: Context):
-        if isinstance(context.node, dict) and context.node.get('lineno')  in config.DEBUG_LINES:
-            breakpoint()
-        elif isinstance(context.node, ASTNode) and context.node.line_no in config.DEBUG_LINES:
-            breakpoint()
-
-        # if isinstance(context.node, ASTNode):
-        #     print(context.stack.frame.variables)
-        #     context.node.pprint()
-
+    def __process_context(
+            self,
+            context: Context,
+            _type=type,
+            _isinstance=isinstance,
+            _dict=dict,
+            _list=list
+    ):
         self._visit_node(context)
 
         if context.modified:
             return
 
-        if type(context.node) == dict:
-            keys = list(context.node.keys())
-            for key in keys:
-                context.visit_child(
-                    node = context.node[key],
-                    replace = partial(self._replace_generic, key=key, context=context)
-                )
-        elif type(context.node) == list:
-            for idx, node_item in enumerate(context.node):
-                context.visit_child(
-                    node = node_item,
-                    replace = partial(self._replace_generic, key=idx, context=context)
-                )
-        elif isinstance(context.node, ASTNode):
+        # Using map is much faster then for-loop
+        if _type(context.node) == _dict:
+            if context.node.get("lineno") in config.DEBUG_LINES:
+                breakpoint()
+            keys = _list(context.node.keys())
+            _list(map(lambda k: self.__visit_dict(k, context), keys))
+        elif _type(context.node) == _list:
+            _list(map(lambda x: self.__visit_list(x[0], x[1], context), enumerate(context.node)))
+        elif _isinstance(context.node, ASTNode):
+            if context.node.line_no in config.DEBUG_LINES:
+                breakpoint()
             context.node._visit_node(context)
 
-    def _init_visit(self, context:Context):
+    def __visit_dict(self, key, context):
+        context.visit_child(
+            node=context.node[key],
+            replace=partial(self._replace_generic, key=key, context=context),
+        )
+
+    def __visit_list(self, idx, item, context):
+        context.visit_child(
+            node=item,
+            replace=partial(self._replace_generic, key=idx, context=context),
+        )
+
+    def _init_visit(self, context: Context):
         pass
 
-    def _visit_node(self, context:Context):
+    def _post_analysis(self):
+        pass
+
+    def _visit_node(self, context: Context):
         pass

@@ -13,7 +13,7 @@ def test_analyze_info_data():
     ta = typos.TypoAnalyzer(uri1, uri2)
     ta.analyze_info_data()
     assert ta.flags['same_docs'] is True
-    assert ta.flags['same_homepage'] is True
+    assert ta.flags['same_homepage'] is False
 
     uri2 = 'pypi://simplejson'
     ta = typos.TypoAnalyzer(uri1, uri2)

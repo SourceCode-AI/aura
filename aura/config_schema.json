@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+
+  "type": "object",
+  "properties": {
+    "ignore_suspicious_files": {
+      "type": "array",
+      "items":{"type": "string"}
+    },
+    "function_definitions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {"$ref": "#/definitions/pattern_matching"},
+          "_id": {"type":  "string"},
+          "message": {"type": "string"},
+          "tags": {
+            "type": "array",
+            "items": {"type":  "string"}
+          },
+          "score": {
+            "type": "number",
+            "minimum": 0
+          },
+          "signature": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {"type":  "string"},
+                "kind": {"type":  "string"},
+                "annotation": {"type": "string"},
+                "default": {"type":  ["string", "number", "boolean"]},
+                "constraint": {}
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["name", "message"],
+        "additionalProperties": false
+      }
+    },
+    "taint_sinks": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "taint_sources": {
+      "type": "array",
+      "items": {"type":  "string"}
+    },
+    "taint_clean": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "strings": {
+      "type": "array",
+      "items": {"allOf":  [
+        {"$ref": "#/definitions/pattern_matching"},
+        {
+          "required": ["message"],
+          "properties": {
+            "score": {
+              "type":  "number",
+              "minimum": 0
+            }
+          }
+        }
+      ]}
+    },
+    "modules": {},
+    "django_modules": {},
+    "function_calls": {},
+    "sensitive_filenames": {
+      "type": "array",
+      "items": {"$ref": "#/definitions/pattern_matching"}
+    }
+  },
+
+  "additionalProperties": false,
+
+  "definitions": {
+    "pattern_matching": {
+      "anyOf": [
+        {"type": "string"},
+        {
+          "type": "object",
+          "properties": {
+            "type": {"const": "regex"},
+            "pattern": {"type": "string"},
+            "message": {"type": "string"},
+            "flags": {"type": "string"}
+          },
+          "required": ["type", "pattern"]
+        }
+      ]
+    }
+  }
+}

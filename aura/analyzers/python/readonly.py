@@ -2,13 +2,10 @@ import os
 import typing
 from pathlib import Path
 
-
 from .. import rules
-from .rewrite_ast import ASTRewrite
 from .taint.visitor import TaintAnalysis
 from .visitor import Visitor
 from .nodes import Context
-from ...utils import lookup_lines
 
 
 class ReadOnlyAnalyzer(Visitor):
@@ -25,7 +22,9 @@ class ReadOnlyAnalyzer(Visitor):
     def __call__(self, pth: Path) -> typing.Iterator[rules.Rule]:
         if not self.hooks:
             return
-        elif self.kwargs.get('mime') != 'text/x-python' and not os.fspath(self.path).endswith('.py'):
+        elif self.kwargs.get("mime") != "text/x-python" and not os.fspath(
+            self.path
+        ).endswith(".py"):
             return
         try:
             self.load_tree(source=pth)
@@ -34,27 +33,23 @@ class ReadOnlyAnalyzer(Visitor):
             for x in self.hooks:
                 x.post_analysis(self)
 
-            lines = [x.line_no for x in self.hits if x.line_no is not None]
-            lines_lookup = lookup_lines(pth, lines)
             for x in self.hits:
                 if x.location is None:
                     x.location = os.fspath(pth)
 
-                if x.line_no in lines_lookup and not x.line:
-                    x.line = lines_lookup[x.line_no]
-
-                yield x
+            rules.Rule.lookup_lines(self.hits)
+            yield from self.hits
 
         finally:
             for x in self.hooks:
                 x.reset_hook()
 
-    def _visit_node(self, context:Context):
-        node_type = 'node_' + type(context.node).__name__
+    def _visit_node(self, context: Context):
+        node_type = "node_" + type(context.node).__name__
 
         for hook in self.hooks:
             handler = getattr(hook, node_type, None)
             if handler is not None:
                 self.hits.extend(handler(context=context))
-            elif hasattr(hook, '_visit_node'):
+            elif hasattr(hook, "_visit_node"):
                 self.hits.extend(hook._visit_node(context=context))

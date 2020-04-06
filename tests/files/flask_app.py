@@ -1,5 +1,9 @@
+# This is an intentionaly vulnerable Flask application
+# Vulnerabilites here are used to test the taint analysis sytem
+
 import flask
 
+from . import taint_import
 
 app = flask.Flask("ratata")
 
@@ -48,6 +52,7 @@ def drive_by():
     """
     return flask.redirect(flask.request.args.get('secret_value'), 302)
 
+
 @app.route('/vuln4')
 def vuln4():
     """
@@ -62,7 +67,7 @@ def vuln5():
     Tainted input defined at the end of the for-loop
     """
     name = None
-    for _ in range(5):
+    for _ in range(5):  # TODO: handle this case
         if name is not None:
             eval(name)
         else:
@@ -76,6 +81,39 @@ def vuln6():
     obj.code = flask.request.args.get('src', 'pass')
     obj.run()
     return "Hello world"
+
+
+@app.route('/vuln7/<command>')
+def vuln7(command):
+    eval(command)
+
+
+@app.route('/vuln8')
+def vuln8():
+    name = flask.request.args.get('name', 'Spiderman')
+    return flask.render_template("main_xss.html", name=name)
+
+@app.route('/vuln9')
+def vuln9():
+    # Test that the taint is passed from a different module
+    name = taint_import.get_username()
+    return flask.render_template('main_xss.html', name=name)
+
+
+@app.route('/not_vuln1/<int:command>')
+def not_vuln1(command):
+    eval(command)
+
+
+@app.route('/not_vuln2/<command>')
+def not_vuln2(command):
+    c = int(command)
+    eval(c)
+
+
+@app.route('/test1')
+def test1():
+    return flask.render_template('doesn_not_exists.html')
 
 
 app.run(debug=True)

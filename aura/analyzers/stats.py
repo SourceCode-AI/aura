@@ -5,14 +5,13 @@ from pathlib import Path
 from .rules import Rule
 from ..utils import Analyzer
 
+
 @dataclass
 class FileStats(Rule):
-    mime: str = ''
+    mime: str = ""
 
     def _asdict(self):
-        d = {
-            'mime': self.mime
-        }
+        d = {"mime": self.mime}
         d.update(Rule._asdict(self))
         return d
 
@@ -20,14 +19,11 @@ class FileStats(Rule):
         return hash(self.mime)
 
 
-@Analyzer.ID('file_stats')
-@Analyzer.description("This analyzer collect stats about analyzer files")
+@Analyzer.ID("file_stats")
 def analyze(pth: Path, **kwargs):
+    """This analyzer collect stats about analyzer files"""
     pth = os.fspath(pth)
 
-    hit = FileStats(
-        mime = kwargs['mime'],
-        signature = f"stats#mime#{pth}"
-    )
+    hit = FileStats(mime=kwargs["mime"], signature=f"stats#mime#{pth}")
     hit.informational = True
     yield hit

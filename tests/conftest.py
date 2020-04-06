@@ -3,9 +3,25 @@ import json
 import tempfile
 import contextlib
 from pathlib import Path
+from unittest import mock
 
-from click.testing import CliRunner
+from click.testing import CliRunner, Result
 import pytest
+
+
+# Definition used to replicate the PyPI mirror file system structure
+MIRROR_FILES = {
+    "wheel": (
+        {
+            "name": "wheel-0.34.2-py2.py3-none-any.whl",
+            "path": "packages/8c/23/848298cccf8e40f5bbb59009b32848a4c38f4e7f3364297ab3c3e2e2cd14"
+        },
+        {
+            "name": "wheel-0.34.2.tar.gz",
+            "path": "packages/75/28/521c6dc7fef23a68368efefdcd682f5b3d1d58c2b90b06dc1d0b805b51ae"
+        }
+    )
+}
 
 
 cli = None
@@ -41,23 +57,28 @@ class Fixtures(object):
         else:
             return result
 
-    def get_cli_output(self, args):
+    def get_cli_output(self, args, check_exit_code=True) -> Result:
         global cli
         if cli is None:
             from aura import cli
 
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
         result = runner.invoke(cli.cli, args=args)
 
-        if result.exception:
+        if check_exit_code:
+            assert result.exit_code == 0
+        if result.exception and type(result.exception) != SystemExit:
             raise result.exception
 
-        assert result.exit_code == 0
         return result
 
     def get_raw_ast(self, src):
-        from aura.analyzers.python import visitor as rvisitor
-        out = rvisitor.get_ast_tree('-', bytes(src, 'utf-8'))
+        from aura import python_executor
+        from aura.analyzers import python_src_inspector
+
+        INSPECTOR_PATH = os.path.abspath(python_src_inspector.__file__)
+
+        out, _, _ = python_executor.run_with_interpreters(command = [INSPECTOR_PATH, '-'], stdin=bytes(src, 'utf-8'))
         return out['ast_tree']['body']
 
     def get_full_ast(self, src):
@@ -83,9 +104,17 @@ class Fixtures(object):
             assert any(match_rule(h, x) for h in output['hits']), x
 
 
+def match_rule(source, target) -> bool:
+    """
+    Fuzzy match the source structure onto the target
+    If something is defined in the target (such as dict key) it must also be present in the source
+    Additional data (keys, list items etc...) that are present in source but not target are ignored
+    This fuzzy match works recursively for nested structures
 
-
-def match_rule(source, target):
+    :param source: input structure that we want to match on
+    :param target: pattern that we match against, all structure items/keys from target must be present in source
+    :return: bool
+    """
     global Rule
     if Rule is None:
         from aura.analyzers.rules import Rule
@@ -93,14 +122,33 @@ def match_rule(source, target):
     if isinstance(source, Rule):
         source = source._asdict()
 
+    if type(target) != type(source):
+        return False
+    elif isinstance(target, list):
+        for t in target:
+            if not any(match_rule(s, t) for s in source):
+                return False
+        return True
+    # Fallback to direct comparison if target is dict
+    elif not isinstance(target, dict):
+        return target == source
+
+    # Check that all the keys from a target are present in the source using recursive fuzzy match
     for x in target.keys():
+        # Fail if the key is not present in a source  or is of a different type then target
         if type(target[x]) != type(source.get(x)):
             return False
+        # Recurse if target key value is a dict
         if isinstance(target[x], dict):
             if not match_rule(source[x], target[x]):
                 return False
+        # Recurse if a target key value is a list
         elif isinstance(target[x], list):
-            assert len(set(target[x]) - set(source[x])) == 0
+            # We don't care about the ordering so any source list item can match
+            for t in target[x]:
+                if any(match_rule(s, t) for s in source[x]):
+                    return True
+        # Fall back to direct comparison
         else:
             if target[x] != source[x]:
                 return False
@@ -108,7 +156,7 @@ def match_rule(source, target):
     return True
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def fixtures():
     yield Fixtures()
 
@@ -127,3 +175,35 @@ def chdir():
 @pytest.fixture
 def fuzzy_rule_match():
     return match_rule
+
+
+@pytest.fixture(scope="module")
+def simulate_mirror(fixtures):
+    """
+    Thjs fixture creates a file/directory structure that simulates an offline PyPI mirror
+    Used to test the `mirror://` bandersnatch integration for scanning the whole PyPI repository
+    """
+    from aura import mirror as amirror
+
+    with tempfile.TemporaryDirectory(prefix="aura_test_mirror_") as mirror:
+        pmirror = Path(mirror)
+        assert pmirror.is_dir()
+        os.mkdir(pmirror / "json")
+
+        for pkg, pkg_files in MIRROR_FILES.items():
+            # copy the package JSON metadata
+            os.link(
+                fixtures.path(f"mirror/{pkg}.json"),
+                pmirror / "json" / pkg
+            )
+
+            for p in pkg_files:
+                os.makedirs(pmirror / p["path"])
+                os.link(
+                    fixtures.path(f"mirror/{p['name']}"),
+                    os.fspath(pmirror / p["path"] / p["name"])
+                )
+
+        with mock.patch.object(amirror.LocalMirror, "get_mirror_path", return_value=pmirror):
+            assert pmirror.is_dir()
+            yield mirror

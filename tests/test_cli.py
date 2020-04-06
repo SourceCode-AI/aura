@@ -12,7 +12,7 @@ def test_simple_cli_analysis(fixtures):
     pth = fixtures.path('basic_ast.py')
     output = fixtures.scan_test_file('basic_ast.py')
 
-    assert output['name'] == pth.split('/')[-1]
+    assert output['name'].endswith(pth.split('/')[-1])
     assert 'url' in output['tags']
 
 

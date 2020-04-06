@@ -42,6 +42,7 @@ def test_stack_copy():
 
     s2 = s1.copy()
     assert s1 is not s2
+    assert set(s1.frame.variables) == set(s2.frame.variables)
     assert s2.frame is not s1.frame
     assert s2.bottom is not s1.bottom
     assert s2.frame is not s2.bottom

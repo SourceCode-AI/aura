@@ -9,17 +9,22 @@ if [ ! -f "$AURA_CFG" ] && [ $PTH == "/config" ]; then
     echo "Configuration file does not exists. Copying from examples..." >>/dev/stderr
     cd /analyzer
     cp config.ini /config/config.ini
-    cat files/example_signatures.json | sed -e 's/^\s*#.*$//' >/config/signatures.json
     cp files/example_rules.yara /config/rules.yara
     cp files/pypi_stats.json /config/pypi_stats.json
-    echo "CFG path: ${AURA_CFG}"
-    tree /config
+    echo "CFG path: ${AURA_CFG}" >>/dev/stderr
+    tree /config >>/dev/stderr
     cd $CWD
+fi
+
+if [ ! -f "/config/signatures" ] && [ $PTH == "/config" ]; then
+  cp /analyzer/signatures.json /config/signatures.json
 fi
 
 if [ $1 == "run_tests" ]; then
     cd /analyzer
-    exec pytest --cov aura tests/ -k "not extended"
+    #rm .coverage || true
+    #echo |sqlite3 .coverage
+    exec pytest --no-cov tests/
 fi;
 
 export AURA_CFG

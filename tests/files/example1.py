@@ -58,9 +58,27 @@ list_comprehension = [x for x in range(10)]
 generator_comprehension = (x for x in range(10))
 
 for x in []:
+    if not x:
+        break
     self_assign = x['val1'] if x['something'] else x['alternative']
 
 
 def generate_powers(top=20, power=2):
     for x in range(1, top):
         yield x**power
+
+do_stuff() -> int: ...
+
+try:
+    do_stuff()
+except Exception:
+    pass
+else:
+    pass
+finally:
+    pass
+
+try:
+    do_stuff()
+except (TypeError, KeyError) as exc:
+    continue

@@ -1,0 +1,10 @@
+*.pyc
+*.egg-info
+.pytest_cache
+.pyre
+.coverage
+venv
+__pycache__
+quarantine
+docs/build
+files/logo

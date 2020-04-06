@@ -1,5 +1,6 @@
-#-*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 import json
+import typing
 from pathlib import Path
 from urllib.parse import urlparse, ParseResult
 
@@ -11,20 +12,24 @@ from .config import CFG
 class LocalMirror(object):
     def __init__(self, mirror_path=None):
         if mirror_path is None:
-            mirror_path = CFG['aura']['mirror']
+            self.mirror_path = self.get_mirror_path()
+        else:
+            self.mirror_path = Path(mirror_path)
 
-        self.mirror_path = Path(mirror_path)
+    @classmethod
+    def get_mirror_path(cls) -> Path:
+        return Path(CFG["aura"]["mirror"])
 
-    def list_packages(self):
-        yield from (self.mirror_path / 'json').iterdir()
+    def list_packages(self) -> typing.Generator[Path, None, None]:
+        yield from (self.mirror_path / "json").iterdir()
 
     def get_json(self, package_name):
-        json_path = self.mirror_path / 'json' / package_name
+        json_path = self.mirror_path / "json" / package_name
 
         if not json_path.is_file():
-            json_path = self.mirror_path / 'json' / self._lookup_package(package_name)
+            json_path = self.mirror_path / "json" / self._lookup_package(package_name)
 
-        with open(json_path, 'r') as fd:
+        with open(json_path, "r") as fd:
             return json.loads(fd.read())
 
     def _lookup_package(self, package_name):
@@ -40,5 +45,5 @@ class LocalMirror(object):
         if not isinstance(url, ParseResult):
             url = urlparse(url)
 
-        pth = url.path.lstrip('/')
+        pth = url.path.lstrip("/")
         return self.mirror_path / pth

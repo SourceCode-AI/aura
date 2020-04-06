@@ -7,11 +7,11 @@ from ...utils import Analyzer
 
 
 SQL_REGEX = re.compile(
-    r'^(SELECT\s.*FROM|'
-    r'DELETE\s.*FROM|'
-    r'INSERT\s+INTO\s.*VALUES\s|'
-    r'UPDATE\s.*SET\s).*'
-    , flags=re.I
+    r"^(SELECT\s.*FROM|"
+    r"DELETE\s.*FROM|"
+    r"INSERT\s+INTO\s.*VALUES\s|"
+    r"UPDATE\s.*SET\s).*",
+    flags=re.I,
 )
 
 
@@ -23,10 +23,10 @@ class SQLInjection(rules.Rule):
     pass
 
 
-
-@Analyzer.ID('sql_injection')
-@Analyzer.description("Finds possible SQL injections via direct string manipulations")
+@Analyzer.ID("sql_injection")
 class SQLi(base.NodeAnalyzerV2):
+    """Finds possible SQL injections via direct string manipulations"""
+
     def node_BinOp(self, context):
         """
         Query:
@@ -42,17 +42,17 @@ class SQLi(base.NodeAnalyzerV2):
         """
         n = context.node
         yield from []
-        if not (isinstance(n.right, String) and n.op in ('mod', 'add')):
+        if not (isinstance(n.right, String) and n.op in ("mod", "add")):
             return
 
         if not is_sql(n.right.value):
             return
 
         yield SQLInjection(
-            score = 50,
-            message = "Possible SQL injection found",
-            signature = f"vuln#{context.visitor.path}#{context.node.line_no}",
-            line_no = context.node.line_no
+            score=50,
+            message="Possible SQL injection found",
+            signature=f"vuln#{context.visitor.path}#{context.node.line_no}",
+            line_no=context.node.line_no,
         )
 
     def node_Call(self, context):
@@ -63,17 +63,18 @@ class SQLi(base.NodeAnalyzerV2):
         Call(Attribute(String(value='SELECT * FROM users WHERE id = {}') . 'format'))(*['uid'])
         """
         n = context.node
-        if not (isinstance(n.func, Attribute) and isinstance(n.func.source, String) and n.func.attr == 'format'):
+        if not (
+            isinstance(n.func, Attribute)
+            and isinstance(n.func.source, String)
+            and n.func.attr == "format"
+        ):
             return
         if not is_sql(n.func.source.value):
             return
 
         yield SQLInjection(
-            score = 50,
-            message = "Possible SQL injection found",
+            score=50,
+            message="Possible SQL injection found",
             signature=f"vuln#{context.visitor.path}#{context.node.line_no}",
-            line_no=context.node.line_no
+            line_no=context.node.line_no,
         )
-
-
-
