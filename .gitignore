@@ -100,6 +100,4 @@ venv.bak/
 /site
 .mypy_cache/
 .idea
-rules.yara
-signatures.json
 quarantine/
