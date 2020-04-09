@@ -31,7 +31,7 @@ class FunctionCallAnalyzer(NodeAnalyzerV2):
                 extra = {
                     "function": context.node.full_name
                 },
-                signature=f"function_call#{sig_id}/{context.node.line_no}#{context.visitor.path}"
+                signature=f"function_call#{sig_id}/{context.node.line_no}#{context.visitor.normalized_path}"
             )
 
             hit.informational = (hit.score == 0)

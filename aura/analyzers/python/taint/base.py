@@ -23,7 +23,7 @@ class TaintDetection(NodeAnalyzerV2):
             message="Tainted input is passed to the sink",
             node=context.node,
             line_no=context.node.line_no,
-            signature=f"taint_anomaly#{context.visitor.path}#{context.node.line_no}",
+            signature=f"taint_anomaly#{context.visitor.normalized_path}#{context.node.line_no}",
             extra={
                 'taint_log': log
             }

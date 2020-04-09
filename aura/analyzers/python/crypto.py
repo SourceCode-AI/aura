@@ -89,7 +89,7 @@ class CryptoGenKey(base.NodeAnalyzerV2):
     def _gen_hit(self, context, info, key_size=None):
         hit = CryptoKeyGeneration(
             message="Generation of cryptography key detected",
-            signature=f"crypto#gen_key#{context.visitor.path}#{context.node.line_no}",
+            signature=f"crypto#gen_key#{context.visitor.normalized_path}#{context.node.line_no}",
             extra={
                 "function": context.node.full_name,
                 "key_type": info["type"],

@@ -171,7 +171,6 @@ def archive_analyzer(pth: Path, metadata, **kwargs):
                     members.append(x)
                 else:
                     yield x
-
             fd.extractall(path=tmp_dir, members=members)
 
     elif mime in SUPPORTED_MIME:
@@ -183,7 +182,6 @@ def archive_analyzer(pth: Path, metadata, **kwargs):
                     members.append(x)
                 else:
                     yield x
-
             fd.extractall(path=tmp_dir, members=members)
     else:
         return

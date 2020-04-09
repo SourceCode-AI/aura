@@ -43,7 +43,7 @@ class JinjaAnalyzer(base.NodeAnalyzerV2):
                 message="Detected jinja environment with autoescaping explicitly disabled",
                 score=100,
                 line_no=context.node.line_no,
-                signature=f"jinja#xss#{context.visitor.path}#{context.node.line_no}",
+                signature=f"jinja#xss#{context.visitor.normalized_path}#{context.node.line_no}",
             )
             yield hit
 
@@ -109,7 +109,7 @@ class NodeWrapper(ASTNode):
 class JinjaTemplateVisitor(Visitor):
     @classmethod
     def from_template(cls, context, template_name, taints):
-        tpl_path = Path(context.visitor.path).parent / "templates" / template_name
+        tpl_path = Path(context.visitor.normalized_path).parent / "templates" / template_name
         if not tpl_path.exists():
             logger.info(f"Could not find jinja template: '{template_name}'")
             return

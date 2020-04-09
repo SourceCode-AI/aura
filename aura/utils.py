@@ -25,7 +25,7 @@ def walk(location) -> Generator[Path, None, None]:
 
     location = location.absolute()
 
-    for x in location.rglob("*"):
+    for x in location.glob("*/*"):
         if x.is_dir():
             continue
         else:

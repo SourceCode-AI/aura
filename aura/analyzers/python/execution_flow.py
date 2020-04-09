@@ -45,7 +45,7 @@ class ExecutionFlow(NodeAnalyzerV2):
                 name=norm,
                 line_no=node.line_no,
                 node=node,
-                signature=f"module_import#{norm}#{context.visitor.path}",
+                signature=f"module_import#{norm}#{context.visitor.normalized_path}",
             )
 
             try:

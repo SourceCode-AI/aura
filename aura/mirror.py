@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 import json
 import typing
 from pathlib import Path
@@ -18,12 +19,19 @@ class LocalMirror(object):
 
     @classmethod
     def get_mirror_path(cls) -> Path:
+        env_path = os.environ.get('AURA_MIRROR_PATH', None)
+        if env_path:
+            return Path(env_path)
+
         return Path(CFG["aura"]["mirror"])
 
     def list_packages(self) -> typing.Generator[Path, None, None]:
         yield from (self.mirror_path / "json").iterdir()
 
     def get_json(self, package_name):
+        if package_name is None:
+            raise NoSuchPackage(f"Could not find package '{package_name}' json at the mirror location")
+
         json_path = self.mirror_path / "json" / package_name
 
         if not json_path.is_file():

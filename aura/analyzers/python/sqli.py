@@ -51,7 +51,7 @@ class SQLi(base.NodeAnalyzerV2):
         yield SQLInjection(
             score=50,
             message="Possible SQL injection found",
-            signature=f"vuln#{context.visitor.path}#{context.node.line_no}",
+            signature=f"vuln#{context.visitor.normalized_path}#{context.node.line_no}",
             line_no=context.node.line_no,
         )
 
@@ -75,6 +75,6 @@ class SQLi(base.NodeAnalyzerV2):
         yield SQLInjection(
             score=50,
             message="Possible SQL injection found",
-            signature=f"vuln#{context.visitor.path}#{context.node.line_no}",
+            signature=f"vuln#{context.visitor.normalized_path}#{context.node.line_no}",
             line_no=context.node.line_no,
         )

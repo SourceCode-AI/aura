@@ -37,7 +37,7 @@ class SecretsAnalyzer(base.NodeAnalyzerV2):
             message="Possible sensitive leaking secret",
             extra={"name": name, "secret": secret},
             line_no=context.node.line_no,
-            signature=f"leaking_secret#{context.visitor.path}#{context.node.line_no}",
+            signature=f"leaking_secret#{context.visitor.normalized_path}#{context.node.line_no}",
         )
 
         if len(secret) < 5:

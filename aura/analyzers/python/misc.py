@@ -27,7 +27,7 @@ class MiscAnalyzer(base.NodeAnalyzerV2):
                     "entropy": entropy,
                     "string": val,
                 },
-                signature=f"misc#high_entropy#{context.visitor.path}#{context.node.line_no}",
+                signature=f"misc#high_entropy#{context.visitor.normalized_path}#{context.node.line_no}",
                 node=context.node
             )
             hit.line_no = context.node.line_no
@@ -46,7 +46,7 @@ class MiscAnalyzer(base.NodeAnalyzerV2):
                     "type": "redos",
                     "regex": val,
                 },
-                signature = f"misc#redos#{context.visitor.path}#{context.node.line_no}",
+                signature = f"misc#redos#{context.visitor.normalized_path}#{context.node.line_no}",
                 line_no=context.node.line_no,
                 node=context.node
             )
@@ -62,7 +62,7 @@ class MiscAnalyzer(base.NodeAnalyzerV2):
 
         hit = Rule(
             message = f"Usage of {context.node.name} in an object indicates a possible pickle exploit",
-            signature = f"pickleploit#{context.visitor.path}#{context.node.line_no}",
+            signature = f"pickleploit#{context.visitor.normalized_path}#{context.node.line_no}",
             line_no = context.node.line_no,
             score = 100,
             tags = {context.node.name}

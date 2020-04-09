@@ -16,6 +16,7 @@ from . import exceptions
 from .uri_handlers.base import URIHandler
 from .diff import DiffAnalyzer
 
+from . import __version__
 from . import config
 
 
@@ -66,6 +67,8 @@ def cli(ctx, **kwargs):
     default=config.get_default_tag_filters(),
     help="Include or exclude results with specified tags only"
 )
+@click.option("--async", "fork_mode", flag_value=True)
+@click.option("--no-async", "fork_mode", flag_value=False)
 def scan(
     uri,
     verbose=0,
@@ -75,7 +78,8 @@ def scan(
     output_path=None,
     benchmark=False,
     benchmark_sort="cumtime",
-    filter_tags=None
+    filter_tags=None,
+    fork_mode=False
 ):
     meta = {
         "verbosity": verbose,
@@ -84,7 +88,8 @@ def scan(
         "analyzers": analyzer,
         "output_path": output_path,
         "source": "cli",
-        "filter_tags": filter_tags
+        "filter_tags": filter_tags,
+        "fork": fork_mode
     }
     if benchmark:
         import cProfile, pstats, io
@@ -109,6 +114,20 @@ def scan(
         print(s.getvalue())
 
     sys.exit(0)
+
+
+@cli.command(name="scan_mirror")
+@click.option("--output_dir", metavar="<OUTPUT DIRECTORY>", default="aura_mirror_scan")
+def scan_mirror(output_dir):
+    output_dir = Path(output_dir)
+
+    if not output_dir.is_dir():
+        click.confirm(f"Output directory doesn't exists, do you want to create it?", abort=True)
+        os.makedirs(output_dir)
+
+    commands.scan_mirror(
+        output_dir=output_dir
+    )
 
 
 @cli.command(name="diff")

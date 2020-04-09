@@ -13,7 +13,7 @@ LOGGER = config.get_logger(__name__)
 
 
 class GitRepoHandler(URIHandler):
-    scheme = "git://"
+    scheme = "git"
     help = """
     Git repository handler.
     Clones the target repository into a temporary directory.

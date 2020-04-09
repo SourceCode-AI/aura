@@ -71,7 +71,7 @@ class TaintAnalysis(Visitor):
             return
 
         for r in context.node.return_nodes.values():
-            f_name = r.full_name
+            f_name = r.cached_full_name
             if not _isinstance(f_name, str):
                 continue
 
@@ -90,7 +90,7 @@ class TaintAnalysis(Visitor):
                 return
 
     def __mark_sinks(self, context):
-        f_name = context.node.full_name
+        f_name = context.node.cached_full_name
         if f_name is None:
             return
         elif "taint_sink" in context.node.tags:
@@ -115,7 +115,7 @@ class TaintAnalysis(Visitor):
             self,
             context: Context
     ):
-        name = context.node.full_name
+        name = context.node.cached_full_name
         if not type(name) == str or "taint_clean" in context.node.tags:
             return
 
@@ -132,7 +132,7 @@ class TaintAnalysis(Visitor):
             context.node.tags.add("taint_clean")
 
     def __mark_sources(self, context):
-        f_name = context.node.full_name
+        f_name = context.node.cached_full_name
 
         if not (type(f_name) == str and "taint_source" not in context.node.tags):
             return
@@ -199,7 +199,7 @@ class TaintAnalysis(Visitor):
                 context.visitor.modified = True
                 return
         elif isinstance(context.node, Call):
-            f_name = context.node.full_name
+            f_name = context.node.cached_full_name
             args_taints = []
             # Extract taints from arguments
             for idx, x in enumerate(context.node.args):
@@ -241,10 +241,10 @@ class TaintAnalysis(Visitor):
                 for idx, x in enumerate(context.node.args):
                     if not isinstance(x, ASTNode):
                         continue
-                    if x.full_name is None:
+                    if x.cached_full_name is None:
                         arg_index = idx
-                    elif isinstance(x.full_name, str):
-                        arg_index = x.full_name
+                    elif type(x.cached_full_name) == str:
+                        arg_index = x.cached_full_name
                     else:
                         continue
                     func_def.set_taint(arg_index, x._taint_class, context)
@@ -323,7 +323,7 @@ class TaintAnalysis(Visitor):
                 return
 
         elif isinstance(context.node, FunctionDef):
-            f_name = context.node.full_name
+            f_name = context.node.cached_full_name
 
             return_taints = []
 

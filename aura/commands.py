@@ -22,11 +22,15 @@ from . import utils
 from . import mirror
 from . import plugins
 from . import typos
+from . import worker_executor
 from .package import PypiPackage
 from .output.base import AuraOutput
 
 
 logger = config.get_logger(__name__)
+
+OK = '\u2713'
+NOK = '\u2717'
 
 
 def check_requirement(pkg):
@@ -122,6 +126,31 @@ def scan_uri(uri, metadata: Union[list, dict]=None) -> list:
     return all_hits
 
 
+def scan_mirror(output_dir: Path):
+    mirror_pth = mirror.LocalMirror.get_mirror_path()
+    click.echo("Collecting package names from a mirror")
+    pkgs = list(x.name for x in Path(mirror_pth / "json").iterdir())
+    click.echo(f"Collected {len(pkgs)} packages")
+    click.echo("Spawning scanning workers")
+
+    with click.progressbar(pkgs) as bar:
+        for idx, pkg in enumerate(bar):
+            uri = f"mirror://{pkg}"
+
+            out_pth = output_dir / f"{pkg}.scan_results.json"
+
+            metadata = {
+                "format": "json",
+                "output_path": os.fspath(out_pth),
+                "fork": True
+            }
+            scan_uri(uri=uri, metadata=metadata)
+            # executor.apply_async(
+            #     func=scan_uri,
+            #     kwds={"uri": uri, "metadata": metadata}
+            # )
+
+
 def parse_ast(path: Union[str, Path], stages=None):
     from .analyzers.python.visitor import Visitor
 
@@ -150,42 +179,42 @@ def info():
         doc = getattr(v, 'analyzer_description', None)
         if not doc:
             doc = inspect.getdoc(v) or "Description N/A"
-        click.echo(f" * {k} - {doc}")
+        click.echo(f" {OK} {k} - {doc}")
 
     if analyzers["disabled"]:
         click.secho("Disabled analyzers:", color="red", bold=True)
         for (k, v) in analyzers["disabled"]:
-            click.echo(f" * {k.name} - {v}")
+            click.echo(f" {NOK} {k.name} - {v}")
 
     click.secho(f"\nAvailable URI handlers:")
     for k, v in URIHandler.load_handlers().items():
-        click.secho(f"- '{k}://'")
+        click.secho(f" {OK} '{k}://'")
 
     click.echo("\nExternal integrations:")
     tokens = {"librariesio": "Libraries.io API"}
     for k, v in tokens.items():
-        t = config.get_token(k)
-        fg = "green" if t is not None else "red"
-        status = "enabled" if t is not None else "Disabled - Token not found"
-        click.secho(f" * {v}: {status}", fg=fg)
+        t = (config.get_token(k) is not None)
+        fg = "green" if t else "red"
+        status = "enabled" if t else "Disabled - Token not found"
+        click.secho(f" {OK if t else NOK} {v}: {status}", fg=fg)
 
         try:
             from google.cloud import bigquery
 
             client = bigquery.Client()
-            client.get_service_account_email()
-            click.secho(" * BigQuery: enabled", fg="green")
+            client.get_service_account_email(retry=0)
+            click.secho(f" {OK} BigQuery: enabled", fg="green")
         except Exception:
-            click.secho(" * BigQuery: disabled", fg="red")
+            click.secho(f" {NOK} BigQuery: disabled", fg="red")
 
     if config.get_relative_path("pypi_stats").is_file():
         click.secho(
-            "\nPyPI download stats present. Typosquatting protection enabled",
+            f"\n {OK} PyPI download stats present. Typosquatting protection enabled",
             fg="green",
         )
     else:
         click.secho(
-            "\nPyPI download stats not found, run `aura fetch-pypi-stats`. Typosquatting protection disabled",
+            f"\n {NOK} PyPI download stats not found, run `aura fetch-pypi-stats`. Typosquatting protection disabled",
             fg="red",
         )
 

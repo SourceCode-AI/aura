@@ -18,6 +18,7 @@ import magic
 from . import utils
 from . import config
 from . import plugins
+from . import worker_executor
 from .uri_handlers import base
 from .analyzers import rules
 from .analyzers.find_imports import TopologySort
@@ -45,11 +46,14 @@ class Analyzer(object):
         if location is None:
             location = self.location
 
-        m = multiprocessing.Manager()
-        worker_pool = multiprocessing.Pool()
-        files_queue = m.Queue()
-        hits = m.Queue()
-        cleanup = m.Queue()
+        if metadata.get("fork") is True:
+            executor = worker_executor.MultiprocessingExecutor()
+        else:
+            executor = worker_executor.LocalExecutor()
+
+        files_queue = executor.manager.Queue()
+        hits = executor.manager.Queue()
+        cleanup = executor.manager.Queue()
         results = []
 
         files_queue.put(base.ScanLocation(location=location))
@@ -57,13 +61,23 @@ class Analyzer(object):
         try:
             while files_queue.qsize() or sum([not x.ready() for x in results]):
                 try:
-                    item = files_queue.get(False, 1)  # type: base.ScanLocation
+
+                    item = files_queue.get(False, 1)
+
+                    if isinstance(item, worker_executor.Wait):
+                        executor.wait()
+                        continue
+
                     item_path = Path(item.location)
 
                     if item_path.is_dir():
                         collected = self.scan_directory(item=item, item_path=item_path)
+
                         for x in collected:
                             files_queue.put(x)
+
+                        files_queue.put(worker_executor.Wait())
+                        executor.wait()
                         continue
 
                     kwargs = {
@@ -74,13 +88,14 @@ class Analyzer(object):
                         "metadata": metadata,
                     }
 
-                    if self.fork and metadata.get("fork", True):
+                    if self.fork or metadata.get("fork", False):
                         results.append(
-                            worker_pool.apply_async(func=self._worker, kwds=kwargs)
+                            executor.apply_async(func=self._worker, kwds=kwargs)
                         )
                     else:
                         self._worker(**kwargs)
                 except queue.Empty:
+                    executor.wait()
                     continue
                 except Exception:
                     # TODO: move error logging to worker
@@ -88,11 +103,12 @@ class Analyzer(object):
                     # logger.exception(f"An error occurred while processing file '{item}'; extra: " + extra)
                     raise
 
-            worker_pool.close()
-            worker_pool.join()
+            executor.close()
+            executor.join()
 
             # Re-raise the exceptions if any occurred during the processing
-            for x in results:
+            #for x in results:
+            for x in executor.jobs:
                 if not x.successful():
                     x.get()
 
@@ -150,6 +166,7 @@ class Analyzer(object):
             analyzers = plugins.get_analyzer_group(metadata.get("analyzers", []))
 
             for x in analyzers(path=path, mime=m, metadata=metadata):
+
                 if isinstance(x, base.ScanLocation):
                     if x.cleanup:
                         cleanup.put(x.location)

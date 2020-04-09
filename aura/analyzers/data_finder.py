@@ -42,7 +42,7 @@ class DataFinder(NodeAnalyzerV2):
     """Extracts artifacts from the source code such sa URLs or Base64 blobs"""
     def node_String(self, context):
         val = context.node.value
-        pth = os.fspath(context.visitor.path)
+        pth = os.fspath(context.visitor.normalized_path)
 
         if URL_REGEX.match(val):
             yield URL(
@@ -85,7 +85,7 @@ class StringFinder(NodeAnalyzerV2):
                 extra={
                     "string": value
                 },
-                signature=f"string_finder#{value}/{context.node.line_no}#{context.visitor.path}",
+                signature=f"string_finder#{value}/{context.node.line_no}#{context.visitor.normalized_path}",
                 score=hit._signature.get("score", 0)
             )
             yield output

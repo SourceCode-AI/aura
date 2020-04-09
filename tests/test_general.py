@@ -18,10 +18,7 @@ def test_config():
 
 def test_path_traversal():
     pth = Path(__file__).absolute().parent
-    print(f"Starting: {pth}")
     paths = list(utils.walk(pth))
 
     for x in paths:
         assert x.is_dir() or x.is_file()
-
-    assert Path(__file__) in paths

@@ -111,8 +111,8 @@ def load_config():
         schema = json.loads(fd.read())
         jsonschema.validate(instance=SEMANTIC_RULES, schema=schema)
 
-    if "LOG" in os.environ:
-        log_level = logging.getLevelName(os.getenv("LOG"))
+    if "AURA_LOG_LEVEL" in os.environ:
+        log_level = logging.getLevelName(os.getenv("AURA_LOG_LEVEL").upper())
     else:
         log_level = logging.getLevelName(
             CFG.get("aura", "log-level", fallback="warning").upper()

@@ -6,10 +6,12 @@ from __future__ import annotations
 import os
 import typing
 import inspect
+import weakref
 from abc import ABCMeta, abstractmethod
 from enum import Enum
 from pathlib import Path
 from warnings import warn
+from collections import defaultdict
 from dataclasses import dataclass, InitVar, field
 from functools import partial, total_ordering, wraps
 
@@ -21,19 +23,6 @@ BASIC_ELEMENTS = (
     str,
     int,
 )
-
-
-def cache_name(func):
-    prev = None
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        nonlocal prev
-        if type(prev) == str:
-            return prev
-        prev = func(*args, **kwargs)
-        return prev
-    return wrapper
-
 
 @total_ordering
 class Taints(Enum):
@@ -115,7 +104,26 @@ class TaintLog:
         return log
 
 
-class ASTNode(metaclass=ABCMeta):
+class KeepRefs:
+    """
+    A class that would keep references to all created instances
+    https://stackoverflow.com/questions/328851/printing-all-instances-of-a-class
+    """
+    __refs__ = defaultdict(list)
+
+    def __init__(self):
+        super(KeepRefs, self).__init__()
+        self.__refs__[self.__class__].append(weakref.ref(self))
+
+    @classmethod
+    def get_instances(cls):
+        for inst_ref in cls.__refs__[cls]:
+            inst = inst_ref()
+            if inst is not None:
+                yield inst
+
+
+class ASTNode(KeepRefs, metaclass=ABCMeta):
     def __post_init__(self, *args, **kwargs):
         self._full_name = None
         self._original = None
@@ -130,6 +138,17 @@ class ASTNode(metaclass=ABCMeta):
 
     @property
     def full_name(self):
+        return self._full_name
+
+    @property
+    def cached_full_name(self) -> str:
+        """
+        Permanently cache the full_name attribute
+        Use this only if all the remaining stages are read-only as otherwise it would not register changes to the attributes
+        """
+        if self._full_name is None:
+            self._full_name = self.full_name
+
         return self._full_name
 
     @property
@@ -366,7 +385,7 @@ class Var(ASTNode):
         elif isinstance(self.value, Arguments) and self._original in self.value.taints:
             new_taint = self.value.taints[self._original]
             log = TaintLog(
-                path=context.visitor.path,
+                path=context.visitor.normalized_path,
                 taint_level=new_taint,
                 message="Taint propagated via the variable that is pointing to an argument",
                 node=self.value,
@@ -408,11 +427,15 @@ class Attribute(ASTNode):
 
     @property
     def full_name(self):
+        if self._full_name is not None:
+            return self._full_name
+
         if isinstance(self.source, Import):
-            return f"{self.source.names[self._original]}.{self.attr}"
+            self._full_name = f"{self.source.names[self._original]}.{self.attr}"
+            return self._full_name
         elif isinstance(self.source, (Attribute, Call)):
             return f"{self.source.full_name}.{self.attr}"
-        elif isinstance(self.source, str):
+        elif type(self.source) == str:
             return f"{self.source}.{self.attr}"
         return f"{repr(self.source)}.{self.attr}"
 
@@ -736,7 +759,7 @@ class Call(ASTNode):
             return self._full_name
 
         f_name = getattr(self.func, "full_name", None)
-        if isinstance(self._original, str) and isinstance(self.func, Import):
+        if type(self._original) == str and isinstance(self.func, Import):
             return self.func.names[self._original]
         elif f_name is not None:
             return f_name
