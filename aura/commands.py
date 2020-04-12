@@ -84,46 +84,47 @@ def scan_worker(item: ScanLocation, metadata: dict) -> list:
 
 
 def scan_uri(uri, metadata: Union[list, dict]=None) -> list:
-    start = time.time()
-    handler = None
-    metadata = metadata or {}
-    output_format = metadata.get("format", "text")
-    all_hits = []
+    with utils.enrich_exception(uri, metadata):
+        start = time.time()
+        handler = None
+        metadata = metadata or {}
+        output_format = metadata.get("format", "text")
+        all_hits = []
 
-    try:
-        handler = URIHandler.from_uri(uri)
+        try:
+            handler = URIHandler.from_uri(uri)
 
-        if handler is None:
-            raise ValueError(f"Could not find a handler for provided URI: '{uri}'")
-        elif not handler.exists:
-            raise exceptions.InvalidLocation(f"Invalid location provided from URI: '{uri}'")
+            if handler is None:
+                raise ValueError(f"Could not find a handler for provided URI: '{uri}'")
+            elif not handler.exists:
+                raise exceptions.InvalidLocation(f"Invalid location provided from URI: '{uri}'")
 
-        metadata.update(
-            {"name": uri, "uri_scheme": handler.scheme, "uri_input": handler.metadata}
-        )
+            metadata.update(
+                {"name": uri, "uri_scheme": handler.scheme, "uri_input": handler.metadata}
+            )
 
-        for x in handler.get_paths():  # type: ScanLocation
-            all_hits.extend(scan_worker(x, metadata))
+            for x in handler.get_paths():  # type: ScanLocation
+                all_hits.extend(scan_worker(x, metadata))
 
-        if output_format:
-            formats = AuraOutput.get_output_formats()
-            if output_format not in formats:
-                raise ValueError(f"Unknown output format: '{output_format}'")
+            if output_format:
+                formats = AuraOutput.get_output_formats()
+                if output_format not in formats:
+                    raise ValueError(f"Unknown output format: '{output_format}'")
 
-            output = formats[output_format](metadata=metadata)
-            output.output(hits=all_hits)
+                output = formats[output_format](metadata=metadata)
+                output.output(hits=all_hits)
 
-    except exceptions.NoSuchPackage:
-        logger.warn(f"No such package: {uri}")
-    except Exception:
-        logger.exception(f"An error was thrown while processing URI: '{uri}'")
-        raise
-    finally:
-        if handler:
-            handler.cleanup()
+        except exceptions.NoSuchPackage:
+            logger.warn(f"No such package: {uri}")
+        except Exception:
+            logger.exception(f"An error was thrown while processing URI: '{uri}'")
+            raise
+        finally:
+            if handler:
+                handler.cleanup()
 
-    logger.info(f"Scan finished in {time.time() - start} s")
-    return all_hits
+        logger.info(f"Scan finished in {time.time() - start} s")
+        return all_hits
 
 
 def scan_mirror(output_dir: Path):

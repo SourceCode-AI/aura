@@ -44,24 +44,22 @@ class TopologySort:
         return topology
 
 
-def get_imports(py_src) -> List:
+def get_imports(py_src, metadata=None) -> List:
     importer_path = Path(__file__).parent / "find_imports_inject.py"
     cmd = [os.fspath(importer_path), os.fspath(py_src)]
 
-    output, _, _ = python_executor.run_with_interpreters(command=cmd)
-    return output
+    return python_executor.run_with_interpreters(command=cmd, metadata=metadata)
 
 
 # TODO: add support for other "pythonic" files, see modulefinder (pyc, dynlib etc.)
-# TODO: pass scan location metadata so the interpreter can be saved
-def find_imports(py_src: Path):
+def find_imports(py_src: Path, metadata=None):
     """
     Construct a dependency matrix of import files
     """
     dependencies = set()
     unknown = set()
 
-    imports = get_imports(py_src)
+    imports = get_imports(py_src, metadata=metadata)
     if not imports:
         return
 

@@ -2,6 +2,7 @@ from click import secho
 
 from ..analyzers.rules import ModuleImport
 from .. import utils
+from ..exceptions import MinimumScoreNotReached
 from .base import AuraOutput
 
 
@@ -10,7 +11,11 @@ class TextOutput(AuraOutput):
         hits = set(hits)
         imported_modules = {h.name for h in hits if isinstance(h, ModuleImport)}
 
-        hits = list(self.filtered(hits))
+        try:
+            hits = self.filtered(hits)
+        except MinimumScoreNotReached:
+            return
+
         score = 0
         tags = set()
 

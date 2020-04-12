@@ -7,6 +7,7 @@ if [ "$#" -ne 1 ]; then
 fi;
 
 export AURA_MIRROR_PATH=$1;
+export PYTHONWARNINGS=ignore;
 
 if [ ! -d "${AURA_MIRROR_PATH}/json" ]; then
   echo "JSON directory not found at ${AURA_MIRROR_PATH}. You probably have not provided a correct path to the web mirror directory" >>2;
@@ -39,4 +40,4 @@ export -f scan
 
 echo "Starting Aura scan"
 
-echo $PKGS|tr ' ' '\n'| parallel --load 80 --memfree 5G --timeout 180 --max-args 1 scan
+echo $PKGS|tr ' \r' '\n'| parallel --load 80 --memfree 5G --timeout 180 --max-args 1 scan

@@ -92,7 +92,7 @@ class ScanLocation:
         if Path(self.location).is_file():
             self.metadata["mime"] = magic.from_file(os.fspath(self.location), mime=True)
             if self.metadata["mime"] == "text/x-python":
-                imports = find_imports.find_imports(self.location)
+                imports = find_imports.find_imports(self.location, metadata=self.metadata)
                 if imports:
                     self.metadata["py_imports"] = imports
 

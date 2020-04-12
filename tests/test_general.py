@@ -10,9 +10,6 @@ def test_config():
     cfg_path = os.environ.get('AURA_CFG')
     assert cfg_path.split('/')[-1] == 'test_config.ini', cfg_path
     assert config.CFG_PATH == cfg_path
-
-    pprint.pprint(dict(config.CFG))
-
     assert config.CFG.get("aura", "config_type") == "test_value"
 
 

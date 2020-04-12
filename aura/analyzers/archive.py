@@ -39,7 +39,7 @@ def is_suspicious(pth, location):
             location=os.fspath(location),
             signature=f"suspicious_archive_entry#absolute_path#{os.fspath(pth)}#{location}",
             extra={"entry_type": "absolute_path", "entry_path": os.fspath(pth)},
-            score=50,
+            score=config.get_score_or_default("suspicious-archive-entry-absolute-path", 50),
         )
 
     elif any(x == ".." for x in Path(pth).parts):
@@ -47,7 +47,7 @@ def is_suspicious(pth, location):
             location=os.fspath(location),
             signature=f"suspicious_archive_entry#parent_reference#{os.fspath(pth)}#{location}",
             extra={"entry_type": "parent_reference", "entry_path": os.fspath(pth)},
-            score=50,
+            score=config.get_score_or_default("suspicious-archive-entry-parent-reference", 50),
         )
 
     return None

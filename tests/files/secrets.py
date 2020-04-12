@@ -18,3 +18,6 @@ class Klass():
     def __init__(self, secret_key_var):
         # This should not match
         self.secret_key = secret_key_var
+
+
+invalid_url = "https://blah@[66:::89]/passwords"

@@ -14,6 +14,7 @@ from defusedxml import (
 
 from .rules import Rule
 from ..utils import Analyzer
+from ..config import get_score_or_default
 
 
 ALLOWED_MIMES = (
@@ -35,7 +36,7 @@ def scan(pth: str, **mode):
         cElementTree.parse(pth, **mode)
     except EntitiesForbidden:
         hit = MalformedXML(
-            score = 100,
+            score = get_score_or_default("malformed-xml-entities", 100),
             extra = {
                 "type": "entities"
             },
@@ -45,7 +46,7 @@ def scan(pth: str, **mode):
         yield hit
     except DTDForbidden:
         hit = MalformedXML(
-            score = 20,
+            score = get_score_or_default("malformed-xml-dtd", 20),
             extra = {
                 "type": "dtd"
             },
@@ -55,7 +56,7 @@ def scan(pth: str, **mode):
         yield hit
     except ExternalReferenceForbidden:
         hit = MalformedXML(
-            score = 100,
+            score = get_score_or_default("malformed-xml-external-reference", 100),
             extra = {
                 "type": "external_reference"
             },

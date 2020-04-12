@@ -44,10 +44,11 @@ class DataFinder(NodeAnalyzerV2):
         val = context.node.value
         pth = os.fspath(context.visitor.normalized_path)
 
-        if URL_REGEX.match(val):
+        if URL_REGEX.match(val):  # TODO: Remove and move to string finder
             yield URL(
                 node=context.node,
                 line_no=context.node.line_no,
+                score=config.get_score_or_default("url", 0),
                 tags={"url",},
                 extra={"url": val},
                 signature=f"data_finder#url#{hash(val)}#{hash(pth)}",
@@ -60,6 +61,7 @@ class DataFinder(NodeAnalyzerV2):
                 yield Base64Blob(
                     node=context.node,
                     line_no=context.node.line_no,
+                    score=config.get_score_or_default("base-64-blob", 0),
                     tags={"base64",},
                     extra={"base64_decoded": result},
                     signature=f"data_finder#base64_blob#{hash(result)}#{hash(pth)}",

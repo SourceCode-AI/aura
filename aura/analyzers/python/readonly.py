@@ -37,7 +37,7 @@ class ReadOnlyAnalyzer(Visitor):
                 if x.location is None:
                     x.location = os.fspath(pth)
 
-            rules.Rule.lookup_lines(self.hits)
+            rules.Rule.lookup_lines(self.hits, metadata=self.metadata)
             yield from self.hits
 
         finally:

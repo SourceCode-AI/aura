@@ -130,14 +130,28 @@ def get_comments(source_code):
             yield {"line": line.start, "string": line.string}
 
 
+def get_encoding(path):
+    if sys.version_info.major == 2:
+        return "utf-8"
+
+    try:
+        with open(path, "rb") as fd:
+            return tokenize.detect_encoding(fd.readline)[0]
+    except SyntaxError:
+        return "utf-8"
+
+
 def main(pth=None, out=sys.stdout):
     if pth is None:
         pth = sys.argv[1]
 
     if pth != "-":
-        with open(pth, "r") as fd:
+        encoding = get_encoding(pth)
+
+        with codecs.open(pth, "r", encoding=encoding) as fd:
             source_code = fd.read()
     else:
+        encoding = sys.getdefaultencoding()
         source_code = sys.stdin.read()
 
     try:
@@ -155,6 +169,7 @@ def main(pth=None, out=sys.stdout):
         "compiler": platform.python_compiler(),
         "build": platform.python_build(),
         "builtins": get_builtins(),
+        "encoding": encoding,
         # TODO: 'comments': list(get_comments(source_code=source_code))
     }
 

@@ -559,7 +559,9 @@ class FunctionDef(ASTNode):
 
     def get_flask_routes(self):
         for d in self.decorator_list:  # type: Call
-            if d.full_name != "flask.Flask.route":
+            if not isinstance(d, ASTNode):
+                continue
+            elif d.full_name != "flask.Flask.route":
                 continue
 
             yield str(d.args[0])

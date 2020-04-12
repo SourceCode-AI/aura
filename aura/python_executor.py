@@ -20,7 +20,7 @@ from . import config
 LOGGER = config.get_logger(__name__)
 
 
-def run_with_interpreters(**kwargs):
+def run_with_interpreters(*, metadata=None, **kwargs):
     """
     Proxy to execute_interpreter
     Iterates over defined interpreter until one that runs the input/script is found
@@ -32,6 +32,12 @@ def run_with_interpreters(**kwargs):
 
     In case an interpreter that is able to execute the input script was not found, all tuple elements are set to None
     """
+    if metadata and metadata.get("interpreter_path"):
+        return execute_interpreter(
+            interpreter=metadata["interpreter_path"],
+            **kwargs
+        )
+
     interpreters = list(config.CFG["interpreters"].items())
     for name, interpreter in interpreters:
         if not os.path.isfile(interpreter):
@@ -40,12 +46,13 @@ def run_with_interpreters(**kwargs):
         try:
             output = execute_interpreter(interpreter=interpreter, **kwargs)
             if output:
-                return (output, name, interpreter)
+                if metadata is not None:
+                    metadata["interpreter_name"] = name
+                    metadata["interpreter_cmd"] = interpreter
+
+                return output
         except json.JSONDecodeError:
             continue
-
-    #raise
-    return (None, None, None)
 
 
 def execute_interpreter(*, command: List[str], interpreter: str, stdin=None):

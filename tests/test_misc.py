@@ -42,3 +42,15 @@ def test_redos(fixtures):
     fixtures.scan_and_match("redos.py", matches=matches)
 
     # TODO: test that clean regexes don't trigger redos
+
+
+def test_different_source_code_encoding(fixtures):
+    matches = [
+        {
+            "type": "FunctionCall",
+            "extra": {
+                "function": "eval"
+            }
+        }
+    ]
+    fixtures.scan_and_match("encoding_ISO_8859_2.py", matches=matches)

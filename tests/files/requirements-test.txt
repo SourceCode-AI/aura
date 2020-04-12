@@ -2,3 +2,12 @@
 six
 # Outdated version
 wheel==0.34.1
+# Non existing package on Pypi
+ratata_does_not_exists_sano_fekete
+pyme
+
+# Local editable
+-e path/to/project
+
+invalid can't parse this
+.[test]

@@ -24,3 +24,6 @@ class ASTNodeRewrite(AuraException):
 class PluginDisabled(AuraException):
     pass
 
+
+class MinimumScoreNotReached(AuraException):
+    pass

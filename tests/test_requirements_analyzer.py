@@ -13,6 +13,13 @@ def test_requirements_generic(fixtures):
                 "package": "six"
             },
             "tags": ["unpinned_requirement"]
+        },
+        {
+            "type": "InvalidRequirement",
+            "extra": {
+                "line": "invalid can't parse this"
+            },
+            "message": "Could not parse the requirement for analysis"
         }
     ]
     fixtures.scan_and_match('requirements-test.txt', matches)

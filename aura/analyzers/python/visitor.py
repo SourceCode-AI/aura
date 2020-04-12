@@ -132,16 +132,9 @@ class Visitor:
             source = os.fspath(source)
 
         cmd = [INSPECTOR_PATH, source]
-
-        if self.metadata.get('interpreter_path'):
-            self.tree = python_executor.execute_interpreter(
-                command = cmd,
-                interpreter = self.metadata['interpreter_path'],
-            )
-        else:
-            self.tree, iname, icmd = python_executor.run_with_interpreters(command=cmd)
-            self.metadata['interpreter_name'] = iname
-            self.metadata['interpreter_path'] = icmd
+        self.tree = python_executor.run_with_interpreters(command=cmd, metadata=self.metadata)
+        if "encoding" not in self.metadata and self.tree.get("encoding"):
+            self.metadata["encoding"] = self.tree["encoding"]
 
     def push(self, context):
         if len(self.queue) >= self.max_queue_size:

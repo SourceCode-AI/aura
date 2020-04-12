@@ -99,7 +99,7 @@ class Rule:
             return False
 
     @classmethod
-    def lookup_lines(cls, rules: typing.List[Rule]):
+    def lookup_lines(cls, rules: typing.List[Rule], metadata=None):
         """
         For each rule in the list, look-up a content of the line based on
         location and line number of the hit
@@ -110,9 +110,14 @@ class Rule:
             if r.line_no is not None and not r.line:
                 paths[r.location].append(r)
 
+        if metadata:
+            encoding = metadata.get("encoding")
+        else:
+            encoding = "utf-8"
+
         for pth, rlines in paths.items():
             linenos = [x.line_no for x in rlines]
-            lines = lookup_lines(pth, linenos)
+            lines = lookup_lines(pth, linenos, encoding=encoding)
             for r in rlines:
                 if r.line_no in lines:
                     r.line = lines[r.line_no]

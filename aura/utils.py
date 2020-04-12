@@ -1,10 +1,12 @@
 import os
 import re
 import sys
+import codecs
 import hashlib
 import shutil
 import importlib
 import dataclasses
+from contextlib import contextmanager
 from pathlib import Path
 from functools import partial, wraps
 from typing import Generator, Union, List
@@ -102,13 +104,13 @@ def json_encoder(obj):
             return dataclasses.asdict(obj)
 
 
-def lookup_lines(pth, line_nos: list, strip=True):
+def lookup_lines(pth, line_nos: list, strip=True, encoding="utf-8"):
     line_nos = sorted(line_nos)
     lines = {}
     if not line_nos:
         return lines
 
-    with open(pth, "r") as fd:
+    with codecs.open(pth, "r", encoding=encoding) as fd:
         for ix, line in enumerate(fd):
             if ix > line_nos[-1] + 1:
                 break
@@ -183,6 +185,22 @@ def pprint_imports(tree, indent=""):
         if subitems:
             new_indent = " " if ix == last else "│"
             pprint_imports(subitems, indent + new_indent)
+
+
+@contextmanager
+def enrich_exception(*args):
+    """
+    Intercept an exception and add additional debug information for logging purposes
+
+    :param args: Extra args to add to the exception
+    :return: re-raised exception with the extra args
+    """
+    try:
+        yield
+    except Exception as exc:
+        exc.args += args
+        raise
+
 
 
 class Analyzer:

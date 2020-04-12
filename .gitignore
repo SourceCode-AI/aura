@@ -101,3 +101,4 @@ venv.bak/
 .mypy_cache/
 .idea
 quarantine/
+aura_mirror_scan

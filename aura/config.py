@@ -4,8 +4,10 @@ import sys
 import typing
 import resource
 import logging
+import warnings
 import configparser
 from pathlib import Path
+from functools import lru_cache
 from logging.handlers import RotatingFileHandler
 
 import jsonschema
@@ -80,6 +82,19 @@ def get_logger(name):
     return _log
 
 
+@lru_cache()
+def get_score_or_default(score_type: str, fallback: int) -> int:
+    """
+    Retrieve score as defined in the config or fallback to the default provided value
+    The scoring values are cached using lru_cache to avoid unnecessary lookups
+
+    :param score_type: name of the scoring parameter as defined in the [score] aura config section
+    :param fallback: fallback default value
+    :return: Score integer
+    """
+    return int(CFG.get("score", score_type, fallback=fallback))
+
+
 def load_config():
     global SEMANTIC_RULES, CFG, CFG_PATH
     pth = Path(os.environ.get("AURA_CFG", "config.ini"))
@@ -122,6 +137,11 @@ def load_config():
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.ERROR
     )
     logger.setLevel(log_level)
+
+    if not sys.warnoptions:
+        w_filter = CFG.get("aura", "warnings", fallback="default")
+        warnings.simplefilter(w_filter)
+        os.environ["PYTHONWARNINGS"] = w_filter
 
     if CFG["aura"].get("rlimit-memory"):
         rss = int(CFG["aura"]["rlimit-memory"])

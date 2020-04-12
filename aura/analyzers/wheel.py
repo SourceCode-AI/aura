@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from . import rules
 from ..utils import Analyzer
+from ..config import get_score_or_default
 
 
 @dataclass
@@ -58,9 +59,14 @@ def analyze_wheel(pth: Path, **kwargs):
             target_checksum = get_checksum(alg, full_pth)
             if target_checksum != checksum:
                 hit = Wheel(
-                    score=10,
+                    score=get_score_or_default("wheel-invalid-record-checksum", 100),
                     message="Wheel anomaly detected, invalid record checksum",
                     tags={"anomaly", "wheel"},
+                    extra={
+                        "real_checksum": target_checksum,
+                        "record_checksum": checksum,
+                        "algorithm": alg
+                    },
                     signature=f"wheel#record_checksum#{target_checksum}#{full_pth}",
                 )
                 yield hit
@@ -70,7 +76,7 @@ def analyze_wheel(pth: Path, **kwargs):
     for x in wheel_root.glob("*/setup.py"):
         hit_path = os.fspath(wheel_root / x)
         hit = Wheel(
-            score=100,
+            score=get_score_or_default("wheel-contain-setup-py", 100),
             message="Found setup.py in a wheel archive",
             tags={"wheel", "anomaly", "setup.py"},
             signature=f"wheel#setup.py#{hit_path}",
@@ -84,8 +90,11 @@ def analyze_wheel(pth: Path, **kwargs):
 
         if x not in record_entries:
             hit = Wheel(
-                score=100,
+                score=get_score_or_default("wheel-file-not-listed-in-records", 10),
                 message="Wheel contain a file not listed in the RECORDs",
+                extra={
+                    "record": os.fspath(x)  #TODO: normalize path
+                },
                 tags={"wheel", "anomaly", "missing_record_file"},
                 signature=f"wheel#missing_record_file#{x}",
             )

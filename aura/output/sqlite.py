@@ -3,26 +3,19 @@ import sqlite3
 from pathlib import Path
 from typing import List
 
+from .base import AuraOutput
 from ..analyzers.rules import Rule
 from ..utils import json_encoder
+from ..exceptions import MinimumScoreNotReached
 
 
-class SQLiteOutput:
+class SQLiteOutput(AuraOutput):
     def __init__(self, metadata):
-        self.metadata = metadata
-        path = metadata.get("output_path")
-        if path is None:
+        super(SQLiteOutput, self).__init__(metadata=metadata)
+        self.db = None
+        self.path = metadata.get("output_path")
+        if self.path is None:
             raise ValueError("Argument --output-path is required with sqlite output")
-
-        self.db = sqlite3.connect(path)
-        self.db.enable_load_extension(True)
-        opts = [x[0] for x in self.db.execute("PRAGMA compile_options").fetchall()]
-        if "ENABLE_JSON1" not in opts:
-            raise EnvironmentError(
-                f"SQLite doesn't have support for JSON1, compile opts: {', '.join(opts)}"
-            )
-
-        self.__create_tables()
 
     def __create_tables(self):
         INPUT_SCHEMA = """
@@ -59,7 +52,26 @@ class SQLiteOutput:
             self.db.execute(HIT_SCHEMA)
             self.db.execute(FILES_SCHEMA)
 
+    def __initialize_db(self):
+        self.db = sqlite3.connect(self.path)
+        self.db.enable_load_extension(True)
+        opts = [x[0] for x in self.db.execute("PRAGMA compile_options").fetchall()]
+        if "ENABLE_JSON1" not in opts:
+            raise EnvironmentError(
+                f"SQLite doesn't have support for JSON1, compile opts: {', '.join(opts)}"
+            )
+
+        self.__create_tables()
+
     def output(self, hits: List[Rule]):
+        try:
+            self.filtered(hits)
+        except MinimumScoreNotReached:
+            return
+
+        if self.db is None:
+            self.__initialize_db()
+
         cur = self.db.cursor()
 
         try:

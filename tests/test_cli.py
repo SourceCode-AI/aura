@@ -65,6 +65,42 @@ def test_custom_analyzer(fixtures):
         ReadOnlyAnalyzer.hooks = hooks
 
 
+def test_min_score_option(fixtures):
+    output = fixtures.scan_test_file("obfuscated.py", args=["--min-score", 1000], decode=False)
+    assert len(output.output.strip()) == 0, output.output
+
+    output = fixtures.scan_test_file("obfuscated.py", args=["--min-score", 10])
+    assert type(output) == dict
+    assert output["score"] > 0
+
+
+@pytest.mark.parametrize(
+    "tag_filter",
+    (
+        ("!test_code",),
+        ("shell_injection",),
+        ("test_code", "shell_injection"),
+        ("test_code",),
+        ("!shell_injection",),
+        ("ratata_does_not_exists"),
+        ("!ratata_does_not_exists")
+    )
+)
+def test_tag_filtering(tag_filter, fixtures):
+    args = []
+    for tag in tag_filter:
+        args += ["-t", tag]
+
+    output = fixtures.scan_test_file("shelli.py", args=args)
+
+    for hit in output["hits"]:
+        for tag in tag_filter:
+            if tag.startswith("!"):
+                assert tag not in hit["tags"], (tag, hit)
+            else:
+                assert tag in hit["tags"], (tag, hit)
+
+
 def test_info_command(fixtures):
     result = fixtures.get_cli_output(['info'])
 

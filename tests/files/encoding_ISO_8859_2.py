@@ -1,0 +1,4 @@
+#-*- coding: iso-8859-2 -*-
+
+print("èuèoriedka")
+eval("pass")

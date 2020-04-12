@@ -1,5 +1,7 @@
 import pkg_resources
 
+from .. import exceptions
+
 OUTPUT_HANDLERS = None
 
 
@@ -47,6 +49,8 @@ class AuraOutput:
         """
         hits = sorted(hits)
 
+        processed = []
+
         for x in hits:
             # normalize tags
             tags = [t.lower().replace('-', '_') for t in x.tags]
@@ -58,9 +62,14 @@ class AuraOutput:
             elif not all(f(tags) for f in self.tag_filters):
                 continue
             else:
-                yield x
+                processed.append(x)
 
-        return None
+        total_score = sum(x.score for x in processed)
+
+        if self.metadata.get("min_score") and self.metadata["min_score"] > total_score:
+            raise exceptions.MinimumScoreNotReached(f"Score of {total_score} did not meet the minimum {self.metadata['min_score']}")
+
+        return processed
 
     @classmethod
     def get_output_formats(cls):

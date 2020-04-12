@@ -1,13 +1,18 @@
 import json
 
 from .base import AuraOutput
+from ..exceptions import MinimumScoreNotReached
 from ..utils import json_encoder
 from ..analyzers.rules import ModuleImport
 
 
 class JSONOutput(AuraOutput):
     def output(self, hits):
-        filtered = list(self.filtered(hits))
+        try:
+            filtered = self.filtered(hits)
+        except MinimumScoreNotReached:
+            return
+
         score = 0
         tags = set()
 

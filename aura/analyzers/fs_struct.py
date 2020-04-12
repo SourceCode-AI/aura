@@ -51,7 +51,7 @@ def analyze_sensitive(pth: Path, **kwargs):
         if fnmatch.fnmatch(str_pth, pattern) or str_pth.endswith(pattern):
             yield SensitiveFile(
                 file_name=name,
-                score=int(CFG.get("score", "contain-sensitive-file")),
+                score=int(CFG.get("score", "contain-sensitive-file")),  # TODO: normalize this via config
                 signature=f"sensitive_file#{os.fspath(pth)}",
             )
 
@@ -74,6 +74,6 @@ def analyze_suspicious(pth: Path, **kwargs):
     yield SuspiciousFile(
         file_name=name,
         file_type=f_type,
-        score=int(CFG.get("score", "contain-suspicious-file")),
+        score=int(CFG.get("score", "contain-suspicious-file")),  # TODO: normalize this via config
         signature=f"suspicious_file#{os.fspath(pth)}",
     )

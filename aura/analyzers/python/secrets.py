@@ -74,7 +74,11 @@ class SecretsAnalyzer(base.NodeAnalyzerV2):
         if not URL_REGEX.match(context.node.value):
             return
 
-        parsed = urlparse(context.node.value)
+        try:
+            parsed = urlparse(context.node.value)
+        except ValueError:
+            return
+
         if not parsed.query:
             return
 

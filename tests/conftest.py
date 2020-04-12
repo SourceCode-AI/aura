@@ -46,12 +46,14 @@ class Fixtures(object):
         with open(self.path(path), 'r') as fp:
             return fp.read()
 
-    def scan_test_file(self, name, decode=True):
+    def scan_test_file(self, name, decode=True, args=None):
         pth = self.path(name)
+        cmd = ['scan', os.fspath(pth), '--format', 'json', '-v']
 
-        result = self.get_cli_output(
-            ['scan', os.fspath(pth), '--format', 'json', '-v']
-        )
+        if args:
+            cmd += args
+
+        result = self.get_cli_output(cmd)
         if decode:
             return json.loads(result.output)
         else:
@@ -66,7 +68,7 @@ class Fixtures(object):
         result = runner.invoke(cli.cli, args=args)
 
         if check_exit_code:
-            assert result.exit_code == 0
+            assert result.exit_code == 0, result.stdout
         if result.exception and type(result.exception) != SystemExit:
             raise result.exception
 
@@ -78,7 +80,7 @@ class Fixtures(object):
 
         INSPECTOR_PATH = os.path.abspath(python_src_inspector.__file__)
 
-        out, _, _ = python_executor.run_with_interpreters(command = [INSPECTOR_PATH, '-'], stdin=bytes(src, 'utf-8'))
+        out = python_executor.run_with_interpreters(command = [INSPECTOR_PATH, '-'], stdin=bytes(src, 'utf-8'))
         return out['ast_tree']['body']
 
     def get_full_ast(self, src):
