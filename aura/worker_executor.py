@@ -1,3 +1,4 @@
+import queue
 import multiprocessing
 from multiprocessing.pool import ThreadPool
 import time
@@ -38,6 +39,9 @@ class MultiprocessingExecutor:
         while any((not x.ready()) for x in self.jobs):
             time.sleep(0.05)
 
+    def create_queue(self):
+        return self.manager.Queue()
+
     def apply_async(self, func, args=None, kwds=None):
         job = self.worker_pool.apply_async(
             func=func,
@@ -50,11 +54,6 @@ class MultiprocessingExecutor:
 
     def log_error(self, traceback):
         raise traceback
-
-
-class ThreadExecutor(MultiprocessingExecutor):
-    def get_pool(self):
-        return ThreadPool()
 
 
 class LocalExecutor(MultiprocessingExecutor):
@@ -75,3 +74,8 @@ class LocalExecutor(MultiprocessingExecutor):
         except Exception as exc:
             self.log_error(exc)
 
+    def wait(self):
+        pass
+
+    def create_queue(self):
+        return queue.Queue()

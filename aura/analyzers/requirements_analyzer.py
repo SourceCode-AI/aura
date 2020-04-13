@@ -14,6 +14,7 @@ from .. import package
 
 
 FILENAME = re.compile(r"^.*requirements.*\.txt$")
+URL = re.compile("^(https?|ftp)://.*$", flags=re.I)
 
 
 @dataclass
@@ -76,6 +77,22 @@ def analyze_requirements_file(pth: Path, metadata: dict, **kwargs) -> Generator[
 
     with pth.open("r") as fd:
         for idx, req_line in enumerate(fd):
+            req_line = req_line.strip()
+
+            if URL.match(req_line):
+                yield InvalidRequirement(
+                    message = f"Can't process requirement with a remote URL",
+                    signature = f"req_invalid#{norm_pth}/{idx}",
+                    extra = {
+                        "reason": "remote_url",
+                        "line": req_line,
+                        "line_no": idx
+                    },
+                    score = get_score_or_default("requirement-remote-url", 20),
+                    tags = {"invalid_requirement", "remote_url"}
+                )
+                continue
+
             try:
                 for req in requirements.parse(req_line):
                     hit = check_unpinned(req, norm_pth)
@@ -98,5 +115,5 @@ def analyze_requirements_file(pth: Path, metadata: dict, **kwargs) -> Generator[
                         "exc_message": exc.args[0]
                     },
                     score = get_score_or_default("requirement-invalid", 0),
-                    tags = {"invalid_requirement"}
+                    tags = {"invalid_requirement", "cant_parse"}
                 )

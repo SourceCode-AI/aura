@@ -27,7 +27,7 @@ class ASTNodeIdentifier:
 
 
 @Analyzer.ID("ast_ngrams")
-def extract(pth: Path, mime: str, **kwargs):
+def extract(pth: Path, mime: str, metadata, **kwargs):
     if pth.suffix == '.py':
         pass
     elif mime != 'text/x-python':
@@ -35,7 +35,7 @@ def extract(pth: Path, mime: str, **kwargs):
 
     spth = os.fspath(pth.absolute())
 
-    ast_tree, iname, icmd = python_executor.run_with_interpreters(command=[INSPECTOR_PATH, spth])
+    ast_tree = python_executor.run_with_interpreters(command=[INSPECTOR_PATH, spth], metadata=metadata)
 
     pprint.pprint(ast_tree['ast_tree'])
 

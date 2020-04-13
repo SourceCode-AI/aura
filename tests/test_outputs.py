@@ -1,6 +1,9 @@
+import os
 import json
 import tempfile
 import sqlite3
+
+import pytest
 
 
 def test_output_formats(fixtures, fuzzy_rule_match):
@@ -59,3 +62,34 @@ def test_non_existing(fixtures):
     # stdout should not contain any of these
     assert "Traceback" not in cli.stdout
     assert "Invalid location" not in cli.stdout
+
+
+@pytest.mark.parametrize(
+    "output_type",
+    (
+        "text",
+        "json",
+        "sqlite"
+    )
+)
+def test_output_not_created_when_below_minimum_score(output_type, fixtures):
+    """
+    Test that an output file is never created if the minimum score is never reached
+    This also tests that the output results are not outputted on stdout
+    """
+    with tempfile.TemporaryDirectory(prefix="aura_pytest_tempd_") as tmpd:
+        cli = fixtures.scan_test_file(
+            "misc.py",
+            decode=False,
+            args=[
+                "--format", output_type,
+                "--min-score", 1000,
+                "--output-path", f"{tmpd}/aura_output"
+            ]
+        )
+
+        assert len(os.listdir(tmpd)) == 0
+        assert not os.path.exists(f"{tmpd}/aura_output")
+
+        for keyword in ("os.system", "eval", "__reduce__"):
+            assert keyword not in cli.stdout, (keyword, cli.stdout)

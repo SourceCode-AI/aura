@@ -51,9 +51,9 @@ class Analyzer(object):
         else:
             executor = worker_executor.LocalExecutor()
 
-        files_queue = executor.manager.Queue()
-        hits = executor.manager.Queue()
-        cleanup = executor.manager.Queue()
+        files_queue = executor.create_queue()
+        hits = executor.create_queue()
+        cleanup = executor.create_queue()
         results = []
 
         files_queue.put(base.ScanLocation(location=location))
