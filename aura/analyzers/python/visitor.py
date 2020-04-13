@@ -133,7 +133,7 @@ class Visitor:
 
         cmd = [INSPECTOR_PATH, source]
         self.tree = python_executor.run_with_interpreters(command=cmd, metadata=self.metadata)
-        if "encoding" not in self.metadata and self.tree.get("encoding"):
+        if "encoding" not in self.metadata and self.tree and self.tree.get("encoding"):
             self.metadata["encoding"] = self.tree["encoding"]
 
     def push(self, context):
