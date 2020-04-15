@@ -1,7 +1,6 @@
 import re
 import pprint
 import fnmatch
-from pathlib import Path
 
 from ..nodes import *
 from ..visitor import Visitor

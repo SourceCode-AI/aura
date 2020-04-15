@@ -29,7 +29,7 @@ class FunctionCallAnalyzer(NodeAnalyzerV2):
                 node=context.node,
                 tags=set(sig.signature.get("tags", [])),
                 extra = {
-                    "function": context.node.full_name
+                    "function": context.node.cached_full_name
                 },
                 signature=f"function_call#{sig_id}/{context.node.line_no}#{context.visitor.normalized_path}"
             )

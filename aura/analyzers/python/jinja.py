@@ -26,7 +26,7 @@ class JinjaAnalyzer(base.NodeAnalyzerV2):
 
     def node_Call(self, context):
         yield from self.__analyze_jinja_template(context)
-        f_name = context.node.full_name
+        f_name = context.node.cached_full_name
 
         if f_name != "jinja2.Environment":
             return
@@ -48,7 +48,7 @@ class JinjaAnalyzer(base.NodeAnalyzerV2):
             yield hit
 
     def __analyze_jinja_template(self, context):
-        f_name = context.node.full_name
+        f_name = context.node.cached_full_name
         yield from []
 
         if f_name != "flask.render_template":

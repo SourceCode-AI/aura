@@ -49,7 +49,7 @@ class CryptoGenKey(base.NodeAnalyzerV2):
     """Analyze the generation of cryptography keys"""
 
     def node_Call(self, context):
-        f_name = context.node.full_name
+        f_name = context.node.cached_full_name
 
         if not type(f_name) == str:
             return
@@ -91,7 +91,7 @@ class CryptoGenKey(base.NodeAnalyzerV2):
             message="Generation of cryptography key detected",
             signature=f"crypto#gen_key#{context.visitor.normalized_path}#{context.node.line_no}",
             extra={
-                "function": context.node.full_name,
+                "function": context.node.cached_full_name,
                 "key_type": info["type"],
                 "key_size": key_size,
             },

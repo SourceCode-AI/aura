@@ -156,6 +156,21 @@ def load_config():
         sys.setrecursionlimit(rec_limit)
 
 
+def get_maximum_archive_size() ->typing.Optional[int] :
+    """
+    Get settings for a maximum archive file size that can be extracted
+    If the limit is not specified, fallback to the rlimit-fsize (if configured)
+
+    :return: File int size in bytes for configured limit; otherwise None
+    """
+    size = CFG["aura"].get("max-archive-size", fallback=None)
+    if size:
+        return int(size)
+    size = CFG["aura"].get("rlimit-fsize", fallback=None)
+    if size:
+        return int(size)
+
+
 def get_default_tag_filters() -> typing.List[str]:
     if "tags" not in CFG:
         return []

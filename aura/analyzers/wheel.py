@@ -6,7 +6,7 @@ from pathlib import Path
 from dataclasses import dataclass
 
 from . import rules
-from ..utils import Analyzer
+from ..utils import Analyzer, normalize_path
 from ..config import get_score_or_default
 
 
@@ -24,7 +24,7 @@ def get_checksum(alg: str, path: Path):
 
 
 @Analyzer.ID("wheel")
-def analyze_wheel(pth: Path, **kwargs):
+def analyze_wheel(pth: Path, location, **kwargs):
     """Find anomalies in the Wheel packages that could be caused by manipulation or using a non-standard tools"""
     parts = pth.parts
 
@@ -74,7 +74,7 @@ def analyze_wheel(pth: Path, **kwargs):
             # print(record)
 
     for x in wheel_root.glob("*/setup.py"):
-        hit_path = os.fspath(wheel_root / x)
+        hit_path = normalize_path(wheel_root / x)
         hit = Wheel(
             score=get_score_or_default("wheel-contain-setup-py", 100),
             message="Found setup.py in a wheel archive",
@@ -93,7 +93,7 @@ def analyze_wheel(pth: Path, **kwargs):
                 score=get_score_or_default("wheel-file-not-listed-in-records", 10),
                 message="Wheel contain a file not listed in the RECORDs",
                 extra={
-                    "record": os.fspath(x)  #TODO: normalize path
+                    "record": location.strip(x)  #TODO: normalize path
                 },
                 tags={"wheel", "anomaly", "missing_record_file"},
                 signature=f"wheel#missing_record_file#{x}",

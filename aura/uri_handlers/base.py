@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import urllib.parse
+import mimetypes
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -91,6 +92,10 @@ class ScanLocation:
 
         if Path(self.location).is_file():
             self.metadata["mime"] = magic.from_file(os.fspath(self.location), mime=True)
+
+            if self.metadata["mime"] in ("text/plain", "application/octet-stream"):
+                self.metadata["mime"] = mimetypes.guess_type(self.location)[0]
+
             if self.metadata["mime"] == "text/x-python":
                 imports = find_imports.find_imports(self.location, metadata=self.metadata)
                 if imports:

@@ -1,6 +1,7 @@
-import resource
+import zipfile
+import tarfile
+import tempfile
 
-from aura import config
 from aura.analyzers import archive
 
 
@@ -23,19 +24,7 @@ def test_zip_extractor(fixtures):
 
 
 def test_zip_bomb(fixtures, fuzzy_rule_match):
-    from aura import config
-
-    resource.setrlimit(resource.RLIMIT_FSIZE, (16384, 16384))
-
-    fsize_limit = config.CFG["aura"]["rlimit-fsize"]
-    try:
-        config.CFG["aura"]["rlimit-fsize"] = "16384"
-        # Fingers crossed
-        output = fixtures.scan_test_file('zip_bomb.zip')
-    finally:
-        config.CFG["aura"]["rlimit-fsize"] = fsize_limit
-
-    hits = [
+    matches = [
         {
             'type': 'ArchiveAnomaly',
             'message': "Archive contain a file that exceed the configured maximum size",
@@ -45,5 +34,28 @@ def test_zip_bomb(fixtures, fuzzy_rule_match):
         } for x in '123456789abcdef'
     ]
 
-    for x in hits:
-        assert any(fuzzy_rule_match(h, x) for h in output['hits'])
+    fixtures.scan_and_match("zip_bomb.zip", matches=matches)
+
+
+def test_damaged_zipfile(fixtures):
+    matches = [
+        {
+            "type": "ArchiveAnomaly",
+            "message": "Could not open the archive for analysis",
+            "extra": {
+                "reason": "archive_read_error"
+            }
+        }
+    ]
+
+    with tempfile.TemporaryDirectory(prefix="aura_pytest_") as tmpd:
+        pth = f"{tmpd}/archive.zip"
+
+        with zipfile.ZipFile(pth, "w") as fd:
+            fd.writestr("foo.txt", b"O, for a Muse of Fire!")
+
+        with open(pth, "wb") as fd:
+            fd.seek(10, 2)
+            fd.write(b"0"*5)
+
+        fixtures.scan_and_match(pth, matches=matches)

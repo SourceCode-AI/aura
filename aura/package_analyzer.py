@@ -165,7 +165,7 @@ class Analyzer(object):
 
             analyzers = plugins.get_analyzer_group(metadata.get("analyzers", []))
 
-            for x in analyzers(path=path, mime=m, metadata=metadata):
+            for x in analyzers(path=path, mime=m, metadata=metadata, location=location):
 
                 if isinstance(x, base.ScanLocation):
                     if x.cleanup:

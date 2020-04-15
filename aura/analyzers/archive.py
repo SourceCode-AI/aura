@@ -2,6 +2,7 @@ import os
 import tempfile
 import tarfile
 import zipfile
+import mimetypes
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Generator, Union
@@ -11,6 +12,7 @@ import magic
 from .rules import Rule
 from ..uri_handlers import base
 from .. import config
+from .. import utils
 
 
 SUPPORTED_MIME = (
@@ -34,19 +36,21 @@ class ArchiveAnomaly(Rule):
 
 
 def is_suspicious(pth, location):
+    norm = utils.normalize_path(pth)
+
     if pth.startswith("/"):
         return SuspiciousArchiveEntry(
-            location=os.fspath(location),
-            signature=f"suspicious_archive_entry#absolute_path#{os.fspath(pth)}#{location}",
-            extra={"entry_type": "absolute_path", "entry_path": os.fspath(pth)},
+            location=utils.normalize_path(location),
+            signature=f"suspicious_archive_entry#absolute_path#{norm}#{location}",
+            extra={"entry_type": "absolute_path", "entry_path": norm},
             score=config.get_score_or_default("suspicious-archive-entry-absolute-path", 50),
         )
 
     elif any(x == ".." for x in Path(pth).parts):
         return SuspiciousArchiveEntry(
-            location=os.fspath(location),
-            signature=f"suspicious_archive_entry#parent_reference#{os.fspath(pth)}#{location}",
-            extra={"entry_type": "parent_reference", "entry_path": os.fspath(pth)},
+            location=utils.normalize_path(location),
+            signature=f"suspicious_archive_entry#parent_reference#{norm}#{location}",
+            extra={"entry_type": "parent_reference", "entry_path": norm},
             score=config.get_score_or_default("suspicious-archive-entry-parent-reference", 50),
         )
 
@@ -73,7 +77,7 @@ def list_zipfile(path):
                 item["name"] = f_pth.name
 
                 for d in f_pth.parents:
-                    d = os.fspath(d)
+                    d = utils.normalize_path(d)
                     if d not in dirs:
                         content.append({"path": d, "type": "d"})
                         dirs.add(d)
@@ -87,6 +91,9 @@ def list_zipfile(path):
 def filter_zip(
     arch: zipfile.ZipFile, path, max_size=None
 ) -> Generator[Union[zipfile.ZipInfo, ArchiveAnomaly], None, None]:
+    if max_size is None:
+        max_size = config.get_maximum_archive_size()
+
     for x in arch.infolist():  # type: zipfile.ZipInfo
         pth = x.filename
 
@@ -99,7 +106,12 @@ def filter_zip(
                 location=path,
                 message="Archive contain a file that exceed the configured maximum size",
                 signature=f"archive_anomaly#size#{path}#{pth}",
-                extra={"archive_path": pth},
+                extra={
+                    "archive_path": pth,
+                    "reason": "file_size_exceeded",
+                    "size": x.file_size,
+                    "limit": max_size
+                },
             )
             yield hit
         else:
@@ -109,6 +121,9 @@ def filter_zip(
 def filter_tar(
     arch: tarfile.TarFile, path, max_size=None
 ) -> Generator[Union[tarfile.TarInfo, ArchiveAnomaly], None, None]:
+    if max_size is None:
+        config.get_maximum_archive_size()
+
     for member in arch.getmembers():
         pth = member.name
 
@@ -122,8 +137,14 @@ def filter_tar(
                 hit = ArchiveAnomaly(
                     location=path,
                     message="Archive contain a file that exceed the configured maximum size",
+                    score = config.get_score_or_default("archive-file-size-exceeded", 100),
                     signature=f"archive_anomaly#size#{path}#{pth}",
-                    extra={"archive_path": pth},
+                    extra={
+                        "archive_path": pth,
+                        "reason": "file_size_exceeded",
+                        "size": member.size,
+                        "limit": max_size
+                    },
                 )
                 yield hit
                 continue
@@ -131,6 +152,30 @@ def filter_tar(
                 yield member
         else:
             continue
+
+
+def process_zipfile(path, tmp_dir) -> Generator[ArchiveAnomaly, None, None]:
+    members = []
+
+    with zipfile.ZipFile(file=path, mode="r") as fd:
+        for x in filter_zip(arch=fd, path=path):
+            if isinstance(x, zipfile.ZipInfo):
+                members.append(x)
+            else:
+                yield x
+        fd.extractall(path=tmp_dir, members=members)
+
+
+def process_tarfile(path, tmp_dir) -> Generator[ArchiveAnomaly, None, None]:
+    members = []
+
+    with tarfile.open(name=path, mode="r:*") as fd:
+        for x in filter_tar(arch=fd, path=path):
+            if isinstance(x, tarfile.TarInfo):
+                members.append(x)
+            else:
+                yield x
+        fd.extractall(path=tmp_dir, members=members)
 
 
 def archive_analyzer(pth: Path, metadata, **kwargs):
@@ -143,12 +188,14 @@ def archive_analyzer(pth: Path, metadata, **kwargs):
     if "mime" in metadata:
         mime = metadata["mime"]
     else:
-        mime = magic.from_file(os.fspath(pth), mime=True)
+        mime = magic.from_file(utils.normalize_path(pth), mime=True)
+
+    if mime == "application/octet-stream":
+        mime = mimetypes.guess_type(pth)[0]
 
     if mime not in SUPPORTED_MIME:
         return
 
-    max_size = int(config.CFG["aura"]["rlimit-fsize"])
     tmp_dir = tempfile.mkdtemp(prefix="aura_pkg__sandbox", suffix=os.path.basename(pth))
     logger.info("Extracting to: '{}' [{}]".format(tmp_dir, mime))
 
@@ -162,26 +209,23 @@ def archive_analyzer(pth: Path, metadata, **kwargs):
 
     yield location
 
-    if mime == "application/zip":
-        members = []
-
-        with zipfile.ZipFile(file=pth, mode="r") as fd:
-            for x in filter_zip(arch=fd, path=pth, max_size=max_size):
-                if isinstance(x, zipfile.ZipInfo):
-                    members.append(x)
-                else:
-                    yield x
-            fd.extractall(path=tmp_dir, members=members)
-
-    elif mime in SUPPORTED_MIME:
-        members = []
-
-        with tarfile.open(name=pth, mode="r:*") as fd:
-            for x in filter_tar(arch=fd, path=pth, max_size=max_size):
-                if isinstance(x, tarfile.TarInfo):
-                    members.append(x)
-                else:
-                    yield x
-            fd.extractall(path=tmp_dir, members=members)
-    else:
-        return
+    try:
+        if mime == "application/zip":
+            yield from process_zipfile(path=pth, tmp_dir=tmp_dir)
+        elif mime in SUPPORTED_MIME:
+            yield from process_tarfile(path=pth, tmp_dir=tmp_dir)
+        else:
+            return
+    except (tarfile.ReadError, zipfile.BadZipFile) as exc:
+        yield ArchiveAnomaly(
+            location=pth,
+            message = "Could not open the archive for analysis",
+            signature = f"archive_anomaly#read_error#{pth}",
+            score = config.get_score_or_default("corrupted-archive", 10),
+            extra = {
+                "reason": "archive_read_error",
+                "exc_message": exc.args[0],
+                "exc_type": type(exc).__class__.__name__,
+                "mime": mime
+            },
+        )

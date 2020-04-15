@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .rules import Rule
-from ..utils import Analyzer
+from ..utils import Analyzer, normalize_path
 
 
 @dataclass
@@ -20,10 +20,10 @@ class FileStats(Rule):
 
 
 @Analyzer.ID("file_stats")
-def analyze(pth: Path, **kwargs):
+def analyze(pth: Path, mime, metadata, **kwargs):
     """This analyzer collect stats about analyzer files"""
-    pth = os.fspath(pth)
+    pth = normalize_path(metadata["normalized_path"])
 
-    hit = FileStats(mime=kwargs["mime"], signature=f"stats#mime#{pth}")
+    hit = FileStats(mime=mime, signature=f"stats#mime#{pth}")
     hit.informational = True
     yield hit

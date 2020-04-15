@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from functools import total_ordering
 from collections import defaultdict
 
-from ..utils import lookup_lines
+from ..utils import lookup_lines, normalize_path
 from .python.nodes import NodeType
 
 
@@ -69,7 +69,7 @@ class Rule:
 
         if self.location is not None:
             if isinstance(self.location, Path):
-                data["location"] = os.fspath(self.location)
+                data["location"] = normalize_path(self.location)
             else:
                 data["location"] = self.location
 

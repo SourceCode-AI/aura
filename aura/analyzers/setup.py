@@ -30,7 +30,7 @@ class SetupPy(NodeAnalyzerV2):
         self.hits = []
 
     def node_Call(self, context):
-        if context.node.full_name == "setuptools.setup":
+        if context.node.cached_full_name == "setuptools.setup":
             self.__parse_setup(context.node)
 
         yield from []

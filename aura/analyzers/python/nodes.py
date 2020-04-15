@@ -11,7 +11,7 @@ from abc import ABCMeta, abstractmethod
 from enum import Enum
 from pathlib import Path
 from warnings import warn
-from collections import defaultdict
+from collections import defaultdict, Hashable
 from dataclasses import dataclass, InitVar, field
 from functools import partial, total_ordering, wraps
 
@@ -31,7 +31,7 @@ class Taints(Enum):
     TAINTED = 3
 
     def __lt__(self, other):
-        if not isinstance(other, Taints):
+        if type(other) != Taints:
             return NotImplemented
 
         if self == Taints.SAFE and other != Taints.SAFE:
@@ -89,9 +89,6 @@ class TaintLog:
         """
         Extract a sequential log from the provided node
         This will follow the path of chained nodes and their logs concatenated together
-
-        :param node:
-        :return:
         """
         log = [x.json() for x in node._taint_log]
 
@@ -760,10 +757,13 @@ class Call(ASTNode):
         if self._full_name is not None:
             return self._full_name
 
+        if type(self._original) == str and type(self.func) == Import:
+            self._full_name = self.func.names[self._original]
+            return self._full_name
+
         f_name = getattr(self.func, "full_name", None)
-        if type(self._original) == str and isinstance(self.func, Import):
-            return self.func.names[self._original]
-        elif f_name is not None:
+
+        if f_name is not None:
             return f_name
         else:
             return self.func
@@ -906,6 +906,9 @@ class Arguments(ASTNode):  # TODO: not used yet
     def set_taint(self, name, taint_level, context):
         if isinstance(name, int) and name < len(self.args):
             name = self.args[name]
+
+        if not isinstance(name, Hashable):
+            return
 
         if name in self.taints:
             t = self.taints[name]

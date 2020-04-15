@@ -4,11 +4,12 @@ import sys
 import codecs
 import hashlib
 import shutil
+import fnmatch
 import importlib
 import dataclasses
 from contextlib import contextmanager
 from pathlib import Path
-from functools import partial, wraps
+from functools import partial, wraps, lru_cache
 from typing import Generator, Union, List
 
 import requests
@@ -46,6 +47,7 @@ def print_tty(msg: str, *args, **kwargs) -> None:
         secho(msg, *args, **kwargs)
 
 
+@lru_cache()
 def md5(
     data: Union[str, bytes, Path], hex=True, block_size=2 ** 20
 ) -> Union[str, bytes]:
@@ -89,13 +91,13 @@ def download_file(url: str, fd) -> None:
 
 
 def json_encoder(obj):
-    if isinstance(obj, (set, tuple)):
+    if type(obj) in (set, tuple):
         return list(obj)
     elif isinstance(obj, Path):
         return os.fspath(obj.absolute())
     elif isinstance(obj, ASTNode):
         return obj.json
-    elif isinstance(obj, bytes):
+    elif type(obj) == bytes:
         return obj.decode("utf-8")
     elif dataclasses.is_dataclass(obj):
         if hasattr(obj, "_asdict"):
@@ -201,6 +203,18 @@ def enrich_exception(*args):
         exc.args += args
         raise
 
+@lru_cache()
+def normalize_path(pth: Path, absolute=False, to_str=True):
+    if type(pth) == str:
+        pth = Path(pth)
+
+    if absolute:
+        pth = pth.absolute()
+
+    if to_str:
+        return os.fspath(pth)
+    else:
+        return Path(pth)
 
 
 class Analyzer:

@@ -1,10 +1,9 @@
-import os
-from copy import deepcopy
 from collections import defaultdict
 from pathlib import Path
 from typing import List
 
 from .. import python_executor
+from .. import utils
 
 
 
@@ -46,7 +45,7 @@ class TopologySort:
 
 def get_imports(py_src, metadata=None) -> List:
     importer_path = Path(__file__).parent / "find_imports_inject.py"
-    cmd = [os.fspath(importer_path), os.fspath(py_src)]
+    cmd = [utils.normalize_path(importer_path), utils.normalize_path(py_src)]
 
     return python_executor.run_with_interpreters(command=cmd, metadata=metadata)
 

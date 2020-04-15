@@ -47,7 +47,7 @@ class SecretsAnalyzer(base.NodeAnalyzerV2):
         yield hit
 
     def node_Call(self, context):
-        f_name = context.node.full_name
+        f_name = context.node.cached_full_name
 
         if f_name in ("requests.auth.HTTPBasicAuth", "requests.auth.HTTPDigestAuth"):
             try:
