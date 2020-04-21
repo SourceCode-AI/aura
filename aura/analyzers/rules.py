@@ -124,6 +124,11 @@ class Rule:
 
 
 @dataclass
+class DataProcessing(Rule):
+    __hash__ = Rule.__hash__
+
+
+@dataclass
 class ModuleImport(Rule):
     root: NodeType = None
     name: NodeType = None

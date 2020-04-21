@@ -59,7 +59,12 @@ class PyPiHandler(URIHandler, PackageProvider):
         for f in self.package.download_release(
             dest=self.opts["download_dir"], release=self.release
         ):
-            yield ScanLocation(location=self.opts["download_dir"] / f)
+            yield ScanLocation(
+                location=self.opts["download_dir"] / f,
+                metadata={
+                    "depth": 0
+                }
+            )
 
     def cleanup(self):
         if self.opts.get("cleanup", False) and self.opts["download_dir"].exists():

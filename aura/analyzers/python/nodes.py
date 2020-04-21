@@ -11,7 +11,8 @@ from abc import ABCMeta, abstractmethod
 from enum import Enum
 from pathlib import Path
 from warnings import warn
-from collections import defaultdict, Hashable
+from collections import defaultdict
+from collections.abc import Hashable
 from dataclasses import dataclass, InitVar, field
 from functools import partial, total_ordering, wraps
 
@@ -665,27 +666,13 @@ class Call(ASTNode):
         return h
 
     def _visit_node(self, context: Context):
-        if isinstance(self.full_name, str):
+        if type(self.full_name) == str:
             context.call_graph[self.full_name] = self
-        elif (
-            self.full_name is None
-            and isinstance(self.func, Import)
-            and isinstance(self._original, str)
-        ):
-            self._full_name = self.func.names[self._original]
-
-        if isinstance(self.func, str) and self.func in context.stack:
-            try:
-                self._original = self.func
-                self.func = context.stack[self.func]
-                context.visitor.modified = True
-            except (TypeError, KeyError):
-                pass
 
         for idx in range(len(self.args)):
             try:
                 arg = self.args[idx]
-                if isinstance(arg, str):
+                if type(arg) == str:
                     arg = context.stack[arg]
                     if arg.line_no != self.line_no:
                         self._orig_args[idx] = self.args[idx]
@@ -701,7 +688,7 @@ class Call(ASTNode):
 
         for key, value in list(self.kwargs.items()):
             try:
-                if isinstance(value, str):
+                if type(value) == str:
                     target = context.stack[value]
                     self.kwargs[key] = target
                     context.visitor.modified = True
@@ -714,30 +701,6 @@ class Call(ASTNode):
                     self.__replace_kwargs, key=key, visitor=context.visitor
                 ),
             )
-
-        # Replace call to functions by their targets from defined variables, e.g.
-        # x = open
-        # x("test.txt") will be replaced to open("test.txt")
-        try:
-            if isinstance(self.func, Var):
-                source = self._full_name
-            else:
-                source = self.func
-
-            target = context.stack[source]
-            if isinstance(target, Import):
-                name = target.names[source]
-            else:
-                name = target.full_name
-            if (
-                isinstance(name, str)
-                and self._full_name != name
-                and target.line_no != self.line_no
-            ):
-                self._full_name = name
-                context.visitor.modified = True
-        except (TypeError, KeyError, AttributeError):
-            pass
 
         context.visit_child(
             node=self.func,
@@ -792,6 +755,13 @@ class Call(ASTNode):
                 inspect.Parameter(name=x, kind=inspect.Parameter.POSITIONAL_ONLY)
             )
 
+        if aura_capture_args:
+            params.append(
+                inspect.Parameter(
+                    name=aura_capture_args, kind=inspect.Parameter.VAR_POSITIONAL
+                )
+            )
+
         for k, v in sig_kwargs.items():
             params.append(
                 inspect.Parameter(
@@ -837,6 +807,7 @@ class Arguments(ASTNode):  # TODO: not used yet
     defaults: typing.List[NodeType]
     kw_defaults: typing.List[NodeType]
     taints: typing.Dict[str, Taints] = field(default_factory=dict)
+    taint_logs: typing.Dict[str, list] = field(default_factory=lambda: defaultdict(list))
 
     def _visit_node(self, context):
         if self.args:
@@ -903,21 +874,28 @@ class Arguments(ASTNode):  # TODO: not used yet
 
         return inspect.Signature(parameters=params)
 
-    def set_taint(self, name, taint_level, context):
-        if isinstance(name, int) and name < len(self.args):
+    def set_taint(self, name, taint_level, context, taint_log=None):
+        if type(name) == int and name < len(self.args):
             name = self.args[name]
 
         if not isinstance(name, Hashable):
             return
 
+        if taint_log is None:
+            warn("Attempting to modify argument taint but log is not set", stacklevel=2)
+
         if name in self.taints:
             t = self.taints[name]
             if taint_level > t:
                 self.taints[name] = taint_level
+                if taint_log:
+                    self.taint_logs[name].append(taint_log)
                 context.visitor.modified = True
             return
         else:
             self.taints[name] = taint_level
+            if taint_log:
+                self.taint_logs[name].append(taint_log)
             context.visitor.modified = True
 
     def to_parameters(self):

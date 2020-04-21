@@ -42,13 +42,36 @@ def analyze_wheel(pth: Path, location, **kwargs):
             continue
 
     record_entries = set()
+    record_path = dist_info / "RECORD"
 
-    with (dist_info / "RECORD").open(mode="r", newline=os.linesep) as rfd:
+    if not record_path.exists():
+        yield Wheel(
+            score = get_score_or_default("wheel-records-missing", 100),
+            message = f"Wheel anomaly, RECORD file is missing in dist-info",
+            tags = {"anomaly", "wheel", "wheel_missing_records"},
+            signature = f"wheel#missing_records#{location.strip(record_path)}"
+        )
+        return
+
+    with record_path.open(mode="r", newline=os.linesep) as rfd:
         reader = csv.reader(rfd, delimiter=",", quotechar='"')
         for record in reader:
             full_pth = wheel_root.joinpath(record[0])
+
+            if not full_pth.exists():
+                yield Wheel(
+                    score=get_score_or_default("wheel-missing-file", 100),
+                    message = "Wheel anomaly detected, file listed in RECORDs but not present in wheel",
+                    tags = {"anomaly", "wheel", "wheel_missing_file"},
+                    extra = {
+                        "record": record[0]
+                    },
+                    signature=f"wheel#missing_file#{record[0]}#{full_pth}"
+                )
+                continue
+
             record_entries.add(full_pth)
-            if full_pth.samefile(dist_info / "RECORD"):
+            if full_pth.samefile(record_path):
                 continue
 
             try:

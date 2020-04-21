@@ -1,17 +1,15 @@
 # -*- coding: utf-8 -*-
 import json
-import sys
 import difflib
 import itertools
 import xmlrpc.client
-from functools import partial
-from pathlib import Path
 
 import click
 import dateutil.parser
 
 from . import diff
 from . import config
+from . import exceptions
 from .utils import normalize_name
 from .uri_handlers.base import URIHandler
 
@@ -220,7 +218,6 @@ def diff_distance(s1, s2, cutoff=0.8, cut_return=None):
     Reference:
     https://github.com/python/cpython/blob/01b731fc2b04744a11e32f93aba8bfb9ddb3dd29/Lib/difflib.py#L722
 
-
     :param s1: first string
     :param s2: second string
     :param cutoff: cutoff value
@@ -265,18 +262,25 @@ def enumerator(generator=None, method=None):
             yield (pkg1, pkg2)
 
 
-def check_name(name):
+def check_name(name, full_list=False):
+    name = normalize_name(name)
+
     pth = config.get_relative_path("pypi_stats")
     typos = []
     with pth.open() as fd:
         for line in fd:
             line = json.loads(line)
-            if name == line["package_name"]:
-                continue
+            pkg_name = normalize_name(line["package_name"])
 
-            dist = damerau_levenshtein(name, line["package_name"])
+            if name == pkg_name:
+                if full_list:
+                    continue
+                else:
+                    break
+
+            dist = damerau_levenshtein(name, pkg_name)
             if dist and dist < 3:
-                typos.append(line["package_name"])
+                typos.append(pkg_name)
 
     return typos
 
@@ -287,15 +291,14 @@ def generate_stats(output: click.File, limit=None):
 
         client = bigquery.Client()
     except Exception:
-        logger.error(
+        raise exceptions.PluginDisabled(
             "Error creating BigQuery client, Aura is probably not correctly configured. Please consult docs."
         )
-        sys.exit(1)
+
+    q = PYPI_STATS_QUERY
 
     if limit:
-        q = PYPI_STATS_QUERY + f" LIMIT {int(limit)}"
-    else:
-        q = PYPI_STATS_QUERY
+        q += f" LIMIT {int(limit)}"
 
     logger.info("Running Query on PyPI download dataset")
     query_job = client.query(q, location="US",)

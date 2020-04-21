@@ -17,6 +17,10 @@ class NoSuchPackage(InvalidLocation):
     pass
 
 
+class NoSuchRepository(InvalidLocation):
+    pass
+
+
 class ASTNodeRewrite(AuraException):
     pass
 

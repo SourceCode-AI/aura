@@ -55,15 +55,20 @@ class YaraMatch(Rule):
 
 
 @Analyzer.ID("yara")
-def analyze(pth: Path, **kwargs):
+def analyze(pth: Path, metadata, **kwargs):
     """Run Yara rules on all input files recursively"""
     pth = os.fspath(pth)
     start = time.time()
 
     for m in rules.match(pth, timeout=10):
         strings = set(x[-1] for x in m.strings)
+        # FIXME: Change to use extra instead for format normalization
         hit = YaraMatch(
-            rule=m.rule, strings=tuple(strings), meta=m.meta, tags=set(m.tags)
+            rule=m.rule,
+            strings=tuple(strings),
+            meta=m.meta,
+            tags=set(m.tags),
+            location=metadata["normalized_path"]
         )
         yield hit
 

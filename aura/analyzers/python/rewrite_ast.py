@@ -1,4 +1,7 @@
 import base64
+
+import chardet
+
 from .visitor import Visitor
 from .convert_ast import ASTVisitor
 from .nodes import *
@@ -15,6 +18,7 @@ class ASTRewrite(Visitor):
             self.resolve_variable,
             self.string_slice,
             self.decode_inline_base64,
+            self.rewrite_function_call,
         )
         super().__init__(**kwargs)
 
@@ -123,13 +127,66 @@ class ASTRewrite(Visitor):
             return
 
         try:
-            decoded = base64.b64decode(str(node.func.source)).decode()
-            new_node = String(value=decoded)
+
+
+            payload = base64.b64decode(str(node.func.source))
+            encoding = chardet.detect(payload)["encoding"]
+
+            if encoding is None:
+                return
+
+            new_node = String(value=payload.decode(encoding))
             new_node.line_no = context.node.line_no
             context.replace(new_node)
         except Exception:
             raise
         return
+
+    def rewrite_function_call(self, context):
+        if not isinstance(context.node, Call):
+            return
+
+        if (
+            context.node.full_name is None
+            and isinstance(context.node.func, Import)
+            and type(context.node._original) == str
+        ):
+            context.node._full_name = context.node.func.names[context.node._original]
+            return True
+
+        # Replace call to functions by their targets from defined variables, e.g.
+        # x = open
+        # x("test.txt") will be replaced to open("test.txt")
+        try:
+            if isinstance(context.node.func, Var):
+                source = context.node._full_name
+            else:
+                source = context.node.func
+
+            target = context.stack[source]
+            if isinstance(target, Import):
+                name = target.names[source]
+            else:
+                name = target.full_name
+            if (
+                type(name) == str
+                and context.node._full_name != name
+                and target.line_no != context.node.line_no
+            ):
+                context.node._full_name = name
+                context.visitor.modified = True
+                return True
+        except (TypeError, KeyError, AttributeError):
+            pass
+
+        if type(context.node.func) == str and context.node.func in context.stack:
+            try:
+                context.node._original = context.node.func
+                context.node.func = context.stack[context.node.func]
+                context.visitor.modified = True
+                return True
+            except (TypeError, KeyError):
+                pass
 
     def resolve_class(self, context):
         node = context.node

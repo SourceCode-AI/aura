@@ -10,7 +10,7 @@ from typing import Generator, Union
 import magic
 
 from .rules import Rule
-from ..uri_handlers import base
+from ..uri_handlers.base import ScanLocation
 from .. import config
 from .. import utils
 
@@ -57,37 +57,6 @@ def is_suspicious(pth, location):
     return None
 
 
-def list_zipfile(path):
-    dirs = set()
-    content = []
-
-    with zipfile.ZipFile(path, "r") as fd:
-        for x in fd.infolist():
-            item = {"path": x.filename}
-            if x.is_dir():
-                if x.filename in dirs:
-                    continue
-
-                item["type"] = "d"
-                dirs.add(x.filename)
-            else:
-                f_pth = Path(x.filename)
-                item["type"] = "f"
-                item["size"] = x.file_size
-                item["name"] = f_pth.name
-
-                for d in f_pth.parents:
-                    d = utils.normalize_path(d)
-                    if d not in dirs:
-                        content.append({"path": d, "type": "d"})
-                        dirs.add(d)
-
-            if item["name"] not in dirs:
-                content.append(item)
-
-    return content
-
-
 def filter_zip(
     arch: zipfile.ZipFile, path, max_size=None
 ) -> Generator[Union[zipfile.ZipInfo, ArchiveAnomaly], None, None]:
@@ -132,6 +101,10 @@ def filter_tar(
             yield res
         elif member.isdir():
             yield member
+        elif member.issym() or member.islnk():
+            # TODO: generate a hit
+            # https://en.wikipedia.org/wiki/Tar_(computing)#Tarbomb
+            continue
         elif member.isfile():
             if max_size is not None and member.size > max_size:
                 hit = ArchiveAnomaly(
@@ -155,30 +128,24 @@ def filter_tar(
 
 
 def process_zipfile(path, tmp_dir) -> Generator[ArchiveAnomaly, None, None]:
-    members = []
-
     with zipfile.ZipFile(file=path, mode="r") as fd:
         for x in filter_zip(arch=fd, path=path):
             if isinstance(x, zipfile.ZipInfo):
-                members.append(x)
+                fd.extract(member=x, path=tmp_dir)
             else:
                 yield x
-        fd.extractall(path=tmp_dir, members=members)
 
 
 def process_tarfile(path, tmp_dir) -> Generator[ArchiveAnomaly, None, None]:
-    members = []
-
     with tarfile.open(name=path, mode="r:*") as fd:
         for x in filter_tar(arch=fd, path=path):
             if isinstance(x, tarfile.TarInfo):
-                members.append(x)
+                fd.extract(member=x, path=tmp_dir, set_attrs=False)
             else:
                 yield x
-        fd.extractall(path=tmp_dir, members=members)
 
 
-def archive_analyzer(pth: Path, metadata, **kwargs):
+def archive_analyzer(pth: Path, metadata, location: ScanLocation, **kwargs):
     """
     Archive analyzer that looks for suspicious entries and unpacks the archive for recursive analysis
     """
@@ -199,15 +166,12 @@ def archive_analyzer(pth: Path, metadata, **kwargs):
     tmp_dir = tempfile.mkdtemp(prefix="aura_pkg__sandbox", suffix=os.path.basename(pth))
     logger.info("Extracting to: '{}' [{}]".format(tmp_dir, mime))
 
-    location = base.ScanLocation(
-        location=tmp_dir,
+    yield location.create_child(
+        new_location=tmp_dir,
         cleanup=True,
         strip_path=tmp_dir,
-        parent=pth,
-        metadata={"depth": metadata.get("depth", 0) + 1},
+        parent=pth
     )
-
-    yield location
 
     try:
         if mime == "application/zip":
@@ -225,7 +189,7 @@ def archive_analyzer(pth: Path, metadata, **kwargs):
             extra = {
                 "reason": "archive_read_error",
                 "exc_message": exc.args[0],
-                "exc_type": type(exc).__class__.__name__,
+                "exc_type": exc.__class__.__name__,
                 "mime": mime
             },
         )

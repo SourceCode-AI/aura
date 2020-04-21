@@ -48,7 +48,7 @@ def run_with_interpreters(*, metadata=None, **kwargs):
             if output:
                 if metadata is not None:
                     metadata["interpreter_name"] = name
-                    metadata["interpreter_cmd"] = interpreter
+                    metadata["interpreter_path"] = interpreter
 
                 return output
         except json.JSONDecodeError:

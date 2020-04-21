@@ -1,3 +1,5 @@
+import pytest
+
 import zipfile
 import tarfile
 import tempfile
@@ -59,3 +61,33 @@ def test_damaged_zipfile(fixtures):
             fd.write(b"0"*5)
 
         fixtures.scan_and_match(pth, matches=matches)
+
+
+def test_damaged_tarfile(fixtures):
+    matches = [
+        {
+            "type": "ArchiveAnomaly",
+            "message": "Could not open the archive for analysis",
+            "extra": {
+                "reason": "archive_read_error",
+                "exc_message": "file could not be opened successfully",
+                "mime": "application/gzip"
+            }
+        }
+    ]
+
+    fixtures.scan_and_match("common-passwords.txt.gz", matches=matches)
+
+
+@pytest.mark.timeout(3)
+def test_recursive_bomb(fixtures):
+    matches = [
+        {
+            "type": "DataProcessing",
+            "extra": {
+                "reason": "max_depth"
+            },
+            "message": "Maximum processing depth reached"
+        }
+    ]
+    fixtures.scan_and_match("recursive_bomb.tar.gz", matches=matches)

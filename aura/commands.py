@@ -99,9 +99,12 @@ def scan_uri(uri, metadata: Union[list, dict]=None) -> list:
             elif not handler.exists:
                 raise exceptions.InvalidLocation(f"Invalid location provided from URI: '{uri}'")
 
-            metadata.update(
-                {"name": uri, "uri_scheme": handler.scheme, "uri_input": handler.metadata}
-            )
+            metadata.update({
+                "name": uri,
+                "uri_scheme": handler.scheme,
+                "uri_input": handler.metadata,
+                "depth": 0
+            })
 
             for x in handler.get_paths():  # type: ScanLocation
                 all_hits.extend(scan_worker(x, metadata))
@@ -221,7 +224,11 @@ def info():
 
 
 def fetch_pypi_stats(out):
-    typos.generate_stats(out)
+    try:
+        typos.generate_stats(out)
+    except exceptions.PluginDisabled as exc:
+        logger.error(exc.args[0])
+        sys.exit(1)
 
 
 def generate_typosquatting(out, distance=2, limit=None):

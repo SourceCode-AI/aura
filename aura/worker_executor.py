@@ -11,17 +11,10 @@ class Wait:
 class MultiprocessingExecutor:
     _instance = None
 
-    def __init__(self, ):
+    def __init__(self):
         self.manager = multiprocessing.Manager()
         self.worker_pool = self.get_pool()
         self.jobs = []
-
-    @classmethod
-    def create(cls, *args, **kwargs):
-        if cls._instance is None:
-            cls._instance = cls(*args, **kwargs)
-
-        return cls._instance
 
     def get_pool(self):
         return multiprocessing.Pool(
@@ -57,6 +50,9 @@ class MultiprocessingExecutor:
 
 
 class LocalExecutor(MultiprocessingExecutor):
+    def __init__(self):
+        self.jobs = []
+
     def join(self):
         pass
 

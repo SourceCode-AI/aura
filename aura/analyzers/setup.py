@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from . import rules
 from .python.nodes import String, Call, Dictionary
 from .base import NodeAnalyzerV2
-from ..utils import Analyzer
+from ..utils import Analyzer, normalize_name
 from .. import config
 
 
@@ -140,8 +140,8 @@ class SetupPy(NodeAnalyzerV2):
         For example typosquatting "requestes" could install itself as "requests"
         """
         # Normalize name
-        source = source.lower().replace("-", "_")
-        target = target.lower()
+        source = normalize_name(source)
+        target = normalize_name(target)
         if source == target:
             return True
         elif target.startswith(source + "."):

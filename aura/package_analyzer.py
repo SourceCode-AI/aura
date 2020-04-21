@@ -11,7 +11,7 @@ import queue
 import dataclasses
 import multiprocessing
 from pathlib import Path
-from collections import defaultdict
+from typing import Union
 
 import magic
 
@@ -51,27 +51,39 @@ class Analyzer(object):
         else:
             executor = worker_executor.LocalExecutor()
 
+        hits_items = []
         files_queue = executor.create_queue()
         hits = executor.create_queue()
         cleanup = executor.create_queue()
-        results = []
 
-        files_queue.put(base.ScanLocation(location=location))
+        meta = metadata.copy()
+        meta["depth"] = 0
+        files_queue.put(
+            base.ScanLocation(
+                location=location,
+                metadata=meta
+            )
+        )
 
         try:
-            while files_queue.qsize() or sum([not x.ready() for x in results]):
+            while files_queue.qsize() or sum([not x.ready() for x in executor.jobs]):
                 try:
 
-                    item = files_queue.get(False, 1)
+                    item: Union[worker_executor.Wait, base.ScanLocation] = files_queue.get(False, 1)
 
-                    if isinstance(item, worker_executor.Wait):
+                    if item is False or isinstance(item, worker_executor.Wait):
                         executor.wait()
                         continue
 
-                    item_path = Path(item.location)
+                    should_continue: Union[bool, rules.Rule] = item.should_continue()
+                    # Equals True if it's ok to process this item
+                    # Otherwise returns `Rule` indicating why processing of this location should be halted
+                    if should_continue is not True:
+                        hits_items.append(should_continue)
+                        continue
 
-                    if item_path.is_dir():
-                        collected = self.scan_directory(item=item, item_path=item_path)
+                    if item.location.is_dir():
+                        collected = self.scan_directory(item=item)
 
                         for x in collected:
                             files_queue.put(x)
@@ -88,19 +100,12 @@ class Analyzer(object):
                         "metadata": metadata,
                     }
 
-                    if self.fork or metadata.get("fork", False):
-                        results.append(
-                            executor.apply_async(func=self._worker, kwds=kwargs)
-                        )
-                    else:
-                        self._worker(**kwargs)
+                    executor.apply_async(func=self._worker, kwds=kwargs)
+
                 except queue.Empty:
                     executor.wait()
                     continue
                 except Exception:
-                    # TODO: move error logging to worker
-                    # extra = str({'metadata': metadata, 'item': item, 'parent': parent})
-                    # logger.exception(f"An error occurred while processing file '{item}'; extra: " + extra)
                     raise
 
             executor.close()
@@ -112,7 +117,6 @@ class Analyzer(object):
                 if not x.successful():
                     x.get()
 
-            hits_items = []
             while hits.qsize():
                 hits_items.append(hits.get())
 
@@ -120,7 +124,7 @@ class Analyzer(object):
         finally:
             while cleanup.qsize():
                 x = cleanup.get()
-                if isinstance(x, Path):
+                if type(x) != str:
                     x = os.fspath(x)
                 if os.path.exists(x):
                     shutil.rmtree(x)
@@ -129,22 +133,16 @@ class Analyzer(object):
     def _worker(
         cls,
         location: base.ScanLocation,
-        queue: multiprocessing.Queue,
+        queue: queue.Queue,
         hits: multiprocessing.Array,
-        cleanup: multiprocessing.Array,
+        cleanup: queue.Queue,
         metadata=None,
     ):
         try:
-            if metadata is None:
-                metadata = {}
-
             path = location.location
 
             if not isinstance(metadata.get("flags"), set):
                 metadata["flags"] = set()
-
-            if metadata.get("depth") is None:
-                metadata["depth"] = 0  #  TODO: add depth support for archive unpacker
 
             if "parent" not in metadata:
                 metadata["parent"] = path
@@ -185,12 +183,12 @@ class Analyzer(object):
         finally:
             pass
 
-    def scan_directory(self, item, item_path):
-        logger.info(f"Collecting files in a directory '{item_path}")
+    def scan_directory(self, item: base.ScanLocation):
+        logger.info(f"Collecting files in a directory '{item.location}")
         topo = TopologySort()
         collected = []
 
-        for f in utils.walk(item_path):
+        for f in utils.walk(item.location):
             new_item = item.create_child(f)
             collected.append(new_item)
             topo.add_node(Path(new_item.location).absolute())

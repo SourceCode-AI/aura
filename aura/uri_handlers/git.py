@@ -48,7 +48,12 @@ class GitRepoHandler(URIHandler):
         LOGGER.info(f"Cloning git repository to {p}")
         git.Repo.clone_from(url=self.uri.geturl(), to_path=p)
 
-        yield ScanLocation(location=p)
+        yield ScanLocation(
+            location=p,
+            metadata={
+                "depth": 0
+            }
+        )
 
     def cleanup(self):
         p = pathlib.Path(self.opts["download_dir"])

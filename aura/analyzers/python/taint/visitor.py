@@ -9,6 +9,7 @@ from .... import config
 
 
 class TaintAnalysis(Visitor):
+
     def load_tree(self, source: Path):
         if self.tree is None:
             cached = ASTRewrite.from_cache(source=source, metadata=self.metadata)
@@ -104,9 +105,9 @@ class TaintAnalysis(Visitor):
         )
 
         for sink in config.SEMANTIC_RULES.get("taint_sinks", []):
-            if sink == f_name or fnmatch.fnmatch(f_name, sink):
-                context.node._taint_log.append(log)
+            if sink.rstrip(".*") == f_name or fnmatch.fnmatch(f_name, sink):
                 context.node.tags.add("taint_sink")
+                context.node._taint_log.append(log)
                 context.visitor.modified = True
                 return
 
@@ -126,8 +127,7 @@ class TaintAnalysis(Visitor):
                 line_no=context.node.line_no,
                 message = "AST node has been cleaned of taint using semantic rules"
             )
-            context.node._taint_log.append(log)
-            context.node.add_taint(Taints.SAFE, context, lock=True)
+            context.node.add_taint(Taints.SAFE, context, taint_log=log, lock=True)
             context.node.tags.add("taint_clean")
 
     def __mark_sources(self, context):
@@ -145,9 +145,8 @@ class TaintAnalysis(Visitor):
 
         for source in config.SEMANTIC_RULES.get("taint_sources", []):
             if source.rstrip(".*") == f_name or fnmatch.fnmatch(f_name, source):
-                context.node._taint_log.append(log)
                 context.node.tags.add("taint_source")
-                context.node.add_taint(Taints.TAINTED, context, lock=True)
+                context.node.add_taint(Taints.TAINTED, context, taint_log=log, lock=True)
                 return
 
         if isinstance(
@@ -171,8 +170,7 @@ class TaintAnalysis(Visitor):
                                 message = "AST node has been marked as Taint because a variable is propagated via werkzeug URL parameter",
                                 taint_level=Taints.TAINTED
                             )
-                            # TODO: assign taint log to the arg
-                            context.node.set_taint(arg, Taints.TAINTED, context)
+                            context.node.set_taint(name=arg, taint_level=Taints.TAINTED, taint_log=log, context=context)
 
     def __propagate_taint(self, context):
         if isinstance(context.node, Attribute) and isinstance(
@@ -202,9 +200,7 @@ class TaintAnalysis(Visitor):
             args_taints = []
             # Extract taints from arguments
             for idx, x in enumerate(context.node.args):
-                if isinstance(x, Arguments) and isinstance(
-                    context.node._orig_args[idx], str
-                ):
+                if isinstance(x, Arguments) and type(context.node._orig_args[idx]) == str:
                     arg_name = context.node._orig_args[idx]
                     args_taints.append(x.taints.get(arg_name, Taints.SAFE))
                 elif isinstance(x, ASTNode):
@@ -231,7 +227,7 @@ class TaintAnalysis(Visitor):
                 return
 
             # Lookup in a call graph if the function was defined
-            if isinstance(f_name, str) and f_name in context.call_graph.definitions:
+            if type(f_name) == str and f_name in context.call_graph.definitions:
                 func_def = context.call_graph.definitions[f_name]
 
                 # Propagate taint from the function definition
@@ -246,7 +242,7 @@ class TaintAnalysis(Visitor):
                         arg_index = x.cached_full_name
                     else:
                         continue
-                    func_def.set_taint(arg_index, x._taint_class, context)
+                    func_def.set_taint(name=arg_index, taint_level=x._taint_class, context=context, taint_log=None)
 
         elif isinstance(context.node, Var):
             var_taint = max(

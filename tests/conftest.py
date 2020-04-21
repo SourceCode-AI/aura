@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 from click.testing import CliRunner, Result
+import responses
 import pytest
 
 
@@ -39,7 +40,7 @@ class MatchFound(ValueError):
 class Fixtures(object):
     BASE_PATH = Path(__file__).parent / 'files'
 
-    def path(self, path=''):
+    def path(self, path: str='') -> str:
         return os.fspath(self.BASE_PATH / path)
 
     def read(self, path):
@@ -209,3 +210,68 @@ def simulate_mirror(fixtures):
         with mock.patch.object(amirror.LocalMirror, "get_mirror_path", return_value=pmirror):
             assert pmirror.is_dir()
             yield mirror
+
+
+@pytest.fixture()
+def mock_github(fixtures):
+    pth = fixtures.path("github_api_mock.json")
+    with open(pth, "r") as fd:
+        mock_data = json.loads(fd.read())
+
+    def _callback(request):
+        resp = json.dumps(mock_data[request.url])
+        return (200, {}, resp)
+
+    def _activate_mock(rsps):
+        for url in mock_data.keys():
+            rsps.add_callback(
+                responses.GET,
+                url,
+                callback=_callback
+            )
+
+    return _activate_mock
+
+
+@pytest.fixture()
+def mock_pypi_rest_api(fixtures):
+    pkgs = (
+        "https://files.pythonhosted.org/packages/8c/23/848298cccf8e40f5bbb59009b32848a4c38f4e7f3364297ab3c3e2e2cd14/wheel-0.34.2-py2.py3-none-any.whl",
+        "https://files.pythonhosted.org/packages/75/28/521c6dc7fef23a68368efefdcd682f5b3d1d58c2b90b06dc1d0b805b51ae/wheel-0.34.2.tar.gz"
+    )
+
+    pth = fixtures.path("pypi_api_mock.json")
+    with open(pth, "r") as fd:
+        mock_data = json.loads(fd.read())
+
+
+    def _callback_download(request):
+        filename = request.url.split("/")[-1]
+        file_pth = fixtures.path(f"mirror/{filename}")
+        assert os.path.exists(file_pth)
+        with open(file_pth, "rb") as fd:
+            return (200, {}, fd.read())
+
+
+    def _callback(request):
+        resp = json.dumps(mock_data[request.url])
+        return (200, {}, resp)
+
+
+    def _activate_mock(rsps):
+        for url in mock_data.keys():
+            rsps.add_callback(
+                responses.GET,
+                url=url,
+                callback=_callback
+            )
+
+        for url in pkgs:
+            rsps.add_callback(
+                responses.GET,
+                url=url,
+                callback=_callback_download
+            )
+
+
+    return _activate_mock

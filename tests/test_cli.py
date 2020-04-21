@@ -8,9 +8,16 @@ from aura import cli
 from aura.analyzers.python.readonly import ReadOnlyAnalyzer
 
 
-def test_simple_cli_analysis(fixtures):
+@pytest.mark.parametrize(
+    "exec_mode",
+    (
+        "--async",
+        "--no-async"
+    )
+)
+def test_simple_cli_analysis(exec_mode, fixtures):
     pth = fixtures.path('basic_ast.py')
-    output = fixtures.scan_test_file('basic_ast.py')
+    output = fixtures.scan_test_file('basic_ast.py', args=[exec_mode])
 
     assert output['name'].endswith(pth.split('/')[-1])
     assert 'url' in output['tags']

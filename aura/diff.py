@@ -31,14 +31,14 @@ class DiffAnalyzer:
     def on_diff(self, sender, ctx):
         if isinstance(sender, Diff):
             self._on_diff_type_diff(sender, ctx)
-        elif isinstance(sender, dict):
+        elif type(sender) == dict:
             self._on_diff_type_dict(sender, ctx)
 
     def on_same_file(self, sender):
         size = os.stat(sender).st_size
         self.same_files.add((sender, size))
 
-    def _on_diff_type_diff(self, sender, ctx):
+    def _on_diff_type_diff(self, sender: Diff, ctx: dict):
         if sender.a_path is None or sender.new_file:
             operation = "A"  #  Added
         elif sender.b_path is None or sender.deleted_file:
@@ -63,7 +63,7 @@ class DiffAnalyzer:
 
             data["a_ref"] = os.fspath(sender.a_path)
             data["a_md5"] = utils.md5(a_fs_path)
-            data["a_mime"] = magic.from_file(os.fspath(a_fs_path), mime=True)
+            data["a_mime"] = magic.from_file(os.path.realpath(a_fs_path), mime=True)
             data["a_size"] = a_fs_path.stat().st_size
         else:
             data["a_size"] = 0
@@ -75,9 +75,9 @@ class DiffAnalyzer:
                 b_fs_path = ctx["b_path"] / sender.b_path
 
             # FIXME: parent $  ref when unpacking data['b_ref'] = utils.construct_path(sender.b_path, parent=ctx.get('b_ref'))
-            data["b_ref"] = os.fspath(b_fs_path)
+            data["b_ref"] = os.fspath(sender.b_path)
             data["b_md5"] = utils.md5(b_fs_path)
-            data["b_mime"] = magic.from_file(os.fspath(b_fs_path), mime=True)
+            data["b_mime"] = magic.from_file(os.path.realpath(b_fs_path), mime=True)
             data["b_size"] = b_fs_path.stat().st_size
             data["diff"] = sender.diff.decode("utf-8")
         else:
@@ -97,7 +97,7 @@ class DiffAnalyzer:
             print(f"{repr(b_path)}, {repr(a_path)}")
             raise ValueError("FS type mismatch")
 
-    def _diff_dirs(self, a_path, b_path, ctx):
+    def _diff_dirs(self, a_path: Path, b_path: Path, ctx):
         self._diff_git(a_path, b_path, ctx)
 
     def _diff_files(self, a_path, b_path, ctx):
@@ -128,14 +128,14 @@ class DiffAnalyzer:
         else:
             self._diff_git(a_path, b_path, ctx)
 
-    def _diff_git(self, a_path, b_path, ctx):
+    def _diff_git(self, a_path: Path, b_path: Path, ctx):
         """
         Diff files/dirs by using temporary git commits which works like this:
 
         1. Create a temporary empty git repository
-        2. Copy content of pth1 & commit them
-        3. Remove all copied files from pth1 from git repo
-        4. Copy content of pth2 & commit them
+        2. Copy content of a_path & commit
+        3. Remove all copied files from a_path from git repo
+        4. Copy content of b_path & commit
         5. Extract diff between those 2 commits
 
         :param a_path: location of first file/dir
@@ -153,6 +153,7 @@ class DiffAnalyzer:
         )
 
         try:
+            # Create an empty repository
             bare_repo = Repo.init(tmp)
             #  bare_content = set(os.listdir(tmp))
             a_content = []
@@ -161,14 +162,14 @@ class DiffAnalyzer:
             # Copy the content from first path
             if a_path.is_dir():
                 for x in a_path.iterdir():
-                    dest = tmp_pth / x.parts[-1]
+                    dest = tmp_pth / x.name
                     if x.is_dir():
                         shutil.copytree(x.absolute(), dest)
                     else:
                         shutil.copy(x.absolute(), dest)
                     a_content.append(os.fspath(dest))
             else:
-                dest = tmp_pth / a_path.parts[-1]
+                dest = tmp_pth / a_path.name
                 shutil.copy(a_path.absolute(), dest)
                 a_content.append(os.fspath(dest))
 
@@ -180,11 +181,12 @@ class DiffAnalyzer:
                     same_files.add(x.path)
 
             # Cleanup repo from pth1 files
-            bare_repo.index.remove(items=a_content, r=True, working_tree=True)
+            if a_content:
+                bare_repo.index.remove(items=a_content, r=True, working_tree=True)
 
             if b_path.is_dir():
-                for x in b_path.iterdir():
-                    dest = tmp_pth / x.parts[-1]
+                for x in b_path.iterdir():  # type: Path
+                    dest = tmp_pth / x.name
                     if dest.exists():
                         shutil.rmtree(dest)
 
@@ -194,7 +196,7 @@ class DiffAnalyzer:
                         shutil.copy2(x.absolute(), dest)
                     b_content.append(os.fspath(dest))
             else:
-                dest = tmp_pth / b_path.parts[-1]
+                dest = tmp_pth / b_path.name
                 shutil.copy(a_path.absolute(), dest)
                 b_content.append(os.fspath(dest))
 

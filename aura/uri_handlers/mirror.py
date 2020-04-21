@@ -41,4 +41,9 @@ class MirrorHandler(URIHandler):
         for x in self.package["releases"][release]:
             pkg_path = self.mirror_path / urlparse(x["url"]).path.lstrip("/")
             if pkg_path.exists():
-                yield ScanLocation(location=pkg_path)
+                yield ScanLocation(
+                    location=pkg_path,
+                    metadata={
+                        "depth": 0
+                    }
+                )

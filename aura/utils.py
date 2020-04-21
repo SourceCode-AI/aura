@@ -4,8 +4,6 @@ import sys
 import codecs
 import hashlib
 import shutil
-import fnmatch
-import importlib
 import dataclasses
 from contextlib import contextmanager
 from pathlib import Path
@@ -20,6 +18,7 @@ from . import config
 
 
 logger = config.get_logger(__name__)
+PKG_NORM_CHARS = re.compile(r"[-_.]+")
 
 
 def walk(location) -> Generator[Path, None, None]:
@@ -71,7 +70,7 @@ def normalize_name(name: str) -> str:
     Normalize package name as described in PEP-503
     https://www.python.org/dev/peps/pep-0503/#normalized-names
     """
-    return re.sub(r"[-_.]+", "-", name).lower()
+    return PKG_NORM_CHARS.sub("-", name).lower()
 
 
 def download_file(url: str, fd) -> None:
@@ -124,17 +123,6 @@ def lookup_lines(pth, line_nos: list, strip=True, encoding="utf-8"):
                     line = line.strip()
                 lines[line_no] = line
     return lines
-
-
-def import_hook(name: str):
-    if ":" in name:
-        modname, target = name.split(":")
-    else:
-        modname = name
-        target = modname.split(".")[-1]
-
-    module = importlib.import_module(modname)
-    return getattr(module, target)
 
 
 def set_function_attr(**kwargs):
@@ -202,6 +190,7 @@ def enrich_exception(*args):
     except Exception as exc:
         exc.args += args
         raise
+
 
 @lru_cache()
 def normalize_path(pth: Path, absolute=False, to_str=True):

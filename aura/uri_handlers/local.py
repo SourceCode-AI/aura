@@ -27,7 +27,12 @@ class LocalFileHandler(URIHandler):
         self.opts = {}
 
     def get_paths(self):
-        yield ScanLocation(location=self.path)
+        yield ScanLocation(
+            location=self.path,
+            metadata={
+                "depth": 0
+            }
+        )
 
     @property
     def exists(self) -> bool:
