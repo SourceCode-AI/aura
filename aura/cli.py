@@ -13,7 +13,7 @@ from prettyprinter import install_extras
 
 from . import commands
 from . import exceptions
-from .uri_handlers.base import URIHandler
+from .uri_handlers.base import URIHandler, ScanLocation
 from .diff import DiffAnalyzer
 
 from . import __version__
@@ -133,13 +133,15 @@ def scan_mirror(output_dir):
 @cli.command(name="diff")
 @click.argument("pth1", metavar="<FIRST PATH>")
 @click.argument("pth2", metavar="<SECOND PATH>")
-def diff(pth1, pth2):
-    pth1 = Path(pth1)
-    pth2 = Path(pth2)
+def diff(pth1, pth2):  # TODO: move functionality to commands and remove direct output type
+    from .output import text
+    pth1 = ScanLocation(Path(pth1))
+    pth2 = ScanLocation(Path(pth2))
 
     da = DiffAnalyzer()
     da.compare(pth1, pth2)
-    da.pprint()
+
+    text.TextOutput().output_diff(da.diffs)
 
 
 @cli.command(name="parse_ast")

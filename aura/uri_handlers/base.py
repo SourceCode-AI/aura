@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import os
+import atexit
 import urllib.parse
 import mimetypes
+import tempfile
+import shutil
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -14,6 +17,7 @@ import pkg_resources
 import magic
 
 from .. import config
+from ..utils import KeepRefs
 from ..analyzers import find_imports
 from ..analyzers.rules import DataProcessing, Rule
 
@@ -49,7 +53,7 @@ class URIHandler(ABC):
         global HANDLERS
 
         if not HANDLERS:
-            handlers = {}
+            handlers = {}  # TODO: migrate to use plugins.load_entrypoint
             for x in pkg_resources.iter_entry_points("aura.uri_handlers"):
                 hook = x.load()
                 handlers[hook.scheme] = hook
@@ -82,7 +86,7 @@ class PackageProvider:
 
 
 @dataclass
-class ScanLocation:
+class ScanLocation(KeepRefs):
     location: Path
     metadata: dict = field(default_factory=dict)
     cleanup: bool = False
@@ -96,16 +100,19 @@ class ScanLocation:
             self.metadata["depth"] = 0
             warn("Depth is not set for the scan location", stacklevel=2)
 
-        if Path(self.location).is_file():
+        if self.location.is_file():
             self.metadata["mime"] = magic.from_file(os.fspath(self.location), mime=True)
 
             if self.metadata["mime"] in ("text/plain", "application/octet-stream"):
                 self.metadata["mime"] = mimetypes.guess_type(self.location)[0]
 
-            if self.metadata["mime"] == "text/x-python":
+            if self.metadata["mime"] == "text/x-python" and "no_imports" not in self.metadata:
                 imports = find_imports.find_imports(self.location, metadata=self.metadata)
                 if imports:
                     self.metadata["py_imports"] = imports
+
+    def __str__(self):
+        return self.strip(self.location)
 
     @property
     def filename(self) -> Union[str, None]:
@@ -122,11 +129,31 @@ class ScanLocation:
         for x in ("mime", "interpreter_path", "interpreter_name"):
             metadata.pop(x, None)
 
+        if type(new_location) == str:
+            str_loc = new_location
+            new_location = Path(new_location)
+        else:
+            str_loc = os.fspath(new_location)
+
+        if "parent" in kwargs:
+            parent = kwargs["parent"]
+        elif self.location.is_dir():
+            parent = self.parent
+        else:
+            parent = self.location
+
+        if "strip_path" in kwargs:
+            strip_path = kwargs["strip_path"]
+        elif str_loc.startswith(os.fspath(tempfile.gettempdir())):
+            strip_path = str_loc
+        else:
+            strip_path = self.strip_path
+
         child = self.__class__(
-            location=Path(new_location),
+            location=new_location,
             metadata=metadata,
-            strip_path=kwargs.get("strip_path", self.strip_path),
-            parent=kwargs.get("parent", self.parent),
+            strip_path=strip_path,
+            parent=parent,
             cleanup=kwargs.get("cleanup", False)
         )
         return child
@@ -178,3 +205,18 @@ class ScanLocation:
             )
 
         return True
+
+
+def cleanup_locations():
+    """
+    Iterate over all created locations and delete path tree for those marked with cleanup
+    """
+    for obj in ScanLocation.get_instances():  # type: ScanLocation
+        if not obj.cleanup:
+            continue
+
+        if obj.location.exists():
+            shutil.rmtree(obj.location)
+
+
+atexit.register(cleanup_locations)

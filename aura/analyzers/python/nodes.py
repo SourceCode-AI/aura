@@ -17,6 +17,7 @@ from dataclasses import dataclass, InitVar, field
 from functools import partial, total_ordering, wraps
 
 from ...stack import Stack, CallGraph
+from ...utils import KeepRefs
 from ... import exceptions
 
 
@@ -100,25 +101,6 @@ class TaintLog:
                 break
 
         return log
-
-
-class KeepRefs:
-    """
-    A class that would keep references to all created instances
-    https://stackoverflow.com/questions/328851/printing-all-instances-of-a-class
-    """
-    __refs__ = defaultdict(list)
-
-    def __init__(self):
-        super(KeepRefs, self).__init__()
-        self.__refs__[self.__class__].append(weakref.ref(self))
-
-    @classmethod
-    def get_instances(cls):
-        for inst_ref in cls.__refs__[cls]:
-            inst = inst_ref()
-            if inst is not None:
-                yield inst
 
 
 class ASTNode(KeepRefs, metaclass=ABCMeta):

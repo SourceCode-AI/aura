@@ -2,8 +2,10 @@ import tempfile
 import os
 import shutil
 from pathlib import Path
+from dataclasses import is_dataclass, asdict
 
 from aura import diff
+from aura.uri_handlers.base import ScanLocation
 
 
 def create_same_files(pth: Path, fixtures):
@@ -18,16 +20,20 @@ def create_same_files(pth: Path, fixtures):
     dest1 = pth / "same_files/same_directory" / filename
     dest1.parent.mkdir(parents=True)
     os.symlink(src=file_pth, dst=dest1)
-    struct.append((dest1.parent, dest1.parent, dest1))
+    struct.append((
+        ScanLocation(dest1.parent),
+        ScanLocation(dest1.parent),
+        dest1
+    ))
 
     # Same file in the same directory but with the renamed filename
     dest2 = pth / "same_files/renamed_file" / "wheel_renamed.tar.gz"
     dest2.parent.mkdir(parents=True)
     os.symlink(src=file_pth, dst=dest2)
     struct.append((
-        dest1.parent,
-        dest2.parent,
-        {"operation": "R", "a_rel_path": dest1.name, "b_rel_path": dest2.name}
+        ScanLocation(dest1.parent),
+        ScanLocation(dest2.parent),
+        {"operation": "R", "a_ref": dest1.name, "b_ref": dest2.name}
     ))
 
     # File has been moved to a subdirectory
@@ -35,9 +41,9 @@ def create_same_files(pth: Path, fixtures):
     dest2.parent.mkdir(parents=True)
     os.symlink(src=file_pth, dst=dest2)
     struct.append((
-        dest1.parent,
-        dest2.parent.parent,
-        {"operation": "R", "a_rel_path": dest1.name, "b_rel_path": "sub_directory/wheel-0.34.2.tar.gz"}
+        ScanLocation(dest1.parent),
+        ScanLocation(dest2.parent.parent),
+        {"operation": "R", "a_ref": dest1.name, "b_ref": f"sub_directory/{filename}"}
     ))
 
     return struct
@@ -58,12 +64,12 @@ def create_add_file(pth: Path, fixtures):
     dest2.parent.mkdir(parents=True)
     os.symlink(src=file_pth, dst=dest2)
     struct.append((
-        dest1,
-        dest2.parent,
+        ScanLocation(dest1),
+        ScanLocation(dest2.parent),
         {
             "operation": "A",
-            "a_rel_path": filename,
-            "b_rel_path": filename,
+            "a_ref": None,
+            "b_ref": filename,
             "a_size": 0,
             "b_size": 58330
         }
@@ -74,12 +80,12 @@ def create_add_file(pth: Path, fixtures):
     dest2.parent.mkdir(parents=True)
     os.symlink(src=file_pth, dst=dest2)
     struct.append((
-        dest1,
-        dest2.parent.parent,
+        ScanLocation(dest1),
+        ScanLocation(dest2.parent.parent),
         {
             "operation": "A",
-            "a_rel_path": f"subdirectory/{filename}",
-            "b_rel_path": f"subdirectory/{filename}",
+            "a_ref": None,
+            "b_ref": f"subdirectory/{filename}",
             "a_size": 0,
             "b_size": 58330
         }
@@ -102,26 +108,24 @@ def create_del_file(pth: Path, fixtures):
     dest2.mkdir(parents=True)
     os.symlink(src=file_pth, dst=dest1)
     struct.append((
-        dest1.parent,
-        dest2,
+        ScanLocation(dest1.parent),
+        ScanLocation(dest2),
         {
             "operation": "D",
-            "a_rel_path": filename,
             "a_ref": filename,
-            "b_rel_path": filename,
+            "b_ref": None,
             "a_size": 58330,
             "b_size": 0
         }
     ))
 
     struct.append((
-        dest1.parent.parent,
-        dest2,
+        ScanLocation(dest1.parent.parent),
+        ScanLocation(dest2),
         {
             "operation": "D",
-            "a_rel_path": f"subdirectory/{filename}",
-            "b_rel_path": f"subdirectory/{filename}",
             "a_ref": f"subdirectory/{filename}",
+            "b_ref": None,
             "a_size": 58330,
             "b_size": 0
         }
@@ -151,12 +155,10 @@ def create_similar_file(pth: Path, fixtures):
         fd.writelines(file_content[:5])
 
     struct.append((
-        dest1.parent,
-        dest2.parent,
+        ScanLocation(dest1.parent),
+        ScanLocation(dest2.parent),
         {
             "operation": "M",
-            "a_rel_path": filename,
-            "b_rel_path": filename,
             "a_ref": filename,
             "b_ref": filename,
             "a_mime": "text/x-python",
@@ -174,9 +176,10 @@ def test_diff_same(fixtures, fuzzy_rule_match):
         for p1, p2, result in struct:
             d = diff.DiffAnalyzer()
             d.compare(p1, p2)
+            diffs = [asdict(x) for x in d.diffs]
 
             if isinstance(result, dict):
-                assert any(fuzzy_rule_match(x, result) for x in d.diffs), d.diffs
+                assert any(fuzzy_rule_match(x, result) for x in diffs), diffs
             else:
                 assert any(os.fspath(x[0]) == os.fspath(result) for x in d.same_files)
 
@@ -189,8 +192,9 @@ def test_diff_file_added(fixtures, fuzzy_rule_match):
         for p1, p2, result in struct:
             d = diff.DiffAnalyzer()
             d.compare(p1, p2)
+            diffs = [asdict(x) for x in d.diffs]
 
-            assert any(fuzzy_rule_match(x, result) for x in d.diffs), d.diffs
+            assert any(fuzzy_rule_match(x, result) for x in diffs), diffs
 
 
 def test_diff_file_removed(fixtures, fuzzy_rule_match):
@@ -201,8 +205,9 @@ def test_diff_file_removed(fixtures, fuzzy_rule_match):
         for p1, p2, result in struct:
             d = diff.DiffAnalyzer()
             d.compare(p1, p2)
+            diffs = [asdict(x) for x in d.diffs]
 
-            assert any(fuzzy_rule_match(x, result) for x in d.diffs), d.diffs
+            assert any(fuzzy_rule_match(x, result) for x in diffs), diffs
 
 
 def test_diff_file_similar(fixtures, fuzzy_rule_match):
@@ -213,5 +218,35 @@ def test_diff_file_similar(fixtures, fuzzy_rule_match):
         for p1, p2, result in struct:
             d = diff.DiffAnalyzer()
             d.compare(p1, p2)
+            diffs = [asdict(x) for x in d.diffs]
 
-            assert any(fuzzy_rule_match(x, result) for x in d.diffs), d.diffs
+            assert any(fuzzy_rule_match(x, result) for x in diffs), diffs
+
+
+def test_diff_archives(fixtures, fuzzy_rule_match):
+    arch1 = fixtures.path("mirror/wheel-0.34.2-py2.py3-none-any.whl")
+    arch2 = fixtures.path("mirror/wheel-0.34.2.tar.gz")
+    # TODO: add more matches
+    matches = [
+        {
+            "a_md5": "8a2e3b6aca9665a0c6abecc4f4ea7090",
+            "a_mime": "application/zip",
+            "a_ref": "wheel-0.34.2-py2.py3-none-any.whl",
+            "b_md5": "ce2a27f99c130a927237b5da1ff5ceaf",
+            "b_mime": "application/gzip",
+            "b_ref": "wheel-0.34.2.tar.gz",
+            "diff": "",
+            "operation": "R"
+        }
+    ]
+
+    d = diff.DiffAnalyzer()
+    d.compare(
+        ScanLocation(arch1, strip_path=os.fspath(fixtures.BASE_PATH)),
+        ScanLocation(arch2, strip_path=os.fspath(fixtures.BASE_PATH)),
+    )
+
+    diffs = [asdict(x) for x in d.diffs]
+
+    for match in matches:
+        assert any(fuzzy_rule_match(x, match) for x in diffs), (match, diffs)

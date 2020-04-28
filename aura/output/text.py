@@ -48,3 +48,22 @@ class TextOutput(AuraOutput):
                 secho(f" * {h._asdict()}")
         else:
             secho("No detections has been triggered", fg="red", bold=True)
+
+    def output_diff(self, diffs):
+        for diff in diffs:
+            if diff.operation == "M":
+                secho(
+                    f"Modified file '{diff.a_ref}' -> '{diff.b_ref}' . Similarity: {diff.similarity}%",
+                    fg="red",
+                )
+            elif diff.operation == "R":
+                secho(f"File renamed: '{diff.a_ref}' -> '{diff.b_ref}'", fg="green")
+            elif diff.operation == "A":
+                secho(f"File added: '{diff.b_ref}'", fg="yellow")
+            elif diff.operation == "D":
+                secho(f"File removed: '{diff.a_ref}'", fg="green")
+
+            if diff.diff:
+                secho("---[ START OF DIFF ]---", fg="blue")
+                secho(diff.diff)
+                secho("---[ END OF DIFF ]---", fg="blue")

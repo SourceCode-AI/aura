@@ -37,3 +37,9 @@ class JSONOutput(AuraOutput):
         else:
             with open(self.metadata["output_path"], "w") as fd:
                 fd.write(out)
+
+
+    def output_diff(self, diffs):
+        data = []
+        # TODO
+        raise NotImplementedError("todo")

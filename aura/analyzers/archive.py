@@ -34,6 +34,21 @@ class SuspiciousArchiveEntry(Rule):
 class ArchiveAnomaly(Rule):
     __hash__ = Rule.__hash__
 
+    @classmethod
+    def from_generic_exception(cls, location: ScanLocation, exc: Exception):
+        return cls(
+            location = location.location,
+            message="Could not open the archive for analysis",
+            signature=f"archive_anomaly#read_error#{location.location}",
+            score=config.get_score_or_default("corrupted-archive", 10),
+            extra={
+                "reason": "archive_read_error",
+                "exc_message": exc.args[0],
+                "exc_type": exc.__class__.__name__,
+                "mime": location.metadata["mime"]
+            },
+        )
+
 
 def is_suspicious(pth, location):
     norm = utils.normalize_path(pth)
@@ -145,51 +160,63 @@ def process_tarfile(path, tmp_dir) -> Generator[ArchiveAnomaly, None, None]:
                 yield x
 
 
-def archive_analyzer(pth: Path, metadata, location: ScanLocation, **kwargs):
+def archive_analyzer(*, location: ScanLocation, **kwargs):
     """
     Archive analyzer that looks for suspicious entries and unpacks the archive for recursive analysis
     """
-    if pth.is_dir():
+    if location.location.is_dir():
         return
 
-    if "mime" in metadata:
-        mime = metadata["mime"]
-    else:
-        mime = magic.from_file(utils.normalize_path(pth), mime=True)
-
-    if mime == "application/octet-stream":
-        mime = mimetypes.guess_type(pth)[0]
-
+    mime = location.metadata["mime"]
     if mime not in SUPPORTED_MIME:
         return
 
-    tmp_dir = tempfile.mkdtemp(prefix="aura_pkg__sandbox", suffix=os.path.basename(pth))
+    tmp_dir = tempfile.mkdtemp(prefix="aura_pkg__sandbox", suffix=os.path.basename(location.location))
     logger.info("Extracting to: '{}' [{}]".format(tmp_dir, mime))
 
     yield location.create_child(
         new_location=tmp_dir,
         cleanup=True,
-        strip_path=tmp_dir,
-        parent=pth
     )
 
     try:
         if mime == "application/zip":
-            yield from process_zipfile(path=pth, tmp_dir=tmp_dir)
+            yield from process_zipfile(path=location.location, tmp_dir=tmp_dir)
         elif mime in SUPPORTED_MIME:
-            yield from process_tarfile(path=pth, tmp_dir=tmp_dir)
+            yield from process_tarfile(path=location.location, tmp_dir=tmp_dir)
         else:
             return
     except (tarfile.ReadError, zipfile.BadZipFile) as exc:
-        yield ArchiveAnomaly(
-            location=pth,
-            message = "Could not open the archive for analysis",
-            signature = f"archive_anomaly#read_error#{pth}",
-            score = config.get_score_or_default("corrupted-archive", 10),
-            extra = {
-                "reason": "archive_read_error",
-                "exc_message": exc.args[0],
-                "exc_type": exc.__class__.__name__,
-                "mime": mime
-            },
-        )
+        yield ArchiveAnomaly.from_generic_exception(location, exc)
+
+
+def diff_archive(diff):
+    if diff.operation not in "RM":
+        return
+    elif diff.a_md5 == diff.b_md5:
+        return
+
+    a_scan_loc = diff.a_scan.create_child(diff.a_path)
+    b_scan_loc = diff.b_scan.create_child(diff.b_path)
+
+    a_hits = list(archive_analyzer(location=a_scan_loc))
+    a_locations = [x for x in a_hits if type(x) == ScanLocation]
+    a_hits = [x for x in a_hits if type(x) != ScanLocation]
+
+    b_hits = list(archive_analyzer(location=b_scan_loc))
+    b_locations = [x for x in b_hits if type(x) == ScanLocation]
+    b_hits = [x for x in b_hits if type(x) != ScanLocation]
+
+    # Yield all anomaly detections
+    yield from a_hits
+    yield from b_hits
+
+    # Check if we should recurse diff into archives
+    if len(a_locations) == 0 and len(b_locations) == 0:
+        return
+
+    # Create a new scan location
+    new_a_location = a_locations[0] if a_locations else a_scan_loc
+    new_b_location = b_locations[0] if b_locations else b_scan_loc
+    new_a_location.metadata["b_scan_location"] = new_b_location
+    yield new_a_location

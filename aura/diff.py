@@ -4,23 +4,114 @@ Utilities for computing diffs
 """
 
 import os
+import re
 import sys
 import tempfile
 import shutil
 import pprint
 from pathlib import Path
+from dataclasses import dataclass, field
 
 import magic
-from git import Repo, Diff, Blob
+from git import Repo, Diff as GitDiff, Blob
 from blinker import signal
 
 from . import utils
+from . import plugins
+from .uri_handlers.base import ScanLocation
 
-# from .package_analyzer import Unpacker
+
+DIFF_EXCLUDE = re.compile(r"^Binary files .+ differ$")
+
+
+@dataclass()
+class Diff:
+    operation: str
+    a_size: str
+    b_size: str
+    a_scan: ScanLocation
+    b_scan: ScanLocation
+    a_ref: str = None
+    b_ref: str = None
+    a_md5: str = None
+    b_md5: str = None
+    a_mime: str = None
+    b_mime: str = None
+    diff: str = ''
+    similarity: float = 0.0
+
+    def __post_init__(self):
+        assert self.operation in ("A", "D", "M", "R")
+
+    @property
+    def a_path(self) -> Path:
+        if self.a_scan.location.is_file():
+            return self.a_scan.location
+        else:
+            return self.a_scan.location / self.a_ref
+
+    @property
+    def b_path(self) -> Path:
+        if self.b_scan.location.is_file():
+            return self.b_scan.location
+        else:
+            return self.b_scan.location / self.b_ref
+
+    @classmethod
+    def from_git_diff(cls, git_diff: GitDiff, a_path: ScanLocation, b_path: ScanLocation):
+        if git_diff.a_path is None or git_diff.new_file:
+            operation = "A"  #  Added
+        elif git_diff.b_path is None or git_diff.deleted_file:
+            operation = "D"  #  Deleted
+        elif not git_diff.diff:
+            operation = "R"  #  Renamed
+        else:
+            operation = "M"  # Modified
+
+        data = {
+            "operation": operation,
+            # Relative paths to the repository
+            "a_scan": a_path,
+            "b_scan": b_path,
+        }
+
+        if git_diff.diff and operation in "MR":
+            data["diff"] = git_diff.diff.decode().strip()
+            if DIFF_EXCLUDE.match(data["diff"]):
+                data.pop("diff")
+
+        if git_diff.a_path is not None and operation != "A":
+            if a_path.location.is_file():
+                a_fs_path = a_path.location
+            else:
+                a_fs_path = a_path.location / git_diff.a_path
+
+            data["a_ref"] = a_path.strip(git_diff.a_path)
+            data["a_md5"] = utils.md5(a_fs_path)
+            data["a_mime"] = magic.from_file(os.path.realpath(a_fs_path), mime=True)
+            data["a_size"] = a_fs_path.stat().st_size
+        else:
+            data["a_size"] = 0
+
+        if git_diff.b_path is not None and operation != "D":
+            if b_path.location.is_file():
+                b_fs_path = b_path.location
+            else:
+                b_fs_path = b_path.location / git_diff.b_path
+
+            data["b_ref"] = b_path.strip(git_diff.b_path)
+            data["b_md5"] = utils.md5(b_fs_path)
+            data["b_mime"] = magic.from_file(os.path.realpath(b_fs_path), mime=True)
+            data["b_size"] = b_fs_path.stat().st_size
+        else:
+            data["b_size"] = 0
+
+        return cls(**data)
 
 
 class DiffAnalyzer:
     def __init__(self):
+        self.hits = []
         self.diffs = []
         self.same_files = set()
         self.diff_hit = signal("aura:diff")
@@ -28,8 +119,13 @@ class DiffAnalyzer:
         self.same_file_hit = signal("aura:same_file")
         self.same_file_hit.connect(self.on_same_file)
 
+    @classmethod
+    def get_diff_hooks(cls) -> dict:
+        data = plugins.load_entrypoint("aura.diff_hooks")
+        return data["entrypoints"]
+
     def on_diff(self, sender, ctx):
-        if isinstance(sender, Diff):
+        if isinstance(sender, GitDiff):
             self._on_diff_type_diff(sender, ctx)
         elif type(sender) == dict:
             self._on_diff_type_dict(sender, ctx)
@@ -38,74 +134,34 @@ class DiffAnalyzer:
         size = os.stat(sender).st_size
         self.same_files.add((sender, size))
 
-    def _on_diff_type_diff(self, sender: Diff, ctx: dict):
-        if sender.a_path is None or sender.new_file:
-            operation = "A"  #  Added
-        elif sender.b_path is None or sender.deleted_file:
-            operation = "D"  #  Deleted
-        elif not sender.diff:
-            operation = "R"  #  Renamed
-        else:
-            operation = "M"  # Modified
+    def _on_diff_type_diff(self, sender: GitDiff, ctx: dict):
+        d = Diff.from_git_diff(git_diff=sender, a_path=ctx["a_path"], b_path=ctx["b_path"])
+        for hook_name, hook in self.get_diff_hooks().items():
+            for output in hook(diff=d):
+                if type(output) == ScanLocation:
+                    self.compare(a_path=output, b_path=output.metadata["b_scan_location"])
+                else:
+                    self.hits.append(output)
 
-        data = {
-            "operation": operation,
-            # Relative paths to the repository
-            "a_rel_path": sender.a_path,
-            "b_rel_path": sender.b_path,
-        }
-
-        if sender.a_path is not None and operation != "A":
-            if ctx["a_path"].is_file():
-                a_fs_path = ctx["a_path"]
-            else:
-                a_fs_path = ctx["a_path"] / sender.a_path
-
-            data["a_ref"] = os.fspath(sender.a_path)
-            data["a_md5"] = utils.md5(a_fs_path)
-            data["a_mime"] = magic.from_file(os.path.realpath(a_fs_path), mime=True)
-            data["a_size"] = a_fs_path.stat().st_size
-        else:
-            data["a_size"] = 0
-
-        if sender.b_path is not None and operation != "D":
-            if ctx["b_path"].is_file():
-                b_fs_path = ctx["b_path"]
-            else:
-                b_fs_path = ctx["b_path"] / sender.b_path
-
-            # FIXME: parent $  ref when unpacking data['b_ref'] = utils.construct_path(sender.b_path, parent=ctx.get('b_ref'))
-            data["b_ref"] = os.fspath(sender.b_path)
-            data["b_md5"] = utils.md5(b_fs_path)
-            data["b_mime"] = magic.from_file(os.path.realpath(b_fs_path), mime=True)
-            data["b_size"] = b_fs_path.stat().st_size
-            data["diff"] = sender.diff.decode("utf-8")
-        else:
-            data["b_size"] = 0
-
-        self.diffs.append(data)
+        self.diffs.append(d)
 
     def _on_diff_type_dict(self, sender, ctx):
         pprint.pprint(sender)
 
-    def compare(self, a_path, b_path, ctx=None):
-        if a_path.is_file() and b_path.is_file():
+    def compare(self, a_path: ScanLocation, b_path: ScanLocation, ctx=None):
+        if a_path.location.is_file() and b_path.location.is_file():
             self._diff_files(a_path, b_path, ctx)
-        elif b_path.is_dir() and a_path.is_dir():
+        elif b_path.location.is_dir() and a_path.location.is_dir():
             self._diff_dirs(a_path, b_path, ctx)
         else:
-            print(f"{repr(b_path)}, {repr(a_path)}")
-            raise ValueError("FS type mismatch")
+            # TODO: be able to compare an archive and a directory
+            raise ValueError(f"FS type mismatch: {str(a_path)}, {str(b_path)}")
 
-    def _diff_dirs(self, a_path: Path, b_path: Path, ctx):
+    def _diff_dirs(self, a_path: ScanLocation, b_path: ScanLocation, ctx):
         self._diff_git(a_path, b_path, ctx)
 
-    def _diff_files(self, a_path, b_path, ctx):
-        a_mime = magic.from_file(os.fspath(a_path), mime=True)
-        b_mime = magic.from_file(os.fspath(b_path), mime=True)
+    def _diff_files(self, a_path: ScanLocation, b_path: ScanLocation, ctx):
 
-        if False:
-            pass
         # TODO: refactor to use the archive unpacker as analyzer
         # if a_mime in Unpacker.supported_mime_types and b_mime in Unpacker.supported_mime_types:
         #     if ctx is None:
@@ -125,10 +181,9 @@ class DiffAnalyzer:
         #         ctx['b_ref'] = b_ref
         #
         #     self.compare(Path(a_archive.tmp_dir), Path(b_archive.tmp_dir), ctx=ctx)
-        else:
-            self._diff_git(a_path, b_path, ctx)
+        self._diff_git(a_path, b_path, ctx)
 
-    def _diff_git(self, a_path: Path, b_path: Path, ctx):
+    def _diff_git(self, a_path: ScanLocation, b_path: ScanLocation, ctx=None):
         """
         Diff files/dirs by using temporary git commits which works like this:
 
@@ -148,9 +203,11 @@ class DiffAnalyzer:
         if ctx is None:
             ctx = {}
 
-        ctx.update(
-            {"tmp": tmp_pth, "a_path": a_path.absolute(), "b_path": b_path.absolute(),}
-        )
+        ctx.update({
+            "tmp": tmp_pth,
+            "a_path": a_path,
+            "b_path": b_path,
+        })
 
         try:
             # Create an empty repository
@@ -160,8 +217,8 @@ class DiffAnalyzer:
             same_files = set()
             b_content = []
             # Copy the content from first path
-            if a_path.is_dir():
-                for x in a_path.iterdir():
+            if a_path.location.is_dir():
+                for x in a_path.location.iterdir():
                     dest = tmp_pth / x.name
                     if x.is_dir():
                         shutil.copytree(x.absolute(), dest)
@@ -169,12 +226,12 @@ class DiffAnalyzer:
                         shutil.copy(x.absolute(), dest)
                     a_content.append(os.fspath(dest))
             else:
-                dest = tmp_pth / a_path.name
-                shutil.copy(a_path.absolute(), dest)
+                dest = tmp_pth / a_path.location.name
+                shutil.copy(a_path.location.absolute(), dest)
                 a_content.append(os.fspath(dest))
 
             bare_repo.index.add(a_content)
-            a_commit = bare_repo.index.commit(message=os.fspath(a_path))
+            a_commit = bare_repo.index.commit(message=str(a_path))
 
             for x in a_commit.tree.traverse():
                 if isinstance(x, Blob):
@@ -184,8 +241,8 @@ class DiffAnalyzer:
             if a_content:
                 bare_repo.index.remove(items=a_content, r=True, working_tree=True)
 
-            if b_path.is_dir():
-                for x in b_path.iterdir():  # type: Path
+            if b_path.location.is_dir():
+                for x in b_path.location.iterdir():  # type: Path
                     dest = tmp_pth / x.name
                     if dest.exists():
                         shutil.rmtree(dest)
@@ -196,12 +253,12 @@ class DiffAnalyzer:
                         shutil.copy2(x.absolute(), dest)
                     b_content.append(os.fspath(dest))
             else:
-                dest = tmp_pth / b_path.name
-                shutil.copy(a_path.absolute(), dest)
+                dest = tmp_pth / b_path.location.name
+                shutil.copy(a_path.location.absolute(), dest)
                 b_content.append(os.fspath(dest))
 
             bare_repo.index.add(b_content)
-            b_commit = bare_repo.index.commit(message=os.fspath(b_path))
+            b_commit = bare_repo.index.commit(message=str(b_path))
 
             for x in b_commit.tree.traverse():
                 if isinstance(x, Blob):
@@ -217,50 +274,10 @@ class DiffAnalyzer:
                 self.on_diff(diff, ctx=ctx)
 
             for x in same_files:
-                if a_path.is_dir():
-                    self.same_file_hit.send(a_path / x)
+                if a_path.location.is_dir():
+                    self.same_file_hit.send(a_path.location / x)
                 else:
                     self.same_file_hit.send(x)
 
         finally:
             shutil.rmtree(tmp)
-
-    def pprint(self, full=True):
-        diff_ratio = []
-        for x in self.same_files:
-            diff_ratio.append(100.0)
-
-        for x in self.diffs:
-            similarity = x.get("similarity", 0.0)
-            diff_ratio.append(similarity)
-
-            if x["operation"] == "M":
-                utils.print_tty(
-                    f"Modified file '{x['a_ref']}' -> '{x['b_ref']}' . Similarity: {similarity}%",
-                    fg="red",
-                )
-                if full:
-                    utils.print_tty("---[ START OF TEXT DIFF ]---", fg="blue")
-                    utils.print_tty(x["diff"])
-                    utils.print_tty("---[ END OF TEXT DIFF ]---", fg="blue")
-            elif x["operation"] == "R":
-                utils.print_tty(
-                    f"File renamed '{x['a_ref']}' -> '{x['b_ref']}'", fg="green"
-                )
-            elif x["operation"] == "A":
-                utils.print_tty(f"File added '{x['b_ref']}' {x['b_mime']}", fg="yellow")
-            elif x["operation"] == "D":
-                utils.print_tty(f"File removed '{x['a_ref']}'", fg="green")
-
-        diff_total = sum(diff_ratio) / len(diff_ratio)
-
-        utils.print_tty(f"Total diff ratio: {diff_total:.4}%")
-
-
-if __name__ == "__main__":
-    pth1 = Path(sys.argv[1])
-    pth2 = Path(sys.argv[2])
-    da = DiffAnalyzer()
-
-    da.compare(pth1, pth2)
-    da.pprint()

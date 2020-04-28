@@ -125,3 +125,7 @@ class SQLiteOutput(AuraOutput):
             raise
         else:
             self.db.commit()
+
+    def output_diff(self, diffs):
+        # TODO
+        raise NotImplementedError("todo")

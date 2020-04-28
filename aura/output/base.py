@@ -1,3 +1,5 @@
+from abc import ABCMeta, abstractmethod, abstractclassmethod
+
 import pkg_resources
 
 from .. import exceptions
@@ -5,9 +7,12 @@ from .. import exceptions
 OUTPUT_HANDLERS = None
 
 
-class AuraOutput:
-    def __init__(self, metadata):
-        self.metadata = metadata
+class AuraOutput(metaclass=ABCMeta):
+    def __init__(self, metadata=None):
+        if metadata is not None:
+            self.metadata = metadata
+        else:
+            self.metadata = {}
         self.verbosity = metadata.get("verbosity", 1)
 
         self.tag_filters = []
@@ -36,8 +41,13 @@ class AuraOutput:
             else:
                 self.tag_filters.append(lambda x: t in x)
 
+    @abstractmethod
     def output(self, hits):
-        pass
+        ...
+
+    @abstractmethod
+    def output_diff(self, diffs):
+        ...
 
     def filtered(self, hits):
         """

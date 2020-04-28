@@ -11,7 +11,7 @@ from . import diff
 from . import config
 from . import exceptions
 from .utils import normalize_name
-from .uri_handlers.base import URIHandler
+from .uri_handlers.base import URIHandler, ScanLocation
 
 
 logger = config.get_logger(__name__)
@@ -119,8 +119,12 @@ class TypoAnalyzer(object):
                 ) as pth1, self.pkg2.package.url2local(y["url"]) as pth2:
                     ctx = {"a_ref": x["filename"], "b_ref": y["filename"]}
                     da = diff.DiffAnalyzer()
-                    da.compare(pth1, pth2, ctx=ctx)
-                    da.pprint()
+                    da.compare(
+                        ScanLocation(pth1),
+                        ScanLocation(pth2),
+                        ctx=ctx
+                    )
+                    #FIXME: da.pprint()
 
 
 def get_all_pypi_packages():

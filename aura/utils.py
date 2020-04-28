@@ -4,8 +4,10 @@ import sys
 import codecs
 import hashlib
 import shutil
+import weakref
 import dataclasses
 from contextlib import contextmanager
+from collections import defaultdict
 from pathlib import Path
 from functools import partial, wraps, lru_cache
 from typing import Generator, Union, List
@@ -13,12 +15,30 @@ from typing import Generator, Union, List
 import requests
 from click import secho
 
-from .analyzers.python.nodes import ASTNode
 from . import config
 
 
 logger = config.get_logger(__name__)
 PKG_NORM_CHARS = re.compile(r"[-_.]+")
+
+
+class KeepRefs:
+    """
+    A class that would keep references to all created instances
+    https://stackoverflow.com/questions/328851/printing-all-instances-of-a-class
+    """
+    __refs__ = defaultdict(list)
+
+    def __init__(self):
+        super(KeepRefs, self).__init__()
+        self.__refs__[self.__class__].append(weakref.ref(self))
+
+    @classmethod
+    def get_instances(cls):
+        for inst_ref in cls.__refs__[cls]:
+            inst = inst_ref()
+            if inst is not None:
+                yield inst
 
 
 def walk(location) -> Generator[Path, None, None]:
@@ -90,6 +110,8 @@ def download_file(url: str, fd) -> None:
 
 
 def json_encoder(obj):
+    from .analyzers.python.nodes import ASTNode
+
     if type(obj) in (set, tuple):
         return list(obj)
     elif isinstance(obj, Path):
