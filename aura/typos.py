@@ -3,29 +3,19 @@ import json
 import difflib
 import itertools
 import xmlrpc.client
+from pathlib import Path
+from typing import Optional, Generator, Iterable
 
-import click
 import dateutil.parser
 
 from . import diff
 from . import config
-from . import exceptions
 from .utils import normalize_name
 from .uri_handlers.base import URIHandler, ScanLocation
 
 
 logger = config.get_logger(__name__)
 WAREHOUSE_XML_RPC = "https://pypi.python.org/pypi"
-PYPI_STATS_QUERY = """
-SELECT file.project as package_name, count(file.project) as downloads
-FROM `the-psf.pypi.downloads*`
-WHERE
-    _TABLE_SUFFIX
-    BETWEEN FORMAT_DATE(
-      '%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY))
-    AND FORMAT_DATE('%Y%m%d', CURRENT_DATE())
-GROUP BY package_name
-ORDER BY downloads DESC"""
 
 
 class TypoAnalyzer(object):
@@ -127,20 +117,42 @@ class TypoAnalyzer(object):
                     #FIXME: da.pprint()
 
 
-def get_all_pypi_packages():
+def threshold_or_default(threshold: Optional[int]) -> int:
+    """
+    Return default threshold if none is set otherwise proxy the value
+    """
+    if threshold is None:
+        return int(config.CFG["aura"].get("pypi_download_threshold", fallback=10000))
+    else:
+        return threshold
+
+
+def get_all_pypi_packages() -> Generator[str, None, None]:
+    """
+    Retrieve a list of all PyPI packages using pypi xml rpc service
+    """
     repo = xmlrpc.client.ServerProxy(WAREHOUSE_XML_RPC, use_builtin_types=True)
     yield from map(normalize_name, repo.list_packages())
 
 
-def damerau_levenshtein(s1, s2, max_distance=3, cap=None):
-    # Original Source:
-    # https://gist.githubusercontent.com/giststhebearbear/4145811/raw/7ae7fc157ee9aebedafc10320bf6349374d52fdd/leven.py
+def damerau_levenshtein(s1: str, s2: str, max_distance: int=3, cap=None) -> int:
+    """
+    Compute damerau-levenshtein distance of two strings
+    This algorithm is optimized to stop computation of distance once the max distance was reached
 
+    Original Source:
+    https://gist.githubusercontent.com/giststhebearbear/4145811/raw/7ae7fc157ee9aebedafc10320bf6349374d52fdd/leven.py
+
+    :param s1: first string
+    :param s2: second string
+    :param max_distance: maximum allowed distance
+    :param cap: cap the max distance or return a given cap value if max_distance was reached
+    """
     #  get smallest string so our rows are minimized
     s1, s2 = (s1, s2) if len(s1) <= len(s2) else (s2, s1)
     #  set lengths
     l1, l2 = len(s1), len(s2)
-    #  We are simulatng an NM matrix where n is the longer string
+    #  We are simulating an NM matrix where n is the longer string
     #  and m is the shorter string. By doing this we can minimize
     #  memory usage to O(M).
     #  Since we are simulating the matrix we only maintain two rows
@@ -240,33 +252,46 @@ def diff_distance(s1, s2, cutoff=0.8, cut_return=None):
         return cut_return
 
 
-def generate_popular(json_path, full_list=None):
-
+def generate_popular(
+        json_path: Path,
+        full_list: Optional[Iterable[str]]=None,
+        download_threshold: Optional[int]=None
+):
     if not json_path.exists():
         raise ValueError(f"PyPI stats file does not exists: {json_path}")
 
     if full_list is None:
         full_list = get_all_pypi_packages()
-    #  We need to convert generator to tuple because we run it in multiple loops
-    full_list = tuple(full_list)
 
-    with open(json_path, "r") as fd:
+    #  We need to convert generator to set because we run it in multiple loops
+    download_threshold = threshold_or_default(download_threshold)
+    full_list = set(full_list)
+    popular = set()
+
+    with json_path.open("r") as fd:
         for line in fd:
             x = json.loads(line)
+
+            if int(x.get("downloads", 0)) < download_threshold:
+                break
+
             pkg1 = normalize_name(x["package_name"])
-            for pkg2 in full_list:
-                if pkg1 != pkg2:
-                    yield (pkg1, pkg2)
+            popular.add(pkg1)
+
+    full_list -= popular
+
+    yield from itertools.product(popular, full_list)
 
 
-def enumerator(generator=None, method=None):
+def enumerator(generator, method):
     for (pkg1, pkg2) in generator:
         res = method(pkg1, pkg2)
         if res and res < 2:
             yield (pkg1, pkg2)
 
 
-def check_name(name, full_list=False):
+def check_name(name, full_list=False, download_threshold=None):
+    download_threshold = threshold_or_default(download_threshold)
     name = normalize_name(name)
 
     pth = config.get_relative_path("pypi_stats")
@@ -275,6 +300,9 @@ def check_name(name, full_list=False):
         for line in fd:
             line = json.loads(line)
             pkg_name = normalize_name(line["package_name"])
+            downloads = int(line.get("downloads", 0))
+            if downloads < download_threshold:
+                break
 
             if name == pkg_name:
                 if full_list:
@@ -288,26 +316,3 @@ def check_name(name, full_list=False):
 
     return typos
 
-
-def generate_stats(output: click.File, limit=None):
-    try:
-        from google.cloud import bigquery
-
-        client = bigquery.Client()
-    except Exception:
-        raise exceptions.PluginDisabled(
-            "Error creating BigQuery client, Aura is probably not correctly configured. Please consult docs."
-        )
-
-    q = PYPI_STATS_QUERY
-
-    if limit:
-        q += f" LIMIT {int(limit)}"
-
-    logger.info("Running Query on PyPI download dataset")
-    query_job = client.query(q, location="US",)
-
-    for row in query_job:
-        output.write(json.dumps(dict(row)) + "\n")
-
-    logger.info("PyPI download stats generation finished")

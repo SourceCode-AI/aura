@@ -1,4 +1,6 @@
+from __future__ import annotations
 from collections import defaultdict
+from typing import Any, List
 
 
 class Frame:
@@ -8,18 +10,27 @@ class Frame:
         self.locals = {}
         self.previous = None  # type: Frame
 
-    def _lookup(self, key):
+    def _lookup(self, key: str) -> Any:
+        if type(key) != str:
+            raise TypeError("Key index must be a string")
+
         if key in self.locals:
             return (self, self.locals[key])
         elif self.previous is not None:
             return self.previous._lookup(key)
         else:
-            raise KeyError("No such variable in stack frames: '{}'".format(key))
+            raise KeyError("No such variable in stack frames")
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str):
+        if type(key) != str:
+            raise TypeError("Key index must be a string")
+
         return self._lookup(key)[1]
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: str, value):
+        if type(key) != str:
+            raise TypeError("Key index must be a string")
+
         if key in self.locals:
             self.locals[key] = value
 
@@ -29,14 +40,14 @@ class Frame:
         except (TypeError, KeyError):
             self.locals[key] = value
 
-    def copy(self):  # type: Frame
+    def copy(self) -> Frame:
         l = self.locals.copy()
         frame_copy = Frame()
         frame_copy.locals = l.copy()
         return frame_copy
 
     @property
-    def variables(self):
+    def variables(self) -> List[str]:
         l = list(self.locals.keys())
 
         if self.previous:
@@ -51,17 +62,26 @@ class Stack:
         self.bottom = Frame()
         self.frame = self.bottom
 
-    def __contains__(self, item):
+    def __contains__(self, key: str) -> bool:
+        if type(key) != str:
+            raise TypeError("Key index must be a string")
+
         try:
-            _ = self[item]
+            _ = self[key]
             return True
         except KeyError:
             return False
 
-    def __getitem__(self, item):
-        return self.frame[item]
+    def __getitem__(self, key: str):
+        if type(key) != str:
+            raise TypeError("Key index must be a string")
 
-    def __setitem__(self, key, value):
+        return self.frame[key]
+
+    def __setitem__(self, key: str, value: Any):
+        if type(key) != str:
+            raise TypeError("Key index must be a string")
+
         self.frame[key] = value
 
     def push(self):

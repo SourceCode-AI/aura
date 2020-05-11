@@ -59,11 +59,14 @@
       "items": {"allOf":  [
         {"$ref": "#/definitions/pattern_matching"},
         {
-          "required": ["message"],
+          "required": ["message", "id"],
           "properties": {
             "score": {
               "type":  "number",
               "minimum": 0
+            },
+            "id": {
+              "type": "string"
             }
           }
         }

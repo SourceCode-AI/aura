@@ -2,48 +2,50 @@ import os
 import json
 
 import pytest
+import responses
 from click.testing import CliRunner
 
 from aura import cli
 from aura.analyzers.python.readonly import ReadOnlyAnalyzer
 
 
-@pytest.mark.parametrize(
-    "exec_mode",
-    (
-        "--async",
-        "--no-async"
-    )
-)
+@pytest.mark.timeout(5)
+@pytest.mark.parametrize("exec_mode", ("--async", "--no-async"))
 def test_simple_cli_analysis(exec_mode, fixtures):
     pth = fixtures.path('basic_ast.py')
-    output = fixtures.scan_test_file('basic_ast.py', args=[exec_mode])
+    output = fixtures.scan_test_file("basic_ast.py", args=[exec_mode])
 
-    assert output['name'].endswith(pth.split('/')[-1])
-    assert 'url' in output['tags']
+    assert output["name"].endswith(pth.split("/")[-1])
+    assert "url" in output["tags"]
 
 
 @pytest.mark.extended
 def test_complex_cli_analysis(fixtures, fuzzy_rule_match):
-    output = fixtures.scan_test_file('obfuscated.py')
+    output = fixtures.scan_test_file("obfuscated.py")
 
     hits = [
         {
-            'type': 'URL',
-            'extra': {
-                'url': 'https://example.com/index.html'
-            }
+            "type": "StringMatch",
+            "extra": {
+                "signature_id": "url",
+                "string": "https://example.com/index.html",
+            },
+            "tags": ["url"]
         },
         {
-            'type': 'URL',
-            'extra': {
-                'url': 'http://malware.com/CnC'
-            }
+            "type": "StringMatch",
+            "extra": {
+                "signature_id": "url",
+                "string": "http://malware.com/CnC"
+            },
+            "tags": ["url"]
         },
         {
-            'type': 'YaraMatch',
-            'rule': 'eicar_substring_test'
-        }
+            "type": "YaraMatch",
+            "extra": {
+                "rule": "eicar_substring_test"
+            }
+        },
     ]
 
     for x in hits:
@@ -59,8 +61,7 @@ def test_custom_analyzer(fixtures):
     hooks = ReadOnlyAnalyzer.hooks[:]
     try:
         result = runner.invoke(
-            cli.cli,
-            ['scan', os.fspath(pth), '-a', 'custom_analyzer:CustomAnalyzer']
+            cli.cli, ['scan', os.fspath(pth), '-a', 'custom_analyzer:CustomAnalyzer']
         )
 
         if result.exception:
@@ -73,7 +74,9 @@ def test_custom_analyzer(fixtures):
 
 
 def test_min_score_option(fixtures):
-    output = fixtures.scan_test_file("obfuscated.py", args=["--min-score", 1000], decode=False)
+    output = fixtures.scan_test_file(
+        "obfuscated.py", args=["--min-score", 1000], decode=False
+    )
     assert len(output.output.strip()) == 0, output.output
 
     output = fixtures.scan_test_file("obfuscated.py", args=["--min-score", 10])
@@ -90,8 +93,8 @@ def test_min_score_option(fixtures):
         ("test_code",),
         ("!shell_injection",),
         ("ratata_does_not_exists"),
-        ("!ratata_does_not_exists")
-    )
+        ("!ratata_does_not_exists"),
+    ),
 )
 def test_tag_filtering(tag_filter, fixtures):
     args = []
@@ -115,20 +118,15 @@ def test_info_command(fixtures):
 def test_ast_parser(fixtures):
     pth = fixtures.path('obfuscated.py')
 
-    result = fixtures.get_cli_output(
-        ['parse_ast', os.fspath(pth)]
-    )
+    result = fixtures.get_cli_output(['parse_ast', os.fspath(pth)])
     # TODO: add functionality to test the parser output
 
 
-def test_r2c_integration(fixtures):
+def test_r2c_integration():
     f_name = 'r2c_test_output.json'
     runner = CliRunner()
     with runner.isolated_filesystem():
-        result = runner.invoke(
-            cli.cli,
-            ['r2c', 'scan', '--out', f_name]
-        )
+        result = runner.invoke(cli.cli, ['r2c', 'scan', '--out', f_name])
 
         if result.exception:
             raise result.exception
@@ -139,3 +137,39 @@ def test_r2c_integration(fixtures):
 
     assert 'results' in data
     assert 'errors' in data
+
+
+@responses.activate
+def test_fetching_pypi_stats():
+    url = "https://cdn.sourcecode.ai/datasets/typosquatting/pypi_stats.json"
+
+    responses.add(
+        responses.GET,
+        url=url,
+        json=[
+            {"package": "pkg1", "downloads": 6},
+            {"package": "pkg2", "downloads": 4}
+        ],
+        status = 200
+    )
+
+    f_name = "my_stats.json"
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        assert not os.path.exists(f_name)
+        assert not os.path.exists(f"{f_name}.bak")
+
+        with open(f_name, "w") as fd:
+            fd.write("hello_world")
+
+        result = runner.invoke(cli.cli, ["fetch-pypi-stats", "-o", f_name])
+        assert result.exit_code == 0, result.stdout
+        assert os.path.exists(f_name)
+
+        with open(f_name, "r") as fd:
+            for line in fd:
+                assert json.loads(line)["package"] in ("pkg1", "pkg2"), line
+
+        assert os.path.exists(f"{f_name}.bak")
+        with open(f"{f_name}.bak", "r") as fd:
+            assert fd.read() == "hello_world"

@@ -28,6 +28,17 @@ BASIC_ELEMENTS = (
 
 @total_ordering
 class Taints(Enum):
+    """
+    Enumeration class (`enum.Enum`) defining the different taint levels:
+
+    - `SAFE` = 1
+    - `UNKNOWN` = 2
+    - `TAINTED` = 3
+
+    Taint levels are comparable and can be "added" (e.g. taint1 + taint2)
+    which will return the taint level of whichever is the highest
+    """
+
     SAFE = 1
     UNKNOWN = 2
     TAINTED = 3
@@ -44,13 +55,10 @@ class Taints(Enum):
             return False
 
     def __add__(self, other):
-        if self == Taints.TAINTED or other == Taints.TAINTED:
-            return Taints.TAINTED
+        if type(other) != Taints:
+            return NotImplemented
 
-        if self == Taints.UNKNOWN or other == Taints.UNKNOWN:
-            return Taints.UNKNOWN
-
-        return self
+        return max(self, other)
 
 
 @dataclass
@@ -156,9 +164,8 @@ class ASTNode(KeepRefs, metaclass=ABCMeta):
         return NotImplemented
 
     def pprint(self):
-        from pprint import pprint as pp
-
-        pp(to_json(self))
+        from prettyprinter import pprint as pp
+        pp(self)
 
     def add_taint(self, taint: Taints, context: Context, lock=False, taint_log=None) -> bool:
         """

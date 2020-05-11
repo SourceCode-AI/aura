@@ -14,6 +14,7 @@ from defusedxml import (
 
 from .rules import Rule
 from ..utils import Analyzer
+from ..uri_handlers.base import ScanLocation
 from ..config import get_score_or_default
 
 
@@ -25,17 +26,13 @@ ALLOWED_MIMES = (
 )
 
 
-@dataclass
-class MalformedXML(Rule):
-    message = "Malformed or malicious XML"
-    __hash__ = Rule.__hash__
-
-
-def scan(pth: str, **mode):
+def scan(pth: str, **mode):  # TODO: use ScanLocation instead of pth
     try:
         cElementTree.parse(pth, **mode)
     except EntitiesForbidden:
-        hit = MalformedXML(
+        yield Rule(
+            detection_type="MalformedXML",
+            message="Malformed or malicious XML",
             score = get_score_or_default("malformed-xml-entities", 100),
             extra = {
                 "type": "entities"
@@ -43,9 +40,10 @@ def scan(pth: str, **mode):
             signature = f"malformed_xml#entities#{pth}",
             tags = {"malformed_xml", "xml_entities"}
         )
-        yield hit
     except DTDForbidden:
-        hit = MalformedXML(
+        yield Rule(
+            detection_type="MalformedXML",
+            message="Malformed or malicious XML",
             score = get_score_or_default("malformed-xml-dtd", 20),
             extra = {
                 "type": "dtd"
@@ -53,9 +51,10 @@ def scan(pth: str, **mode):
             signature = f"malformed_xml#dtd#{pth}",
             tags = {"malformed_xml", "xml_dtd"}
         )
-        yield hit
     except ExternalReferenceForbidden:
-        hit = MalformedXML(
+        yield Rule(
+            detection_type="MalformedXML",
+            message="Malformed or malicious XML",
             score = get_score_or_default("malformed-xml-external-reference", 100),
             extra = {
                 "type": "external_reference"
@@ -63,7 +62,6 @@ def scan(pth: str, **mode):
             signature = f"malformed_xml#external_reference#{pth}",
             tags = {"malformed_xml", "xml_external_reference"}
         )
-        yield hit
     except NotSupportedError:
         pass
     except ParseError:
@@ -73,15 +71,14 @@ def scan(pth: str, **mode):
 
 
 @Analyzer.ID("xml")
-def analyze(pth: Path, **kwargs):
+def analyze(location: ScanLocation):
     """
     Detect malformed or potentially malicious XML files
     """
-    pth = os.fspath(pth)
-    mime = kwargs.get('mime')
-    if pth.endswith('.xml'):
+    pth = os.fspath(location.location)
+    if pth.endswith(".xml"):
         pass
-    elif mime not in ALLOWED_MIMES:
+    elif location.metadata["mime"] not in ALLOWED_MIMES:
         return
 
     # Parsing will stop at the first error

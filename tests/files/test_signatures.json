@@ -70,5 +70,15 @@
   "taint_clean": [
     "int",
     "flask.Markup.escape"
+  ],
+  "strings": [
+    {
+      "id": "url",
+      "type": "regex",
+      "pattern": "^(http|ftp)s?://.+",
+      "message": "A possible URL has been found",
+      "score": 0,
+      "tags": ["url"]
+    }
   ]
 }

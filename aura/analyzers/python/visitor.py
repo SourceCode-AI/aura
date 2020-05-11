@@ -6,26 +6,24 @@ from __future__ import annotations
 import os
 import copy
 import time
-import typing
-import subprocess
 from functools import partial, wraps
 from collections import deque
 from pathlib import Path
 from warnings import warn
+from typing import Optional, Tuple
 
 import pkg_resources
-import simplejson as json
 
 from .nodes import Context, ASTNode, CallGraph
 from .. import python_src_inspector
+from ...uri_handlers.base import ScanLocation
+from ...exceptions import ASTParseError
 from ... import python_executor
 from ... import config
 
 
 INSPECTOR_PATH = os.path.abspath(python_src_inspector.__file__)
-
 DEFAULT_STAGES = ("convert", "rewrite", "taint_analysis", "readonly")
-
 VISITORS = None
 
 logger = config.get_logger(__name__)
@@ -52,10 +50,12 @@ class Visitor:
     when nodes are visited as well as modification via the passed context
     """
 
+    stage_name = None
     _lru_cache = {}
 
-    def __init__(self, *, metadata, **kwargs):
-        self.kwargs = kwargs
+    def __init__(self, *, location: ScanLocation):
+        self.location: ScanLocation = location
+        self.kwargs: dict = {}  # TODO: this should be removed, old analyzer class init signature
         self.tree = None
         self.traversed = False
         self.modified = False
@@ -64,45 +64,29 @@ class Visitor:
         self.queue = deque()
         self.call_graph = CallGraph()
 
-        self.metadata = metadata
+        self.metadata = location.metadata  # TODO: check if this could be removed
         self.hits = []
-        self.path = metadata["path"]
-        self.normalized_path = metadata.get("normalized_path", self.path)
+        self.path = location.location
+        self.normalized_path: str = str(location)
         self.max_iterations = int(config.CFG["aura"].get("max-ast-iterations", 500))
         self.max_queue_size = int(config.CFG["aura"].get("max-ast-queue-size", 10000))
 
     @classmethod
-    def from_cache(cls, *, source, **kwargs):
-        # TODO: remove, deprecated by from_visitor
-        obj = cls(path=source, **kwargs)
-        obj.load_tree(source)
+    def from_visitor(cls, visitor: Visitor):
+        obj = cls(location=visitor.location)
+        obj.tree = visitor.tree
         obj.traverse()
+
         return obj
 
     @classmethod
-    def from_visitor(cls, visitor: Visitor):
-        cache_id = f"{cls.__name__}#{os.fspath(visitor.path)}"
-
-        if cache_id not in cls._lru_cache:
-            obj = cls(
-                metadata=visitor.metadata,
-                **visitor.kwargs,
-            )
-            obj.tree = copy.deepcopy(visitor.tree)
-            obj.traverse()
-            cls._lru_cache[cache_id] = obj
-
-        return cls._lru_cache[cache_id]
-
-    @classmethod
-    def run_stages(cls, *, metadata, stages=DEFAULT_STAGES, **kwargs):
+    def run_stages(cls, *, location: ScanLocation, stages: Optional[Tuple[str, ...]]=DEFAULT_STAGES) -> Visitor:
         if not stages:
             stages = DEFAULT_STAGES
 
         v = None
-        path = os.fspath(metadata["path"])
-        previous = Visitor(metadata=metadata, **kwargs)
-        previous.load_tree(path)
+        previous = Visitor(location=location)
+        previous.load_tree()
         previous.traverse()
 
         visitors = cls.get_visitors()
@@ -127,12 +111,15 @@ class Visitor:
 
         return VISITORS
 
-    def load_tree(self, source: Path):
-        if isinstance(source, Path):
-            source = os.fspath(source)
+    def load_tree(self):
+        source = self.location.str_location
 
         cmd = [INSPECTOR_PATH, source]
         self.tree = python_executor.run_with_interpreters(command=cmd, metadata=self.metadata)
+
+        if self.tree is None:
+            raise ASTParseError("Unable to parse the source code")
+
         if "encoding" not in self.metadata and self.tree and self.tree.get("encoding"):
             self.metadata["encoding"] = self.tree["encoding"]
 
@@ -185,18 +172,15 @@ class Visitor:
 
             self.modified = False
 
-            # logger.debug(f"Tree '{self.__class__.__name__}' iteration {self.iteration}")
-
             new_ctx = Context(
                 node=self.tree, parent=None, replace=self._replace_root, visitor=self
             )
             self.queue.append(new_ctx)
             self._init_visit(new_ctx)
-
             processed_nodes = set()
 
             while self.queue:
-                ctx = self.queue.popleft()  # type: Context
+                ctx: Context = self.queue.popleft()
 
                 # Keep track of processed object ID's
                 # This is to prevent infinite loops where processed object will add themselves back to queue
@@ -204,9 +188,8 @@ class Visitor:
                 if _id(ctx.node) in processed_nodes:
                     continue
 
-                # logger.debug(f"Processing context: {ctx.node}")
                 self.__process_context(ctx)
-                processed_nodes.add(id(ctx.node))
+                processed_nodes.add(_id(ctx.node))
 
             self.iteration += 1
             if self.iteration >= self.max_iterations:  # TODO: report this as a result so we can collect this data
@@ -223,7 +206,7 @@ class Visitor:
         if end >= 3:
             # Log message if the tree traversal took loner then 3s
             logger.info(
-                f"[{self.__class__.__name__}] Convergence of {self.metadata.get('path')} took {end}s in {self.iteration} iterations"
+                f"[{self.__class__.__name__}] Convergence of {str(self.location)} took {end}s in {self.iteration} iterations"
             )
 
         if self.path:

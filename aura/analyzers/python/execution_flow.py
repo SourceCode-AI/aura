@@ -7,9 +7,8 @@ from fnmatch import fnmatch
 
 from ..base import NodeAnalyzerV2
 from ...utils import Analyzer
-from .taint.visitor import TaintAnalysis
 from .nodes import *
-from ..rules import ModuleImport
+from ..rules import Rule
 from ... import config
 
 
@@ -20,14 +19,6 @@ class ExecutionFlow(NodeAnalyzerV2):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.reset_hook()
-
-    def load_tree(self, source):
-        if self.tree is None:
-            cached = TaintAnalysis.from_cache(source=source, metadata=self.metadata)
-            if not cached.traversed:
-                cached.traverse()
-            self.tree = cached.tree
-            del cached
 
     def _visit_node(self, context: Context):
         if isinstance(context.node, Import):
@@ -40,9 +31,14 @@ class ExecutionFlow(NodeAnalyzerV2):
         node = context.node
 
         for norm in node.get_modules():
-            hit = ModuleImport(
-                root=norm,
-                name=norm,
+            hit = Rule(
+                detection_type="ModuleImport",
+                message = f"Module '{norm}' import in a source code",
+                extra = {
+                    "root": norm,
+                    "name": norm,
+                    "categories": set()
+                },
                 line_no=node.line_no,
                 node=node,
                 signature=f"module_import#{norm}#{context.visitor.normalized_path}",
@@ -57,7 +53,7 @@ class ExecutionFlow(NodeAnalyzerV2):
                             hit.score += score
                             hit.tags |= tags
                             node.tags |= tags
-                            hit.categories.add(cat["name"])
+                            hit.extra["categories"].add(cat["name"])
             except Exception:
                 raise
 

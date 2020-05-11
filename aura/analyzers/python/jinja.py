@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 from functools import partial
 from dataclasses import dataclass
@@ -8,7 +10,7 @@ from jinja2 import nodes as jnodes
 from .visitor import Visitor
 from .. import base
 from .. import rules
-from .nodes import Context, Taints, ASTNode
+from .nodes import Context, Taints, ASTNode, String
 from ...utils import Analyzer
 from ... import config
 
@@ -63,6 +65,10 @@ class JinjaAnalyzer(base.NodeAnalyzerV2):
 
             taints[name] = kw._taint_class
 
+        if type(context.node.args[0]) not in (String, str):
+            logger.warn(f"Unable to determine jinja template location for template located in '{context.visitor.normalized_path}'#{context.node.line_no}")
+            return
+
         tpl_name = str(context.node.args[0])
 
         v = JinjaTemplateVisitor.from_template(
@@ -108,23 +114,27 @@ class NodeWrapper(ASTNode):
 
 class JinjaTemplateVisitor(Visitor):
     @classmethod
-    def from_template(cls, context, template_name, taints):
+    def from_template(cls, context, template_name, taints) -> JinjaTemplateVisitor:
         tpl_path = Path(context.visitor.normalized_path).parent / "templates" / template_name
         if not tpl_path.exists():
             logger.info(f"Could not find jinja template: '{template_name}'")
             return
 
-        metadata = {
-            "path": tpl_path,
+        new_location = context.visitor.location.create_child(
+            new_location=tpl_path
+        )
+
+        new_location.metadata.update({
+            "template_path": tpl_path,
             "template_context": context.node.args[1:],
             "taints": taints,
-        }
+        })
 
-        v = cls(metadata=metadata)
-        v.load_tree(source=tpl_path)
+        v = cls(location=new_location)
+        v.load_tree()
         return v
 
-    def load_tree(self, source: Path):
+    def load_tree(self):
         if self.path:
             with self.path.open("r") as fd:
                 raw_template = fd.read()

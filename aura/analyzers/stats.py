@@ -1,29 +1,23 @@
-import os
-from dataclasses import dataclass
-from pathlib import Path
+from ..uri_handlers.base import ScanLocation
 
 from .rules import Rule
-from ..utils import Analyzer, normalize_path
+from ..utils import Analyzer
 
-
-@dataclass
-class FileStats(Rule):
-    mime: str = ""
-
-    def _asdict(self):
-        d = {"mime": self.mime}
-        d.update(Rule._asdict(self))
-        return d
-
-    def __hash__(self):
-        return hash(self.mime)
 
 
 @Analyzer.ID("file_stats")
-def analyze(pth: Path, mime, metadata, **kwargs):
+def analyze(*, location: ScanLocation):
     """This analyzer collect stats about analyzer files"""
-    pth = normalize_path(metadata["normalized_path"])
 
-    hit = FileStats(mime=mime, signature=f"stats#mime#{pth}")
-    hit.informational = True
-    yield hit
+    loc = str(location)
+
+    yield Rule(
+        detection_type="FileStats",
+        message = "Statistics about files scanned by aura",
+        informational=True,
+        extra={
+            "mime": location.metadata["mime"],
+        },
+        location=loc,
+        signature=f"file_stats#{loc}"
+    )

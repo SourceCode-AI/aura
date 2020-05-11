@@ -5,6 +5,7 @@ import inspect
 import fnmatch
 from abc import ABCMeta, abstractmethod
 from typing import List, Union
+from functools import lru_cache
 
 from .analyzers.python import nodes
 
@@ -121,6 +122,7 @@ class RegexPattern(StringPatternMatcher):
 
         self._regex = re.compile(signature["pattern"], flags=flags)
 
+    @lru_cache()
     def match_string(self, value: str) -> bool:
         """
         match the ast node against the signature
@@ -135,6 +137,7 @@ class GlobPattern(StringPatternMatcher):
 
     pattern_type = "glob"
 
+    @lru_cache()
     def match_string(self, value: str) -> bool:
         return fnmatch.fnmatch(value, self._signature["pattern"])
 
@@ -186,13 +189,17 @@ class FunctionDefinitionPattern:
 
     def match(self, node: nodes.NodeType) -> Union[None, bool, inspect.BoundArguments]:
         """
-        Determine whetever the call to the function matches a defined signature
+        Determine whenever the call to the function matches a defined signature
         The following conditions are required:
         - matching function name (could be another pattern such as regex)
         - matching function args & kwargs as defined in the signature
         - matching constraints for all args/kwargs
         """
-        if not self.check_name(node.full_name):
+        full_name = node.full_name
+        if type(full_name) != str:
+            return False
+
+        if not self.check_name(full_name):
             return
 
         if not self.compiled:
@@ -209,14 +216,14 @@ class FunctionDefinitionPattern:
                 return
         return sig
 
-    def check_name(self, name:str) -> bool:
+    @lru_cache()
+    def check_name(self, name: str) -> bool:
         """
         Checks if the call function name is matching the pattern defined in signature
         """
         patterns = PatternMatcher.compile_patterns([self.signature["name"]])
         matches = list(PatternMatcher.find_matches(name, patterns))
         return bool(matches)
-
 
     def check_constraint(self, name: str, value) -> bool:  # TODO!!!
         """

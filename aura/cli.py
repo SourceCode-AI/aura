@@ -5,6 +5,7 @@ Main CLI entry point for the Aura framework
 import json
 import sys
 import os
+import shutil
 import textwrap
 from pathlib import Path
 
@@ -162,13 +163,23 @@ def info():
     "-o",
     "--out",
     default=os.fspath(config.get_relative_path("pypi_stats")),
-    type=click.File("w"),
+    type=click.Path(
+        file_okay=True,
+        dir_okay=True,
+        writable=True,
+        allow_dash=True
+    ),
 )
 def fetch_pypi_stats(out):
     """
     Download the latest PyPI download stats from the public BigQuery dataset
     """
-    commands.fetch_pypi_stats(out)
+    if out !="-" and os.path.exists(out):
+        LOGGER.info(f"File '{out}' exists, creating backup")
+        shutil.copyfile(out, f"{out}.bak")
+
+    with open(out, "wb") as fd:
+        commands.fetch_pypi_stats(fd)
 
 
 @cli.command()

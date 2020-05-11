@@ -4,6 +4,7 @@ import tempfile
 import contextlib
 from pathlib import Path
 from unittest import mock
+from typing import Pattern
 
 from click.testing import CliRunner, Result
 import responses
@@ -81,30 +82,33 @@ class Fixtures(object):
 
         INSPECTOR_PATH = os.path.abspath(python_src_inspector.__file__)
 
-        out = python_executor.run_with_interpreters(command = [INSPECTOR_PATH, '-'], stdin=bytes(src, 'utf-8'))
-        return out['ast_tree']['body']
+        out = python_executor.run_with_interpreters(command = [INSPECTOR_PATH, "-"], stdin=bytes(src, "utf-8"))
+        return out["ast_tree"]["body"]
 
     def get_full_ast(self, src):
         """
         Get a full AST tree after all stages has been applied, e.g. rewrite & taint analysis
         """
-        from aura.analyzers.python.taint.visitor import TaintAnalysis
+        from aura.analyzers.python.visitor import Visitor
+        from aura.uri_handlers.base import ScanLocation
 
         with tempfile.NamedTemporaryFile() as fd:
             fd.write(bytes(src, 'utf-8'))
-            meta = {
-                'path': fd.name,
-                'source': 'cli'
-            }
-            analyzer = TaintAnalysis.from_cache(source=fd.name, metadata=meta)
-            if not analyzer.traversed:
-                analyzer.traverse()
-            return analyzer.tree['ast_tree']
+            loc = ScanLocation(
+                location=Path(fd.name),
+                metadata={"source": "cli"}
+            )
+
+            visitor = Visitor.run_stages(location=loc)
+            return visitor.tree["ast_tree"]
 
     def scan_and_match(self, input_file, matches):
         output = self.scan_test_file(input_file)
         for x in matches:
-            assert any(match_rule(h, x) for h in output['hits']), x
+            assert any(match_rule(h, x) for h in output["hits"]), (x, output["hits"])
+
+        for hit in output["hits"]:
+            assert hit["type"] != "ASTParseError"
 
 
 def match_rule(source, target) -> bool:
@@ -118,12 +122,18 @@ def match_rule(source, target) -> bool:
     :param target: pattern that we match against, all structure items/keys from target must be present in source
     :return: bool
     """
+    # We want to avoid importing the Rule in top level
+    # as the tests can change the aura configuration which is influenced by import
     global Rule
     if Rule is None:
         from aura.analyzers.rules import Rule
 
     if isinstance(source, Rule):
         source = source._asdict()
+
+    # Check if target is a regex and apply it to source string
+    if isinstance(target, Pattern) and type(source) == str:
+        return bool(target.match(source))
 
     if type(target) != type(source):
         return False

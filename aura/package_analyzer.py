@@ -39,14 +39,9 @@ class Analyzer(object):
     def __init__(self, location):
         self.location = location
 
-    def run(self, location=None, strip_path=None, parent=None, metadata=None):
-        if metadata is None:
-            metadata = {}
+    def run(self):
 
-        if location is None:
-            location = self.location
-
-        if metadata.get("fork") is True:
+        if self.location.metadata.get("fork") is True:
             executor = worker_executor.MultiprocessingExecutor()
         else:
             executor = worker_executor.LocalExecutor()
@@ -56,19 +51,20 @@ class Analyzer(object):
         hits = executor.create_queue()
         cleanup = executor.create_queue()
 
-        meta = metadata.copy()
+        progress = worker_executor.ProgressBar(queue=files_queue)
+        meta = self.location.metadata.copy()
         meta["depth"] = 0
         files_queue.put(
             base.ScanLocation(
-                location=location,
+                location=self.location.location,
                 metadata=meta
             )
         )
 
         try:
             while files_queue.qsize() or sum([not x.ready() for x in executor.jobs]):
+                progress._update_queue()
                 try:
-
                     item: Union[worker_executor.Wait, base.ScanLocation] = files_queue.get(False, 1)
 
                     if item is False or isinstance(item, worker_executor.Wait):
@@ -97,7 +93,7 @@ class Analyzer(object):
                         "queue": files_queue,
                         "hits": hits,
                         "cleanup": cleanup,
-                        "metadata": metadata,
+                        "metadata": self.location.metadata,
                     }
 
                     executor.apply_async(func=self._worker, kwds=kwargs)
@@ -108,6 +104,7 @@ class Analyzer(object):
                 except Exception:
                     raise
 
+            progress._update_queue()
             executor.close()
             executor.join()
 
@@ -122,6 +119,7 @@ class Analyzer(object):
 
             return hits_items
         finally:
+            progress.close()
             while cleanup.qsize():
                 x = cleanup.get()
                 if type(x) != str:
@@ -136,7 +134,7 @@ class Analyzer(object):
         queue: queue.Queue,
         hits: multiprocessing.Array,
         cleanup: queue.Queue,
-        metadata=None,
+        metadata=None,  # TODO: remove metadata as it's already part of location/item
     ):
         try:
             path = location.location
@@ -148,23 +146,22 @@ class Analyzer(object):
                 metadata["parent"] = path
 
             metadata["path"] = path
-            metadata["normalized_path"] = location.strip(location.location)
+            metadata["normalized_path"] = str(location)
 
-            m = magic.from_file(os.fspath(path), mime=True)
+            m = magic.from_file(location.str_location, mime=True)
 
             for x in path.parts:  # TODO: move this somewhere else
                 if TEST_REGEX.match(x):
                     metadata["flags"].add("test-code")
                     break
 
-            logger.debug(f"Analyzing file '{path}' {m}")
+            logger.debug(f"Analyzing file '{location.str_location}' {m}")
             # TODO: let analyzer specify mime_types
             #    return
 
             analyzers = plugins.get_analyzer_group(metadata.get("analyzers", []))
 
-            for x in analyzers(path=path, mime=m, metadata=metadata, location=location):
-
+            for x in analyzers(location=location):
                 if isinstance(x, base.ScanLocation):
                     if x.cleanup:
                         cleanup.put(x.location)
@@ -184,12 +181,12 @@ class Analyzer(object):
             pass
 
     def scan_directory(self, item: base.ScanLocation):
-        logger.info(f"Collecting files in a directory '{item.location}")
+        logger.info(f"Collecting files in a directory '{item.str_location}")
         topo = TopologySort()
         collected = []
 
         for f in utils.walk(item.location):
-            new_item = item.create_child(f)
+            new_item = item.create_child(f, strip_path=item.strip_path)
             collected.append(new_item)
             topo.add_node(Path(new_item.location).absolute())
 

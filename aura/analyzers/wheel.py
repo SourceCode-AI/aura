@@ -1,18 +1,17 @@
 import os
+import io
 import csv
 import base64
 import hashlib
 from pathlib import Path
 from dataclasses import dataclass
 
+import chardet
+
 from . import rules
 from ..utils import Analyzer, normalize_path
+from ..uri_handlers.base import ScanLocation
 from ..config import get_score_or_default
-
-
-@dataclass
-class Wheel(rules.Rule):
-    __hash__ = rules.Rule.__hash__
 
 
 def get_checksum(alg: str, path: Path):
@@ -24,17 +23,17 @@ def get_checksum(alg: str, path: Path):
 
 
 @Analyzer.ID("wheel")
-def analyze_wheel(pth: Path, location, **kwargs):
+def analyze_wheel(*, location: ScanLocation):
     """Find anomalies in the Wheel packages that could be caused by manipulation or using a non-standard tools"""
-    parts = pth.parts
+    parts = location.location.parts
 
-    if len(parts) < 3 or pth.parts[-1] != "WHEEL":
+    if len(parts) < 3 or location.location.name != "WHEEL":
         return
     elif not parts[-2].endswith(".dist-info"):
         return
 
-    wheel_root = pth.parents[1].absolute()
-    dist_info = pth.parents[0]
+    wheel_root = location.location.parents[1].absolute()
+    dist_info = location.location.parents[0]
 
     required_files = ("WHEEL", "METADATA", "RECORD")
     for x in required_files:
@@ -45,7 +44,9 @@ def analyze_wheel(pth: Path, location, **kwargs):
     record_path = dist_info / "RECORD"
 
     if not record_path.exists():
-        yield Wheel(
+        yield rules.Rule(
+            detection_type="Wheel",
+            location=location.location,
             score = get_score_or_default("wheel-records-missing", 100),
             message = f"Wheel anomaly, RECORD file is missing in dist-info",
             tags = {"anomaly", "wheel", "wheel_missing_records"},
@@ -53,56 +54,81 @@ def analyze_wheel(pth: Path, location, **kwargs):
         )
         return
 
-    with record_path.open(mode="r", newline=os.linesep) as rfd:
-        reader = csv.reader(rfd, delimiter=",", quotechar='"')
-        for record in reader:
-            full_pth = wheel_root.joinpath(record[0])
+    try:
+        with record_path.open(mode="r", newline=os.linesep) as rfd:
+            records_content = rfd.read()
+    except UnicodeDecodeError:
+        with record_path.open(mode="rb") as rfd:
+            records_raw: bytes = rfd.read()
+            records_encoding = chardet.detect(records_raw)["encoding"]
+            records_content = records_raw.decode(records_encoding)
 
-            if not full_pth.exists():
-                yield Wheel(
-                    score=get_score_or_default("wheel-missing-file", 100),
-                    message = "Wheel anomaly detected, file listed in RECORDs but not present in wheel",
-                    tags = {"anomaly", "wheel", "wheel_missing_file"},
-                    extra = {
-                        "record": record[0]
-                    },
-                    signature=f"wheel#missing_file#{record[0]}#{full_pth}"
-                )
-                continue
+    records_io = io.StringIO(records_content)
+    reader = csv.reader(records_io, delimiter=",", quotechar='"')
+    for record in reader:
+        full_pth = wheel_root.joinpath(record[0])
 
-            record_entries.add(full_pth)
-            if full_pth.samefile(record_path):
-                continue
+        if not full_pth.exists():
+            yield rules.Rule(
+                location=location.location,
+                detection_type="Wheel",
+                score=get_score_or_default("wheel-missing-file", 100),
+                message = "Wheel anomaly detected, file listed in RECORDs but not present in wheel",
+                tags = {"anomaly", "wheel", "wheel_missing_file"},
+                extra = {
+                    "record": record[0]
+                },
+                signature=f"wheel#missing_file#{record[0]}#{full_pth}"
+            )
+            continue
 
-            try:
-                alg, checksum = record[1].split("=")
-            except ValueError:  # not enough values to unpack
-                continue
+        record_entries.add(full_pth)
+        if full_pth.samefile(record_path):
+            continue
 
-            target_checksum = get_checksum(alg, full_pth)
-            if target_checksum != checksum:
-                hit = Wheel(
-                    score=get_score_or_default("wheel-invalid-record-checksum", 100),
-                    message="Wheel anomaly detected, invalid record checksum",
-                    tags={"anomaly", "wheel"},
-                    extra={
-                        "real_checksum": target_checksum,
-                        "record_checksum": checksum,
-                        "algorithm": alg
-                    },
-                    signature=f"wheel#record_checksum#{target_checksum}#{full_pth}",
-                )
-                yield hit
+        try:
+            alg, checksum = record[1].split("=")
+        except ValueError:  # not enough values to unpack
+            continue
+        except IndexError:  # Record does not have the `=` sign
+            yield rules.Rule(
+                detection_type="Wheel",
+                location=location.location,
+                message="Malformed record entry",
+                extra = {
+                    "record": record
+                },
+                tags = {"anomaly", "wheel"},
+                signature = f"wheel#malformed_record#{full_pth}#{record}"
+            )
+            continue
 
-            # print(record)
+        target_checksum = get_checksum(alg, full_pth)
+        if target_checksum != checksum:
+            hit = rules.Rule(
+                detection_type="Wheel",
+                location=location.location,
+                score=get_score_or_default("wheel-invalid-record-checksum", 100),
+                message="Wheel anomaly detected, invalid record checksum",
+                tags={"anomaly", "wheel"},
+                extra={
+                    "real_checksum": target_checksum,
+                    "record_checksum": checksum,
+                    "algorithm": alg
+                },
+                signature=f"wheel#record_checksum#{target_checksum}#{location.strip(full_pth)}",
+            )
+            yield hit
 
     for x in wheel_root.glob("*/setup.py"):
         hit_path = normalize_path(wheel_root / x)
-        hit = Wheel(
+        hit = rules.Rule(
+            detection_type="Wheel",
+            location=location.location,
             score=get_score_or_default("wheel-contain-setup-py", 100),
             message="Found setup.py in a wheel archive",
             tags={"wheel", "anomaly", "setup.py"},
-            signature=f"wheel#setup.py#{hit_path}",
+            signature=f"wheel#setup.py#{location.strip(hit_path)}",
         )
         yield hit
 
@@ -112,13 +138,15 @@ def analyze_wheel(pth: Path, location, **kwargs):
             continue
 
         if x not in record_entries:
-            hit = Wheel(
+            hit = rules.Rule(
+                detection_type="Wheel",
+                location=location.location,
                 score=get_score_or_default("wheel-file-not-listed-in-records", 10),
                 message="Wheel contain a file not listed in the RECORDs",
                 extra={
                     "record": location.strip(x)  #TODO: normalize path
                 },
                 tags={"wheel", "anomaly", "missing_record_file"},
-                signature=f"wheel#missing_record_file#{x}",
+                signature=f"wheel#missing_record_file#{location.strip(x)}",
             )
             yield hit

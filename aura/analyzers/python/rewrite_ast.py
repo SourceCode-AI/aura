@@ -19,14 +19,9 @@ class ASTRewrite(Visitor):
             self.string_slice,
             self.decode_inline_base64,
             self.rewrite_function_call,
+            self.replace_string,
         )
         super().__init__(**kwargs)
-
-    def load_tree(self, source):
-        if self.tree is None:
-            cached = ASTVisitor.from_cache(source=source, metadata=self.metadata)
-            self.tree = cached.tree
-            del cached
 
     def _visit_node(self, context):
         for mutation in self.__mutations:
@@ -92,6 +87,7 @@ class ASTRewrite(Visitor):
             # Replace attributes such as x.decode("base64") to "test".decode("base64")
 
             source = context.node.source
+
             try:
                 target = context.stack[source]
             except (TypeError, KeyError):
@@ -195,3 +191,44 @@ class ASTRewrite(Visitor):
         elif not (isinstance(node.func, str) and node.func == "self"):
             # TODO
             return
+
+    def replace_string(self, context):  # TODO: add test
+        """
+        Rewrites an expression `"some_string".replace("s", "a")`
+        AST structure:
+
+        ::
+            aura.analyzers.python.nodes.Call(
+              func=aura.analyzers.python.nodes.Attribute(
+                source=aura.analyzers.python.nodes.String(value='some_string'),
+                attr='replace',
+                action='Load'
+              ),
+              args=[
+                aura.analyzers.python.nodes.String(value='s'),
+                aura.analyzers.python.nodes.String(value='a')
+              ],
+              kwargs={}
+            )
+        """
+        # We are looking for a function call
+        if type(context.node) != Call:
+            return
+        # Function target is an attribute with `replace` attribute name
+        func: Attribute = context.node.func
+        if not (type(func) == Attribute and func.attr == "replace"):
+            return
+
+        replace_source = func.source
+        # Source of the replace must be String
+        if type(replace_source) != String:
+            return
+
+        # Check that replace args are also strings
+        if len(context.node.args) < 2 or type(context.node.args[0]) != String or type(context.node.args[1]) != String:
+            return
+
+        # Rewrite the node by applying the replace operation
+        # TODO: check docs if replace takes additional (kw)arguments
+        data = str(replace_source).replace(str(context.node.args[0]), str(context.node.args[1]))
+        context.replace(String(value=data))

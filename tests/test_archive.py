@@ -4,21 +4,25 @@ import zipfile
 import tarfile
 import tempfile
 
+from aura.analyzers.rules import Rule
 from aura.analyzers import archive
 
 
 def test_suspicious_files():
     ret = archive.is_suspicious(pth='/etc/shadow', location='something')
     assert ret is not None
-    assert isinstance(ret, archive.SuspiciousArchiveEntry)
+    # TODO: add fuzzy rule match
+    assert isinstance(ret, Rule)
 
     ret = archive.is_suspicious(pth='test/../../../../../../etc/shadow', location='something')
     assert ret is not None
-    assert isinstance(ret, archive.SuspiciousArchiveEntry)
+    # TODO: add fuzzy rule match
+    assert isinstance(ret, Rule)
 
     ret = archive.is_suspicious('pkg-dist/RECORDS', location='something')
     assert ret is None
-    assert not isinstance(ret, archive.SuspiciousArchiveEntry)
+    # TODO: add fuzzy rule match
+    assert not isinstance(ret, Rule)
 
 
 def test_zip_extractor(fixtures):

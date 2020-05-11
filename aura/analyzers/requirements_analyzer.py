@@ -4,7 +4,6 @@ import codecs
 import sys
 import locale
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Optional, Generator, List, Tuple, Text
 
 import chardet
@@ -13,6 +12,7 @@ from pkg_resources import RequirementParseError
 
 from .rules import Rule
 from ..utils import Analyzer
+from ..uri_handlers.base import ScanLocation
 from ..config import get_score_or_default
 from ..exceptions import NoSuchPackage
 from .. import package
@@ -32,7 +32,7 @@ BOMS: List[Tuple[bytes, Text]] = [
 ]
 
 
-
+# TODO: normalize Rules below
 @dataclass
 class OutdatedRequirement(Rule):
     __hash__ = Rule.__hash__
@@ -107,16 +107,16 @@ def check_outdated(requirement, path) -> Optional[OutdatedRequirement]:
 
 
 @Analyzer.ID("requirements_file_analyzer")
-def analyze_requirements_file(pth: Path, metadata: dict, **kwargs) -> Generator[Rule, None, None]:
+def analyze_requirements_file(*, location: ScanLocation) -> Generator[Rule, None, None]:
     """
     Analyzer the requirements.txt file and lookup for outdated packages
     """
-    if not FILENAME.match(os.fspath(pth)):
+    if not FILENAME.match(os.fspath(location.location)):
         return
 
-    norm_pth = os.fspath(metadata.get("normalized_path") or pth)
+    norm_pth = str(location)
 
-    with pth.open("rb") as fd:
+    with location.location.open("rb") as fd:
         decoded = auto_decode(fd.read())
 
     for idx, req_line in enumerate(decoded.split("\n")):

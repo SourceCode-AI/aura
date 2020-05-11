@@ -10,7 +10,7 @@ import shutil
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Union
+from typing import Union, Optional
 from warnings import warn
 
 import pkg_resources
@@ -94,14 +94,20 @@ class ScanLocation(KeepRefs):
     strip_path: str = ""
 
     def __post_init__(self):
-        self.location = Path(self.location)
+        if type(self.location) == str:
+            self.__str_location = self.location
+            self.location = Path(self.location)
+        else:
+            self.__str_location = os.fspath(self.location)
+
+        self.__str_parent = None
 
         if self.metadata.get("depth") is None:
             self.metadata["depth"] = 0
             warn("Depth is not set for the scan location", stacklevel=2)
 
         if self.location.is_file():
-            self.metadata["mime"] = magic.from_file(os.fspath(self.location), mime=True)
+            self.metadata["mime"] = magic.from_file(self.str_location, mime=True)
 
             if self.metadata["mime"] in ("text/plain", "application/octet-stream"):
                 self.metadata["mime"] = mimetypes.guess_type(self.location)[0]
@@ -112,7 +118,24 @@ class ScanLocation(KeepRefs):
                     self.metadata["py_imports"] = imports
 
     def __str__(self):
-        return self.strip(self.location)
+        return self.strip(self.str_location)
+
+    @property
+    def str_location(self) -> str:
+        return self.__str_location
+
+    @property
+    def str_parent(self) -> Optional[str]:
+        if self.parent is None:
+            return None
+
+        if self.__str_parent is None:
+            if type(self.parent) == str:
+                self.__str_parent = self.parent
+            else:
+                self.__str_parent = os.fspath(self.parent)
+
+        return self.__str_parent
 
     @property
     def filename(self) -> Union[str, None]:
@@ -120,6 +143,10 @@ class ScanLocation(KeepRefs):
             return self.location.name
         else:
             return None
+
+    @property
+    def is_python_source_code(self) -> bool:
+        return (self.metadata["mime"] == "text/x-python")
 
     def create_child(self, new_location: Union[str, Path], metadata=None, **kwargs) -> ScanLocation:
         if metadata is None:
@@ -172,7 +199,7 @@ class ScanLocation(KeepRefs):
         :param target: Path to replace/strip
         :return: normalized path
         """
-        target = os.fspath(target)
+        target: str = os.fspath(target)
 
         if self.strip_path and target.startswith(self.strip_path):
             size = len(self.strip_path)
@@ -182,7 +209,8 @@ class ScanLocation(KeepRefs):
             target = target[size:]
 
         if self.parent:
-            target = os.fspath(self.parent) + "$" + target
+            if not target.startswith(self.str_parent):  # Target might be already stripped
+                target = self.str_parent + "$" + target
 
         return target
 
@@ -201,10 +229,14 @@ class ScanLocation(KeepRefs):
                 extra = {
                     "reason": "max_depth"
                 },
-                signature = f"data_processing#max_depth#{os.fspath(self.location)}"
+                signature = f"data_processing#max_depth#{str(self)}"
             )
 
         return True
+
+    def pprint(self):
+        from prettyprinter import pprint as pp
+        pp(self)
 
 
 def cleanup_locations():

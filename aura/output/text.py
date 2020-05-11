@@ -1,4 +1,8 @@
-from click import secho
+import re
+from textwrap import shorten, wrap
+from prettyprinter import pformat
+
+from click import echo, secho, style
 
 from ..analyzers.rules import ModuleImport
 from .. import utils
@@ -6,7 +10,55 @@ from ..exceptions import MinimumScoreNotReached
 from .base import AuraOutput
 
 
+# Reference for unicode box characters:
+# https://jrgraphix.net/r/Unicode/2500-257F
+
+class PrettyReport:
+    STRIP_ANSI_RE = re.compile(r"""
+    \x1b     # literal ESC
+    \[       # literal [
+    [;\d]*   # zero or more digits or semicolons
+    [A-Za-z] # a letter
+    """, re.VERBOSE).sub
+
+    def __init__(self, width=80):
+        self.width = width  # TODO: add config option
+
+    @classmethod
+    def ansi_length(cls, line:str):
+        return len(cls.STRIP_ANSI_RE("", line))
+
+    def print_separator(self, sep="\u2504", left="\u251C", right="\u2524"):
+        secho(f"{left}{sep*(self.width-2)}{right}")
+
+    def align(self, line, pos=-1, left="\u2502 ", right=" \u2502"):
+        content_len = self.ansi_length(line)
+        remaining_len = self.width - len(left) - len(right)
+
+        if content_len > remaining_len:
+            line = shorten(line, remaining_len)
+
+        if pos == -1:
+            line = line + " "*(remaining_len-content_len)
+        else:
+            line = " "*(remaining_len-content_len) + line
+
+        echo(f"{left}{line}{right}")
+
+    def wrap(self, text, left="\u2502 ", right=" \u2502"):
+        remaining_len=self.width - len(left) - len(right)
+        for line in wrap(text, width=remaining_len):
+            self.align(line, left=left, right=right)
+
+    def pformat(self, obj, left="\u2502 ", right=" \u2502"):
+        remaining_len = self.width - len(left) - len(right)
+        for line in pformat(obj, width=remaining_len).splitlines(False):
+            self.align(line, left=left, right=right)
+
+
 class TextOutput(AuraOutput):
+    formatter = PrettyReport()
+
     def output(self, hits):
         hits = set(hits)
         imported_modules = {h.name for h in hits if isinstance(h, ModuleImport)}
@@ -45,9 +97,36 @@ class TextOutput(AuraOutput):
         if hits:
             secho("Detections:")
             for h in hits:
-                secho(f" * {h._asdict()}")
+                self._format_detection(h._asdict())
         else:
             secho("No detections has been triggered", fg="red", bold=True)
+
+    def _format_detection(self, hit):
+        out = self.formatter
+        out.print_separator(left="\u2552", sep="\u2550", right="\u2555")
+        out.align(style(hit["type"], "green", bold=True))
+        out.print_separator()
+        out.wrap(hit["message"])
+        out.print_separator()
+
+        if hit.get('line_no') or hit.get('location'):
+            line_info = f"Line {style(str(hit.get('line_no', 'N/A')), 'blue', bold=True)}"
+            line_info += f" at {style(hit['location'], 'blue', bold=True)}"
+            out.align(line_info)
+
+        if hit.get('line'):
+            out.align(style(hit["line"], "cyan"))
+        out.print_separator()
+
+        score = f"Score: {style(str(hit['score']), 'blue', bold=True)}"
+        if hit.get('informational'):
+            score += ", informational"
+        out.align(score)
+
+        out.align(f"Tags: {', '.join(hit.get('tags', []))}")
+        out.align("Extra:")
+        out.pformat(hit.get('extra', {}))
+        out.print_separator(left="\u2558", sep="\u2550", right="\u255B")
 
     def output_diff(self, diffs):
         for diff in diffs:

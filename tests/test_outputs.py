@@ -6,7 +6,11 @@ import sqlite3
 import pytest
 
 
-def test_output_formats(fixtures, fuzzy_rule_match):
+def test_output_formats(fixtures):
+    """
+    Test different output formats
+    """
+
     scan_path = fixtures.path('flask_app.py')
 
     # Test plain text output
@@ -93,3 +97,39 @@ def test_output_not_created_when_below_minimum_score(output_type, fixtures):
 
         for keyword in ("os.system", "eval", "__reduce__"):
             assert keyword not in cli.stdout, (keyword, cli.stdout)
+
+
+@pytest.mark.parametrize(
+    "scan_file",
+    (
+        "djamgo-0.0.1-py3-none-any.whl",
+        "evil.tar.gz",
+        "misc.py",
+        "r.tar.gz",
+        "malformed_xmls/bomb.xml"
+    )
+)
+def test_output_path_formatting(scan_file, fixtures):
+    """
+    Test that in the output, the paths have correct output formats:
+    - Archives have $ denoting the path afterwards indicate the path in the archive
+    - Paths should not contain parts of a temporary directory
+    """
+    temp_prefix = tempfile.gettempdir()
+    output = fixtures.scan_test_file(scan_file)["hits"]
+
+    for hit in output:
+        location: str = hit.get("location")
+        signature: str = hit["signature"]
+        if not location:
+            continue
+
+        # Check that the location does not expose temporary directory used by aura
+        assert not location.startswith(temp_prefix)
+        # Location should never end only with $ which is special character in aura indicating path inside the archive
+        # `$` should always be followed by a path
+        assert not location.endswith(f"$")
+        # Having scan_file multiple times in a location might indicate a problem with stripping path via parent
+        assert location.count(scan_file) <= 1
+        # Signatures also should not contain any temporary paths
+        assert temp_prefix not in signature

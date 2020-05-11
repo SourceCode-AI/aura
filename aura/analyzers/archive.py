@@ -25,18 +25,12 @@ SUPPORTED_MIME = (
 logger = config.get_logger(__name__)
 
 
-@dataclass
-class SuspiciousArchiveEntry(Rule):
-    __hash__ = Rule.__hash__
 
-
-@dataclass
 class ArchiveAnomaly(Rule):
-    __hash__ = Rule.__hash__
-
     @classmethod
     def from_generic_exception(cls, location: ScanLocation, exc: Exception):
         return cls(
+            detection_type=cls.__name__,
             location = location.location,
             message="Could not open the archive for analysis",
             signature=f"archive_anomaly#read_error#{location.location}",
@@ -54,7 +48,9 @@ def is_suspicious(pth, location):
     norm = utils.normalize_path(pth)
 
     if pth.startswith("/"):
-        return SuspiciousArchiveEntry(
+        return Rule(
+            message = "Archive contains an absolute path item",
+            detection_type="SuspiciousArchiveEntry",
             location=utils.normalize_path(location),
             signature=f"suspicious_archive_entry#absolute_path#{norm}#{location}",
             extra={"entry_type": "absolute_path", "entry_path": norm},
@@ -62,7 +58,9 @@ def is_suspicious(pth, location):
         )
 
     elif any(x == ".." for x in Path(pth).parts):
-        return SuspiciousArchiveEntry(
+        return Rule(
+            message = "Archive contains an item with parent reference",
+            detection_type="SuspiciousArchiveEntry",
             location=utils.normalize_path(location),
             signature=f"suspicious_archive_entry#parent_reference#{norm}#{location}",
             extra={"entry_type": "parent_reference", "entry_path": norm},
@@ -74,7 +72,7 @@ def is_suspicious(pth, location):
 
 def filter_zip(
     arch: zipfile.ZipFile, path, max_size=None
-) -> Generator[Union[zipfile.ZipInfo, ArchiveAnomaly], None, None]:
+) -> Generator[Union[zipfile.ZipInfo, Rule], None, None]:
     if max_size is None:
         max_size = config.get_maximum_archive_size()
 
@@ -104,7 +102,7 @@ def filter_zip(
 
 def filter_tar(
     arch: tarfile.TarFile, path, max_size=None
-) -> Generator[Union[tarfile.TarInfo, ArchiveAnomaly], None, None]:
+) -> Generator[Union[tarfile.TarInfo, Rule], None, None]:
     if max_size is None:
         config.get_maximum_archive_size()
 
@@ -142,7 +140,7 @@ def filter_tar(
             continue
 
 
-def process_zipfile(path, tmp_dir) -> Generator[ArchiveAnomaly, None, None]:
+def process_zipfile(path, tmp_dir) -> Generator[Rule, None, None]:
     with zipfile.ZipFile(file=path, mode="r") as fd:
         for x in filter_zip(arch=fd, path=path):
             if isinstance(x, zipfile.ZipInfo):
@@ -151,7 +149,7 @@ def process_zipfile(path, tmp_dir) -> Generator[ArchiveAnomaly, None, None]:
                 yield x
 
 
-def process_tarfile(path, tmp_dir) -> Generator[ArchiveAnomaly, None, None]:
+def process_tarfile(path, tmp_dir) -> Generator[Rule, None, None]:
     with tarfile.open(name=path, mode="r:*") as fd:
         for x in filter_tar(arch=fd, path=path):
             if isinstance(x, tarfile.TarInfo):
@@ -160,7 +158,7 @@ def process_tarfile(path, tmp_dir) -> Generator[ArchiveAnomaly, None, None]:
                 yield x
 
 
-def archive_analyzer(*, location: ScanLocation, **kwargs):
+def archive_analyzer(*, location: ScanLocation):
     """
     Archive analyzer that looks for suspicious entries and unpacks the archive for recursive analysis
     """
@@ -186,7 +184,7 @@ def archive_analyzer(*, location: ScanLocation, **kwargs):
             yield from process_tarfile(path=location.location, tmp_dir=tmp_dir)
         else:
             return
-    except (tarfile.ReadError, zipfile.BadZipFile) as exc:
+    except (tarfile.ReadError, zipfile.BadZipFile, EOFError) as exc:
         yield ArchiveAnomaly.from_generic_exception(location, exc)
 
 

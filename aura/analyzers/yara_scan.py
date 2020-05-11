@@ -2,14 +2,14 @@
 
 import os
 import time
-from dataclasses import dataclass, field
-from pathlib import Path
 
 
 from .base import AnalyzerDeactivated
 from .rules import Rule
+from ..uri_handlers.base import ScanLocation
 from ..utils import Analyzer
 from .. import config
+
 
 rules = None
 yara = None
@@ -32,46 +32,28 @@ except yara.Error:
 logger = config.get_logger(__name__)
 
 
-@dataclass
-class YaraMatch(Rule):
-    rule: str = ""
-    strings: tuple = ()
-    meta: dict = field(default_factory=dict)
-
-    def _asdict(self):
-        d = {"rule": self.rule, "strings": self.strings}
-
-        if self.meta:
-            d["metadata"] = self.meta
-
-        d.update(Rule._asdict(self))
-        return d
-
-    def __hash__(self):
-        if self._hash is None:
-            self._hash = hash((self.rule, self.strings))
-
-        return self._hash
-
-
 @Analyzer.ID("yara")
-def analyze(pth: Path, metadata, **kwargs):
+def analyze(*, location: ScanLocation):
     """Run Yara rules on all input files recursively"""
-    pth = os.fspath(pth)
+    loc = str(location)
     start = time.time()
 
-    for m in rules.match(pth, timeout=10):
-        strings = set(x[-1] for x in m.strings)
-        # FIXME: Change to use extra instead for format normalization
-        hit = YaraMatch(
-            rule=m.rule,
-            strings=tuple(strings),
-            meta=m.meta,
-            tags=set(m.tags),
-            location=metadata["normalized_path"]
+    for m in rules.match(os.fspath(location.location), timeout=10):
+        strings = tuple(set(x[-1] for x in m.strings))
+        hit = Rule(
+            detection_type = "YaraMatch",
+            message = f"Yara match '{m.rule}' signature",
+            signature = f"yara#{location}#{m.rule}#{hash(strings)}",
+            location = loc,
+            extra = {
+                "rule": m.rule,
+                "strings": strings,
+                "meta": m.meta,
+            },
+            tags = set(m.tags)
         )
         yield hit
 
     end = time.time() - start
     if end >= 1:
-        logger.info(f"Yara scan of {pth} took {end} s")
+        logger.info(f"Yara scan of {loc} took {end} s")

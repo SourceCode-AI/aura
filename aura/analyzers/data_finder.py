@@ -5,7 +5,6 @@ import re
 import os
 import base64
 import binascii
-from dataclasses import dataclass
 
 from . import rules
 from .base import NodeAnalyzerV2
@@ -14,27 +13,9 @@ from ..pattern_matching import PatternMatcher
 from .. import config
 
 
-URL_REGEX = re.compile(r"^(http|ftp)s?://.+")
 BASE64_REGEX = re.compile(
     r"^([A-Za-z0-9+\/]{4}){12,}([A-Za-z0-9+\/]{2}==|[A-Za-z0-9+\/]{3}=)?\b$"
 )
-
-
-@dataclass
-class URL(rules.Rule):
-    message = "URL found"
-    __hash__ = rules.Rule.__hash__
-
-
-@dataclass
-class Base64Blob(rules.Rule):
-    message = "Base64 data blob found"
-    __hash__ = rules.Rule.__hash__
-
-
-@dataclass
-class StringMatch(rules.Rule):
-    __hash__ = rules.Rule.__hash__
 
 
 @Analyzer.ID("data_finder")
@@ -44,23 +25,15 @@ class DataFinder(NodeAnalyzerV2):
         val = context.node.value
         pth = os.fspath(context.visitor.normalized_path)
 
-        if URL_REGEX.match(val):  # TODO: Remove and move to string finder
-            yield URL(
-                node=context.node,
-                line_no=context.node.line_no,
-                score=config.get_score_or_default("url", 0),
-                tags={"url",},
-                extra={"url": val},
-                signature=f"data_finder#url#{hash(val)}#{hash(pth)}",
-            )
-        elif BASE64_REGEX.match(val):
+        if BASE64_REGEX.match(val):
             try:
                 result = base64.b64decode(val)
                 result = result.decode("utf-8")
 
-                yield Base64Blob(
+                yield rules.Rule(
+                    detection_type="Base64Blob",
+                    message="Base64 data blob found",
                     node=context.node,
-                    line_no=context.node.line_no,
                     score=config.get_score_or_default("base-64-blob", 0),
                     tags={"base64",},
                     extra={"base64_decoded": result},
@@ -81,14 +54,18 @@ class StringFinder(NodeAnalyzerV2):
         value = str(context.node)
 
         for hit in PatternMatcher.find_matches(value, compiled):
-            # TODO: define some kind of _id to embed into the signature below
-            output = StringMatch(
+            output = rules.Rule(
+                detection_type="StringMatch",
                 message=hit.message,
                 extra={
+                    "signature_id": hit._signature["id"],
                     "string": value
                 },
-                signature=f"string_finder#{value}/{context.node.line_no}#{context.visitor.normalized_path}",
-                score=hit._signature.get("score", 0)
+                signature=f"string_finder#{hit._signature['id']}#{value}#{context.visitor.normalized_path}/{context.node.line_no}",
+                score=hit._signature.get("score", 0),
+                node=context.node,
+                #location=context.visitor.path,
+                tags=set(hit._signature.get("tags", []))
             )
             yield output
 

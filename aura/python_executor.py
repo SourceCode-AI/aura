@@ -40,6 +40,7 @@ def run_with_interpreters(*, metadata=None, **kwargs):
 
     interpreters = list(config.CFG["interpreters"].items())
     for name, interpreter in interpreters:
+        # If interpreter is not directly an executable, find out it's location via `witch` lookup
         if not os.path.isfile(interpreter):
             interpreter = which(interpreter)
 

@@ -13,11 +13,17 @@ class FunctionCall(Rule):
 class FunctionCallAnalyzer(NodeAnalyzerV2):
     """Match signatures defined for function calls against passed arguments"""
 
+    def __init__(self, *args, **kwargs):
+        super(FunctionCallAnalyzer, self).__init__(*args, **kwargs)
+
+        self.__function_defs = []
+        for func_def in config.SEMANTIC_RULES.get("function_definitions", []):
+            self.__function_defs.append(pattern_matching.FunctionDefinitionPattern(func_def))
+
     def node_Call(self, context):
-        for s in config.SEMANTIC_RULES.get("function_definitions", []):
-            sig = pattern_matching.FunctionDefinitionPattern(s)
+        for sig in self.__function_defs:
             match = sig.match(context.node)
-            if match is None:
+            if match is not True:
                 continue
 
             sig_id = sig.signature.get("_id") or sig.signature["name"]
@@ -25,7 +31,6 @@ class FunctionCallAnalyzer(NodeAnalyzerV2):
             hit = FunctionCall(
                 score = sig.signature.get("score", 0),
                 message = sig.signature["message"],
-                line_no = context.node.line_no,
                 node=context.node,
                 tags=set(sig.signature.get("tags", [])),
                 extra = {

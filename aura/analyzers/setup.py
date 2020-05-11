@@ -14,11 +14,6 @@ from .. import config
 logger = config.get_logger(__name__)
 
 
-@dataclass
-class SetupScript(rules.Rule):
-    __hash__ = rules.Rule.__hash__
-
-
 @Analyzer.ID("setup_py")
 class SetupPy(NodeAnalyzerV2):
     """Audit setup.py file for anomalies such as code execution or network communication"""
@@ -31,11 +26,11 @@ class SetupPy(NodeAnalyzerV2):
 
     def node_Call(self, context):
         if context.node.cached_full_name == "setuptools.setup":
-            self.__parse_setup(context.node)
+            self.__parse_setup(context)
 
         yield from []
 
-    def __parse_setup(self, node: Call):
+    def __parse_setup(self, context):
         # Extract basic package identifiers
         copy_fields = ("name", "version", "description", "url")
 
@@ -43,17 +38,17 @@ class SetupPy(NodeAnalyzerV2):
 
         for x in copy_fields:
             # Convert basic fields into string
-            if x in node.kwargs:
-                parsed[x] = self.__as_str(node.kwargs[x])
+            if x in context.node.kwargs:
+                parsed[x] = self.__as_str(context.node.kwargs[x])
 
-        if node.kwargs.get("cmdclass"):
-            parsed.update(self.__parse_cmdclass(node))
+        if context.node.kwargs.get("cmdclass"):
+            parsed.update(self.__parse_cmdclass(context))
 
         pkgs = []
-        if isinstance(node.kwargs.get("packages"), list):
-            pkgs = [self.__as_str(x) for x in node.kwargs["packages"]]
-        elif isinstance(node.kwargs.get("packages"), str):
-            pkgs = [node.kwargs["packages"]]
+        if isinstance(context.node.kwargs.get("packages"), list):
+            pkgs = [self.__as_str(x) for x in context.node.kwargs["packages"]]
+        elif isinstance(context.node.kwargs.get("packages"), str):
+            pkgs = [context.node.kwargs["packages"]]
 
         for pkg in pkgs:
             parsed["packages"].append(pkg)
@@ -61,15 +56,20 @@ class SetupPy(NodeAnalyzerV2):
             if isinstance(parsed.get("name"), str) and not self.__check_name(
                 parsed["name"], pkg
             ):
-                sig = SetupScript(
+                sig = rules.Rule(
+                    detection_type="SetupScript",
                     score=100,
                     message=f"Package '{parsed['name']}' is installed under different name: '{pkg}'",
                     signature=f"setup_analyzer#pkg_name_mismatch#{parsed['name']}#{pkg}",
                 )
                 self.hits.append(sig)
 
-        main_sig = SetupScript(
-            score=0, message="Setup script found", extra={"parsed": parsed}
+        main_sig = rules.Rule(
+            detection_type="SetupScript",
+            score=0,
+            message="Setup script found", extra={"parsed": parsed},
+            signature=f"setup_analyzer#setup_script#{context.visitor.normalized_path}#{context.node.line_no}",
+            node=context.node
         )
         self.hits.append(main_sig)
 
@@ -87,7 +87,8 @@ class SetupPy(NodeAnalyzerV2):
 
         for x in analyzer.hits:
             if x.__class__.__name__ == "FunctionCall" and "code_execution" in x.tags:
-                sig = SetupScript(
+                sig = rules.Rule(
+                    detection_type="SetupScript",
                     score=100,
                     message="Code execution capabilities found in a setup.py script",
                     tags=x.tags,
@@ -97,10 +98,11 @@ class SetupPy(NodeAnalyzerV2):
                 )
 
                 analyzer.hits.append(sig)
-            elif isinstance(x, rules.ModuleImport) and (
-                "network" in x.categories or "network" in x.tags
-            ):
-                sig = SetupScript(
+            elif isinstance(x, rules.Rule) and (
+                "network" in x.extra.get("categories", []) or "network" in x.tags
+            ):  # TODO: refactor this elif condition for categories
+                sig = rules.Rule(
+                    detection_type="SetupScript",
                     score=100,
                     message="Imported module with network communication capabilities in a setup.py script",
                     tags=x.tags,
@@ -110,26 +112,26 @@ class SetupPy(NodeAnalyzerV2):
                 )
                 analyzer.hits.append(sig)
 
-    def __parse_cmdclass(self, node):
+    def __parse_cmdclass(self, context):
         parsed = {}
-        if isinstance(node.kwargs["cmdclass"], Dictionary):
+        if isinstance(context.node.kwargs["cmdclass"], Dictionary):
             parsed["install_hooks"] = [
-                self.__as_str(x) for x in node.kwargs["cmdclass"].keys
+                self.__as_str(x) for x in context.node.kwargs["cmdclass"].keys
             ]
 
             if "install" in parsed["install_hooks"]:
-                sig = SetupScript(
+                sig = rules.Rule(
+                    detection_type="SetupScript",
                     score=500,
                     message="Setup script hooks to the `setup.py install` command.",
+                    tags={"setup.py", "install_hook"},
+                    signature=f"setup_analyzer#install_hook#{context.visitor.normalized_path}#{context.node.line_no}",
+                    node=context.node
                 )
 
                 self.hits.append(sig)
         else:
-            sig = SetupScript(
-                score=500,
-                message=f"Unknown setup hook, please report a bug: {node.kwargs['cmdclass']}",
-            )
-            self.hits.append(sig)
+            logger.info(f"Unknown setup hook: {context.node.kwargs['cmdclass']}")
 
         return parsed
 

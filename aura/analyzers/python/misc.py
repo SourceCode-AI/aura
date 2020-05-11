@@ -39,18 +39,29 @@ class MiscAnalyzer(base.NodeAnalyzerV2):
         # https://github.com/dlint-py/dlint/blob/master/docs/linters/DUO138.md
         # https://github.com/dlint-py/dlint/blob/master/dlint/linters/bad_re_catastrophic_use.py
 
-        if detect_redos.catastrophic(val):
-            hit = Rule(
-                message = "Possible catastrophic ReDoS",
-                extra = {
-                    "type": "redos",
-                    "regex": val,
+        try:
+            if detect_redos.catastrophic(val):
+                hit = Rule(
+                    message = "Possible catastrophic ReDoS",
+                    extra = {
+                        "type": "redos",
+                        "regex": val,
+                    },
+                    signature = f"misc#redos#{context.visitor.normalized_path}#{context.node.line_no}",
+                    node=context.node,
+                    tags={"redos"}
+                )
+                yield hit
+        except RecursionError:
+            yield Rule(
+                detection_type="Misc",
+                message="Recursion limit exceeded when scanning regex pattern for ReDoS",
+                extra={
+                    "regex": val
                 },
-                signature = f"misc#redos#{context.visitor.normalized_path}#{context.node.line_no}",
-                line_no=context.node.line_no,
+                signature=f"misc#redos_recursion_error#{context.visitor.normalized_path}#{context.node.line_no}",
                 node=context.node
             )
-            yield hit
 
     def node_FunctionDef(self, context):
         if type(context.node.name) != str:

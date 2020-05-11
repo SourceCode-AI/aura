@@ -95,15 +95,32 @@ def get_score_or_default(score_type: str, fallback: int) -> int:
     return int(CFG.get("score", score_type, fallback=fallback))
 
 
+def find_configuration():
+    pth = Path(os.environ.get("AURA_CFG", "config.ini"))
+    if pth.is_absolute():
+        return pth
+
+    cwd = Path.cwd()
+    while cwd not in (cwd.root, cwd.drive):
+        if (cwd / pth).exists():
+            return cwd/pth
+        else:
+            cwd = cwd.parent
+
+    return pth
+
+
 def load_config():
     global SEMANTIC_RULES, CFG, CFG_PATH
-    pth = Path(os.environ.get("AURA_CFG", "config.ini"))
+    pth = find_configuration()
     if pth.is_dir():
         pth /= "config.ini"
 
     if not pth.is_file():
         logger.fatal(f"Invalid configuration path: {pth}")
         sys.exit(1)
+
+    logger.debug(f"Aura configuration located at {pth}")
 
     CFG_PATH = os.fspath(pth)
     CFG.read(pth)
@@ -136,7 +153,7 @@ def load_config():
     logging.basicConfig(
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.ERROR
     )
-    logger.setLevel(log_level)
+    configure_logger(log_level)
 
     if not sys.warnoptions:
         w_filter = CFG.get("aura", "warnings", fallback="default")
@@ -151,7 +168,9 @@ def load_config():
         fsize = int(CFG["aura"]["rlimit-fsize"])
         resource.setrlimit(resource.RLIMIT_FSIZE, (fsize, fsize))
 
-    if CFG["aura"].get("python-recursion-limit"):
+    if "AURA_RECURSION_LIMIT" in os.environ:
+        sys.setrecursionlimit(int(os.environ["AURA_RECURSION_LIMIT"]))
+    elif CFG["aura"].get("python-recursion-limit"):
         rec_limit = int(CFG["aura"]["python-recursion-limit"])
         sys.setrecursionlimit(rec_limit)
 

@@ -77,9 +77,8 @@ def scan_worker(item: ScanLocation, metadata: dict) -> list:
         logger.error(f"Location '{item.location}' does not exists. Skipping")
         return []
 
-    sandbox = Analyzer(location=item.location)
-
-    hits = sandbox.run(strip_path=item.location.parent, metadata=item_metadata)
+    sandbox = Analyzer(location=item)
+    hits = sandbox.run()
     return hits
 
 
@@ -160,7 +159,9 @@ def parse_ast(path: Union[str, Path], stages=None):
 
     meta = {"path": path, "source": "cli"}
 
-    v = Visitor.run_stages(metadata=meta, stages=stages)
+    location = ScanLocation(location=path, metadata=meta)
+
+    v = Visitor.run_stages(location=location, stages=stages)
 
     tree = json.dumps(v.tree["ast_tree"], default=utils.json_encoder, indent=2)
     print(tree)
@@ -202,14 +203,6 @@ def info():
         status = "enabled" if t else "Disabled - Token not found"
         click.secho(f" {OK if t else NOK} {v}: {status}", fg=fg)
 
-        try:
-            from google.cloud import bigquery
-
-            client = bigquery.Client()
-            client.get_service_account_email(retry=0)
-            click.secho(f" {OK} BigQuery: enabled", fg="green")
-        except Exception:
-            click.secho(f" {NOK} BigQuery: disabled", fg="red")
 
     if config.get_relative_path("pypi_stats").is_file():
         click.secho(
@@ -224,20 +217,19 @@ def info():
 
 
 def fetch_pypi_stats(out):
-    try:
-        typos.generate_stats(out)
-    except exceptions.PluginDisabled as exc:
-        logger.error(exc.args[0])
-        sys.exit(1)
+    STATS_CDN_URL = "https://cdn.sourcecode.ai/datasets/typosquatting/pypi_stats.json"
+
+    utils.download_file(STATS_CDN_URL, out)
 
 
 def generate_typosquatting(out, distance=2, limit=None):
     f = partial(typos.damerau_levenshtein, max_distance=distance)
     pth = config.get_relative_path("pypi_stats")
     for num, (x, y) in enumerate(typos.enumerator(typos.generate_popular(pth), f)):
-        out.write(json.dumps({"original": x, "typosquatting": y}) + "\n")
         if limit and num >= limit:
             break
+
+        out.write(json.dumps({"original": x, "typosquatting": y}) + "\n")
 
 
 def generate_r2c_input(out_file):
@@ -271,18 +263,6 @@ def generate_r2c_input(out_file):
             }
         )
     )
-
-    # lm = mirror.LocalMirror()
-    # for x in lm.list_packages():
-    #     pkg = lm.get_json(x.name)
-    #
-    #     urls = []
-    #     for u in pkg.get('urls', []):
-    #         urls.append(u['url'])
-    #
-    #     if urls:
-    #         record = {f'https://pypi.org/project/{x.name}': urls}
-    #         out_file.write(json.dumps(record) + '\n')
 
 
 def r2c_scan(source, out_file, mode="generic"):

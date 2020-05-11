@@ -9,15 +9,6 @@ from .... import config
 
 
 class TaintAnalysis(Visitor):
-
-    def load_tree(self, source: Path):
-        if self.tree is None:
-            cached = ASTRewrite.from_cache(source=source, metadata=self.metadata)
-            if not cached.traversed:
-                cached.traverse()
-            self.tree = cached.tree
-            del cached
-
     def _visit_node(self, context: Context, _isinstance=isinstance):
         if not _isinstance(context.node, ASTNode):
             return
@@ -38,41 +29,58 @@ class TaintAnalysis(Visitor):
             if context.visitor.modified:
                 return
 
-    def __mark_flask_route(self, context, _isinstance=isinstance):
-        if not type(context.node) == FunctionDef:
-            return
+    def __mark_flask_route(self, context):
+        """
+        Mark a function as a flask route by adding an AST node tag
+        Example:
 
-        if not len(context.node.decorator_list) > 0:
-            return
+        ::
+            @app.route("/")
+            def index():
+                return "Hello world"
 
-        for dec in context.node.decorator_list:
-            if (
-                _isinstance(dec, Call)
-                and _isinstance(dec.func, Attribute)
-                and dec.func.attr == "route"
-            ):
-                if "flask_route" not in context.node.tags:
-                    log = TaintLog(
-                        path = self.path,
-                        line_no=context.node.line_no,
-                        message="AST node marked as a Flask route"
-                    )
-                    context.node._taint_log.append(log)
-                    context.node.tags.add("flask_route")
-                    context.visitor.modified = True
-                    return
 
-    def __mark_django_view(self, context, _isinstance=isinstance):
-        if not _isinstance(context.node, FunctionDef):
-            return
-        elif "flask_route" in context.node.tags:
+        index function in this case should be marked as a flask route
+        """
+        if "flask_route" in context.node.tags:
             return
         elif "django_view" in context.node.tags:
             return
 
+        # Node is a function definition
+        if not type(context.node) == FunctionDef:
+            return
+        # Node has at least one decorator
+        if not len(context.node.decorator_list) > 0:
+            return
+
+        # Iterate over decorators
+        for dec in context.node.decorator_list:
+            if (
+                isinstance(dec, Call)
+                and dec.full_name == "flask.Flask.route"
+            ):
+                log = TaintLog(
+                    path = self.path,
+                    line_no=context.node.line_no,
+                    message="AST node marked as a Flask route"
+                )
+                context.node._taint_log.append(log)
+                context.node.tags.add("flask_route")
+                context.visitor.modified = True
+                return
+
+    def __mark_django_view(self, context):
+        if "flask_route" in context.node.tags:
+            return
+        elif "django_view" in context.node.tags:
+            return
+        elif not isinstance(context.node, FunctionDef):
+            return
+
         for r in context.node.return_nodes.values():
             f_name = r.cached_full_name
-            if not _isinstance(f_name, str):
+            if type(f_name) != str:
                 continue
 
             if f_name in config.SEMANTIC_RULES["django_modules"] and f_name.startswith(

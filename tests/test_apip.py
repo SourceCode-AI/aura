@@ -54,7 +54,7 @@ def test_apip():
         venv.create(
             env_dir=venv_dir,
             with_pip=True,
-            # symlinks=True
+            symlinks=True
         )
         # Install apip
         shutil.copy(

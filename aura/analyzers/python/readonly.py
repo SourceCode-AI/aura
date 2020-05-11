@@ -1,43 +1,28 @@
-import os
 import typing
-from pathlib import Path
 
 from .. import rules
-from .taint.visitor import TaintAnalysis
 from .visitor import Visitor
 from .nodes import Context
 
 
 class ReadOnlyAnalyzer(Visitor):
+    stage_name = "read_only"
     hooks = []
 
-    def load_tree(self, source: Path):
-        if self.tree is None:
-            cached = TaintAnalysis.from_cache(source=source, metadata=self.metadata)
-            if not cached.traversed:
-                cached.traverse()
-
-            self.tree = cached.tree
-
-    def __call__(self, pth: Path) -> typing.Iterator[rules.Rule]:
+    def __call__(self) -> typing.Generator[rules.Rule, None, None]:
         if not self.hooks:
             return
-        elif self.kwargs.get("mime") != "text/x-python" and not os.fspath(
-            self.path
-        ).endswith(".py"):
+        elif self.location.metadata["mime"] != "text/x-python":
             return
         try:
-            self.load_tree(source=pth)
-            self.traverse()
-
             for x in self.hooks:
                 x.post_analysis(self)
 
             for x in self.hits:
                 if x.location is None:
-                    x.location = os.fspath(pth)
+                    x.location = self.location.location
 
-            rules.Rule.lookup_lines(self.hits, metadata=self.metadata)
+            rules.Rule.lookup_lines(self.hits, location=self.location)
             yield from self.hits
 
         finally:

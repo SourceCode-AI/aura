@@ -115,7 +115,7 @@ class SQLiteOutput(AuraOutput):
                         h.signature,
                         h.score,
                         hit_data["type"],
-                        json.dumps(hit_data),
+                        json.dumps(hit_data, default=json_encoder),
                         input_id,
                     ),
                 )

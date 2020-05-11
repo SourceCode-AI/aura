@@ -1,6 +1,5 @@
 import json
-import io
-from unittest.mock import MagicMock, Mock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
@@ -31,18 +30,16 @@ def test_distance():
     assert dm == 1
 
 
-def test_typosquatting_generator():
-    typos.get_all_pypi_packages = MagicMock(
-        return_value=[
-            'requests',
-            'requestes',
-            'requests2',
-            'requests3',
-            'request',
-            'grequest',
-        ]
-    )
-
+@patch("aura.typos.get_all_pypi_packages")
+def test_typosquatting_generator(mock):
+    mock.return_value = [
+        'requests',
+        'requestes',
+        'requests2',
+        'requests3',
+        'request',
+        'grequest',
+    ]
 
     runner = CliRunner()
     result = runner.invoke(
@@ -63,36 +60,6 @@ def test_typosquatting_generator():
         assert 'typosquatting' in entry
 
     assert line_count > 0 and line_count <= 10
-
-
-def test_generate_stats():
-    from google.cloud import bigquery
-
-    query_result = [
-        {"package_name": "urllib3", "downloads": 65405956},
-        {"package_name": "pip", "downloads": 54903481},
-        {"package_name": "six", "downloads": 54052080}
-    ]
-
-    bigquery.Client = Mock()
-    instance = bigquery.Client.return_value
-    instance.query.return_value = iter(query_result)
-
-    out_file = io.StringIO()
-    typos.generate_stats(out_file, limit=2)
-
-    instance.query.assert_called_once()
-
-    out_value = out_file.getvalue().strip()
-    idx = None
-    assert out_value
-
-    for idx, line in enumerate(out_value.split("\n")):
-        assert idx < 3, (idx, line)
-        decoded = json.loads(line)
-        assert decoded == query_result[idx], decoded
-
-    assert idx == 2, out_value
 
 
 @pytest.mark.parametrize(
@@ -133,3 +100,22 @@ def test_check_name_invalid(typo):
     """
     results = typos.check_name(typo)
     assert len(results) == 0, results
+
+
+
+@patch("xmlrpc.client.ServerProxy")
+def test_mocked_get_all_pypi_packages(mock):
+    srv_mock = mock.return_value
+    srv_mock.list_packages.return_value = [
+        "PaCkaGe1",
+        "pack_age_2",
+        "pack.age.3",
+        "Pack_age.4"
+    ]
+
+    packages = list(typos.get_all_pypi_packages())
+    assert len(packages) == 4, packages
+    assert "package1" in packages
+    assert "pack-age-2" in packages
+    assert "pack-age-3" in packages
+    assert "pack-age-4" in packages

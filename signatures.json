@@ -286,22 +286,33 @@
   ],
   "strings": [
     {
+      "id": "api_endpoint",
       "type": "regex",
       "pattern": "^(https?://.{5,}|/[-a-z_\\d/\\.]{3,}|([^ \\\\]*/[^ \\\\]{2,}){2,})$",
       "message": "hardcoded API endpoint",
       "flags": "I"
     },
     {
+      "id": "all_interfaces",
       "type": "regex",
       "pattern": "0.0.0.0",
       "message": "Binding to all interfaces may unwillingly expose non-protected interface",
       "score": 10
     },
     {
+      "id": "tmp_folder",
       "type": "regex",
       "pattern": "^(/tmp|/var/tmp|/dev/shm).*$",
       "message": "Hardcoded tmp folder in the source code",
       "score": 10
+    },
+    {
+      "id": "url",
+      "type": "regex",
+      "pattern": "^(http|ftp)s?://.+",
+      "message": "A possible URL has been found",
+      "score": 0,
+      "tags": ["url"]
     }
   ]
 }

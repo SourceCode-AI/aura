@@ -31,3 +31,7 @@ class PluginDisabled(AuraException):
 
 class MinimumScoreNotReached(AuraException):
     pass
+
+
+class ASTParseError(AuraException):
+    pass
