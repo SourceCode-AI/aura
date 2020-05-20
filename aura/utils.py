@@ -17,6 +17,7 @@ import requests
 from click import secho
 
 from . import config
+from . import progressbar
 
 
 logger = config.get_logger(__name__)
@@ -107,7 +108,8 @@ def download_file(url: str, fd) -> None:
             unit="bytes",
             unit_scale=True,
             unit_divisor=1024,
-            desc="Downloading file"
+            desc="Downloading file",
+            disable=progressbar.disable(),
         )
         r.raw.read = partial(
             _,
