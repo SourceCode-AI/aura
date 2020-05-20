@@ -54,3 +54,46 @@ def test_different_source_code_encoding(fixtures):
         }
     ]
     fixtures.scan_and_match("encoding_ISO_8859_2.py", matches=matches)
+
+
+def test_fs_structure_detections(fixtures, fuzzy_rule_match):
+    matches = [
+        {
+            "type": "SuspiciousFile",
+            "message": "A potentially suspicious file has been found",
+            "tags": ["python_bytecode"],
+            "extra": {
+                "file_name": "bytecode.pyc",
+                "file_type": "python_bytecode"
+            }
+        },
+        {
+            "type": "SuspiciousFile",
+            "message": "A potentially suspicious file has been found",
+            "tags": ["hidden_file"],
+            "extra": {
+                "file_name": ".pypirc",
+                "file_type": "hidden_file"
+            }
+        },
+        {
+            "type": "SensitiveFile",
+            "message": "A potentially sensitive file has been found",
+            "tags": ["sensitive-file"],
+            "extra": {
+                "file_name": ".pypirc"
+            }
+        }
+    ]
+
+    output = fixtures.scan_test_file("fs/")
+
+    for m in matches:
+        assert any(fuzzy_rule_match(x, m) for x in output["hits"]), m
+
+    exclude = {
+        "extra": {
+            "file_name": ".empty.txt"
+        }
+    }
+    assert not any(fuzzy_rule_match(x, exclude) for x in output["hits"])

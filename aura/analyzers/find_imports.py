@@ -1,10 +1,9 @@
 from collections import defaultdict
 from pathlib import Path
-from typing import List
+from typing import List, Tuple, Optional
 
 from .. import python_executor
 from .. import utils
-
 
 
 class TopologySort:
@@ -29,7 +28,7 @@ class TopologySort:
         g = dict(self.graph)
 
         while g:
-            best = None
+            best: Optional[Tuple[int, Path]] = None
             keys = set(g.keys())
 
             for node, edges in g.items():

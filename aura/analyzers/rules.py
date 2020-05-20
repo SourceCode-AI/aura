@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import os
-from typing  import List, Union, Set, Optional
+from typing  import List, Union, Set, Optional, Dict, cast
 from pathlib import Path
 from dataclasses import dataclass, field
 from functools import total_ordering
@@ -58,7 +57,7 @@ class Rule:
         if isinstance(self.node, ASTNode) and self.line_no is None:
             self.line_no = self.node.line_no
 
-    def _asdict(self) -> dict:
+    def _asdict(self) -> Dict:
         """
         Exporting mechanism for JSON output/machine processing
         Define fields to be exported here, subclass need to fetch the fields from their parent in this method
@@ -69,11 +68,8 @@ class Rule:
         """
         data = {
             "score": self.score,
+            "type": self.name
         }
-        if self.detection_type is not None:
-            data["type"] = self.detection_type
-        else:
-            data["type"] = self.__class__.__name__
 
         if self.tags:
             data["tags"] = list(self.tags)
@@ -94,7 +90,7 @@ class Rule:
 
         if self.location is not None:
             if isinstance(self.location, Path):
-                data["location"] = normalize_path(self.location)
+                data["location"] = normalize_path(cast(Path, self.location))
             else:
                 data["location"] = self.location
 
@@ -143,7 +139,6 @@ class Rule:
                 paths[r.location].append(r)
                 r.location = location.strip(r.location)
 
-        # TODO: write test for the encoding
         encoding = location.metadata.get("encoding") or "utf-8"
 
         for pth, rlines in paths.items():
@@ -153,31 +148,14 @@ class Rule:
                 if r.line_no in lines:
                     r.line = lines[r.line_no]
 
+    @property
+    def name(self) -> str:
+        if self.detection_type:
+            return self.detection_type
+        else:
+            return self.__class__.__name__
+
 
 
 class DataProcessing(Rule):
     pass
-
-
-@dataclass
-class ModuleImport(Rule):  #TODO: remove and migrate to `Rule`
-    root: NodeType = None
-    name: NodeType = None
-    categories: set = field(default_factory=set)
-
-    def _asdict(self):
-        d = {"root": self.root, "name": self.name, "categories": list(self.categories)}
-        d.update(Rule._asdict(self))
-        return d
-
-    def __hash__(self):
-        if self._hash is None:
-            t = (
-                self.root,
-                self.name,
-                self.location,
-                self.line_no,
-            )
-            self._hash = hash(t)
-
-        return self._hash

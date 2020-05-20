@@ -40,6 +40,10 @@ class PatternMatcher(metaclass=ABCMeta):
         """
         ...
 
+    @abstractmethod
+    def match_node(self, context: nodes.Context) -> bool:
+        ...
+
     @property
     def message(self):
         """
@@ -64,7 +68,7 @@ class PatternMatcher(metaclass=ABCMeta):
         Compile all defined string pattern matchers into a dictionary indexed by type
         :signatures: a list of defined signatures (loaded from json file)
         """
-        types = {x.pattern_type: x for x in cls.get_patterns()}
+        types = {x.pattern_type: x for x in PatternMatcher.get_patterns()}
 
         compiled = []
         for s in signatures:
@@ -99,6 +103,9 @@ class StringPatternMatcher(PatternMatcher, metaclass=ABCMeta):
             return False
 
         return self.match_string(value)
+
+    def match_node(self, node: nodes.NodeType) -> bool:
+        return False
 
     @abstractmethod
     def match_string(self, value: str):
@@ -154,7 +161,26 @@ class ExactPattern(StringPatternMatcher):
 
 
 class NumberPattern(PatternMatcher):
-    pass  # TODO: eq, leq, range etc..
+
+    pattern_type = "number"
+
+    def match_node(self, node: nodes.NodeType) -> bool:
+        if type(node) not in (nodes.Number, int):
+            return False
+
+        value = int(node)
+        comparator = self._signature["comparator"]
+        constrain = self._signature["value"]
+
+        # TODO: eq, leq, range etc..
+        if comparator == "=":
+            return self.__check_eq(value, constrain)
+        else:
+            return False
+
+    def __check_eq(self, value: int, constrain: int) -> bool:
+        return value == constrain
+
 
 
 class FunctionDefinitionPattern:
@@ -187,6 +213,43 @@ class FunctionDefinitionPattern:
         else:
             self.compiled = None
 
+    def match_node(self, context: nodes.Context) -> Union[bool, inspect.BoundArguments]:
+        """
+        Determine whenever the call to the function matches a defined signature
+        The following conditions are required:
+        - matching function name (could be another pattern such as regex)
+        - matching function args & kwargs as defined in the signature
+        - matching constraints for all args/kwargs
+        """
+        if type(context.node) != nodes.Call:
+            return False
+
+        full_name = context.node.full_name
+        if type(full_name) != str:
+            return False
+
+        names = [full_name]
+        # Add all wildcards as name prefixes such as `from ctypes import *`
+        for wildcard_import in context.shared_state.get("wildcard_imports", []):
+            names.append(f"{wildcard_import}.{full_name}")
+
+        if not any(map(self.check_name, names)):
+            return False
+
+        if not self.compiled:
+            return True
+
+        try:
+            sig = context.node.bind(self.compiled)
+            sig.apply_defaults()
+        except TypeError:
+            return False
+
+        for name, value in sig.arguments.items():
+            if not self.check_constrain(name, value):
+                return False
+        return sig
+
     def match(self, node: nodes.NodeType) -> Union[None, bool, inspect.BoundArguments]:
         """
         Determine whenever the call to the function matches a defined signature
@@ -212,7 +275,7 @@ class FunctionDefinitionPattern:
             return
 
         for name, value in sig.arguments.items():
-            if not self.check_constraint(name, value):
+            if not self.check_constrain(name, value):
                 return
         return sig
 
@@ -225,39 +288,51 @@ class FunctionDefinitionPattern:
         matches = list(PatternMatcher.find_matches(name, patterns))
         return bool(matches)
 
-    def check_constraint(self, name: str, value) -> bool:  # TODO!!!
+    def check_constrain(self, name: str, value) -> bool:  # TODO!!!
         """
-        Checks if the function argument value is matching all the constraints
+        Checks if the function argument value is matching all the constrains
         :param name: function argument name
         :param value: binded function argument value
         """
         annotation = self.__args[name].get("annotation", "").lower()
-        constraint = self.__args[name].get("constraint", [])
+        constrain = self.__args[name].get("constrain", [])
+
+        if type(constrain) == dict:
+            return False
 
         if not annotation:
             return True
         # TODO: check type by supported annotation
-        if constraint is None or constraint == []:
+        if constrain is None or constrain == []:
             return True
 
-        if not isinstance(constraint, (tuple, list)):
-            constraint = (constraint,)
+        if not isinstance(constrain, (tuple, list)):
+            constrain = (constrain,)
 
-        for c in constraint:
-            if not CONSTRAINTS[annotation](value, c):
+        for c in constrain:
+            if not CONSTRAINS[annotation](value, c):
                 return False
+
         return True
 
 
-def boolean_constraint(value, constraint):
+def boolean_constrain(value, constrain):
     if value == 'False':
         value = False
     elif value == 'True':
         value = True
-    return (value is constraint)
+    return (value is constrain)
+
+
+def int_constrain(value, constrain):
+    if type(value) not in (int, nodes.Number):
+        return False
+
+    return int(value) == constrain
 
 
 # Possible constraint annotations for function arguments
-CONSTRAINTS = {
-    "bool": boolean_constraint
+CONSTRAINS = {
+    "bool": boolean_constrain,
+    "int": int_constrain
 }

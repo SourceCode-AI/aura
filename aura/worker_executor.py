@@ -1,10 +1,7 @@
 import queue
 import multiprocessing
-from multiprocessing.pool import ThreadPool
-from functools import partial
 import time
 
-from tqdm import tqdm
 
 
 class Wait:
@@ -78,22 +75,3 @@ class LocalExecutor(MultiprocessingExecutor):
 
     def create_queue(self):
         return queue.Queue()
-
-
-class ProgressBar(tqdm):  # TODO: move to different location
-    def __init__(self, *, queue, **kwargs):
-        super(ProgressBar, self).__init__(**kwargs)
-        queue.put = partial(self.put_queue, progress=self, func=queue.put)
-        self._track_queue = queue
-        self._queue_total = 0
-
-    def _update_queue(self):
-        self.reset(self._queue_total)
-        self.n = self._queue_total - self._track_queue.qsize()
-        self.refresh()
-
-    @staticmethod
-    def put_queue(*args, progress, func, **kwargs):
-        progress._queue_total += 1
-        progress._update_queue()
-        return func(*args, **kwargs)

@@ -26,7 +26,7 @@ else
 fi
 
 scan() {
-  AURA_LOG_LEVEL="ERROR" aura scan --min-score=10 --async -f json mirror://$1 1> >(tee -a "aura_mirror_scan/$1.results.json" |jq .) 2> >(tee -a aura_mirror_scan/$1.errors.log >&2)
+  AURA_LOG_LEVEL="ERROR" aura scan --min-score=10 --async -f json mirror://$1 -v 1> >(tee -a "aura_mirror_scan/$1.results.json" |jq .) 2> >(tee -a aura_mirror_scan/$1.errors.log >&2)
   if [ $? -ne 0 ]; then
     echo $1 >>aura_mirror_scan/failed_packages.log
     # Remove results which has 0 score
@@ -34,6 +34,11 @@ scan() {
   else
     echo $1 >>aura_mirror_scan/processed_packages.log
   fi
+
+  if [ -s aura_mirror_scan/$1.errors.log ]; then
+    rm aura_mirror_scan/$1.errors.log
+  fi
+
 }
 
 export -f scan

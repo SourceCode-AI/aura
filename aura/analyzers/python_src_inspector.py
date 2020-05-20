@@ -15,6 +15,7 @@ import inspect
 import codecs
 import tokenize
 import platform
+import traceback
 
 from collections import OrderedDict
 
@@ -157,6 +158,7 @@ def main(pth=None, out=sys.stdout):
     try:
         src = ast.parse(source_code)
     except SyntaxError:
+        traceback.print_exc(file=sys.stderr)
         sys.exit(1)
     except Exception:
         print("Error parsing source code for file: " + pth, file=sys.stderr)

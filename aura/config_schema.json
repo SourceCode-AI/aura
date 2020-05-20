@@ -32,7 +32,7 @@
                 "kind": {"type":  "string"},
                 "annotation": {"type": "string"},
                 "default": {"type":  ["string", "number", "boolean"]},
-                "constraint": {}
+                "constrain": {}
               },
               "additionalProperties": false
             }
@@ -82,7 +82,6 @@
   },
 
   "additionalProperties": false,
-
   "definitions": {
     "pattern_matching": {
       "anyOf": [

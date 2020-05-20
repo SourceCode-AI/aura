@@ -1,6 +1,5 @@
 import math
 
-from .nodes import *
 from .. import base
 from .. import detect_redos
 from ..rules import Rule

@@ -1,9 +1,9 @@
 import base64
+import codecs
 
 import chardet
 
 from .visitor import Visitor
-from .convert_ast import ASTVisitor
 from .nodes import *
 
 
@@ -17,7 +17,7 @@ class ASTRewrite(Visitor):
             self.binop,
             self.resolve_variable,
             self.string_slice,
-            self.decode_inline_base64,
+            self.inline_decode,
             self.rewrite_function_call,
             self.replace_string,
         )
@@ -103,40 +103,36 @@ class ASTRewrite(Visitor):
                 else:
                     context.node.source = target
 
-    def decode_inline_base64(self, context):
+    def inline_decode(self, context):
         node = context.node
-        if not isinstance(node, Call):
+        if not type(node) == Call:
             return
-        # check if it is calling <str>.decode(something)
         elif not (
-            isinstance(node.func, Attribute)
-            and isinstance(node.func.source, String)
+            type(node.func) == Attribute
+            and type(node.func.source) in (String, Bytes)
             and node.func.attr == "decode"
         ):
             return
-        # check if the decode attribute is base64
-        elif not (len(node.args) == 1 and isinstance(node.args[0], (String, str))):
+
+        elif not all(type(x) in (String, str) for x in node.args):
             return
 
-        codec = str(node.args[0])
-        if codec != "base64":
-            return
-
-        try:
-
-
-            payload = base64.b64decode(str(node.func.source))
-            encoding = chardet.detect(payload)["encoding"]
-
-            if encoding is None:
+        if len(node.args) > 0:
+            try:
+                _ = codecs.getdecoder(str(node.args[0]))
+            except LookupError:
                 return
 
-            new_node = String(value=payload.decode(encoding))
-            new_node.line_no = context.node.line_no
-            context.replace(new_node)
-        except Exception:
-            raise
-        return
+        args = list(map(str, node.args))
+
+        decoded = codecs.decode(bytes(node.func.source), *args)
+        if type(decoded) == str:
+            new_node = String(decoded)
+        else:
+            new_node = Bytes(decoded)
+
+        new_node.line_no = node.line_no
+        context.replace(new_node)
 
     def rewrite_function_call(self, context):
         if not isinstance(context.node, Call):

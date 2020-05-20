@@ -4,7 +4,7 @@ import csv
 import base64
 import hashlib
 from pathlib import Path
-from dataclasses import dataclass
+from typing import Generator
 
 import chardet
 
@@ -14,7 +14,7 @@ from ..uri_handlers.base import ScanLocation
 from ..config import get_score_or_default
 
 
-def get_checksum(alg: str, path: Path):
+def get_checksum(alg: str, path: Path) -> str:
     h = hashlib.new(alg)
     with path.open("rb") as fd:
         h.update(fd.read())
@@ -23,7 +23,7 @@ def get_checksum(alg: str, path: Path):
 
 
 @Analyzer.ID("wheel")
-def analyze_wheel(*, location: ScanLocation):
+def analyze_wheel(*, location: ScanLocation) -> Generator[rules.Rule, None, None]:
     """Find anomalies in the Wheel packages that could be caused by manipulation or using a non-standard tools"""
     parts = location.location.parts
 
@@ -60,8 +60,18 @@ def analyze_wheel(*, location: ScanLocation):
     except UnicodeDecodeError:
         with record_path.open(mode="rb") as rfd:
             records_raw: bytes = rfd.read()
-            records_encoding = chardet.detect(records_raw)["encoding"]
-            records_content = records_raw.decode(records_encoding)
+            try:
+                records_encoding = chardet.detect(records_raw)["encoding"]
+                records_content = records_raw.decode(records_encoding)
+            except (TypeError, UnicodeDecodeError):
+                yield rules.Rule(
+                    detection_type="Wheel",
+                    location=location.location,
+                    message="Unable to decode the wheel RECORDs file",
+                    tags={"anomaly", "wheel", "unicode_decode_error"},
+                    signature=f"wheel#record_decode_err#{location.strip(record_path)}"
+                )
+                return
 
     records_io = io.StringIO(records_content)
     reader = csv.reader(records_io, delimiter=",", quotechar='"')
@@ -102,23 +112,36 @@ def analyze_wheel(*, location: ScanLocation):
                 signature = f"wheel#malformed_record#{full_pth}#{record}"
             )
             continue
-
-        target_checksum = get_checksum(alg, full_pth)
-        if target_checksum != checksum:
-            hit = rules.Rule(
+        try:
+            target_checksum = get_checksum(alg, full_pth)
+        except ValueError as exc:
+            yield rules.Rule(
                 detection_type="Wheel",
                 location=location.location,
                 score=get_score_or_default("wheel-invalid-record-checksum", 100),
-                message="Wheel anomaly detected, invalid record checksum",
+                message=f"Wheel anomaly detected, {exc.args[0]}",
                 tags={"anomaly", "wheel"},
                 extra={
-                    "real_checksum": target_checksum,
-                    "record_checksum": checksum,
-                    "algorithm": alg
+                    "exception_type": type(exc).__name__,
+                    "exception_message": exc.args[0]
                 },
-                signature=f"wheel#record_checksum#{target_checksum}#{location.strip(full_pth)}",
+                signature=f"wheel#exc#{type(exc).__name__}#{exc.args[0]}#{location.strip(full_pth)}"
             )
-            yield hit
+        else:
+            if target_checksum != checksum:
+                yield rules.Rule(
+                    detection_type="Wheel",
+                    location=location.location,
+                    score=get_score_or_default("wheel-invalid-record-checksum", 100),
+                    message="Wheel anomaly detected, invalid record checksum",
+                    tags={"anomaly", "wheel"},
+                    extra={
+                        "real_checksum": target_checksum,
+                        "record_checksum": checksum,
+                        "algorithm": alg
+                    },
+                    signature=f"wheel#record_checksum#{target_checksum}#{location.strip(full_pth)}",
+                )
 
     for x in wheel_root.glob("*/setup.py"):
         hit_path = normalize_path(wheel_root / x)

@@ -1,4 +1,5 @@
 import os
+import re
 import json
 
 import pytest
@@ -42,10 +43,18 @@ def test_complex_cli_analysis(fixtures, fuzzy_rule_match):
         },
         {
             "type": "YaraMatch",
+            "location": re.compile(r".*obfuscated\.py$"),
             "extra": {
                 "rule": "eicar_substring_test"
             }
         },
+        {
+            "type": "YaraMatch",
+            "location": re.compile(r".*obfuscated\.py:\d+\$blob$"),
+            "extra": {
+                "rule": "eicar_substring_test"
+            }
+        }
     ]
 
     for x in hits:
@@ -106,7 +115,7 @@ def test_tag_filtering(tag_filter, fixtures):
     for hit in output["hits"]:
         for tag in tag_filter:
             if tag.startswith("!"):
-                assert tag not in hit["tags"], (tag, hit)
+                assert tag[1:] not in hit["tags"], (tag, hit)
             else:
                 assert tag in hit["tags"], (tag, hit)
 
@@ -143,14 +152,20 @@ def test_r2c_integration():
 def test_fetching_pypi_stats():
     url = "https://cdn.sourcecode.ai/datasets/typosquatting/pypi_stats.json"
 
+    stats_content = json.dumps([
+        {"package": "pkg1", "downloads": 6},
+        {"package": "pkg2", "downloads": 4}
+    ])
+
     responses.add(
         responses.GET,
         url=url,
-        json=[
-            {"package": "pkg1", "downloads": 6},
-            {"package": "pkg2", "downloads": 4}
-        ],
-        status = 200
+        body=stats_content,
+        status = 200,
+        adding_headers={
+            "Content-length": str(len(stats_content)),
+            "Content-type": "application/json"
+        }
     )
 
     f_name = "my_stats.json"

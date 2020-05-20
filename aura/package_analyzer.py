@@ -12,6 +12,7 @@ import dataclasses
 import multiprocessing
 from pathlib import Path
 from typing import Union
+from contextlib import contextmanager
 
 import magic
 
@@ -19,6 +20,7 @@ from . import utils
 from . import config
 from . import plugins
 from . import worker_executor
+from . import progressbar
 from .uri_handlers import base
 from .analyzers import rules
 from .analyzers.find_imports import TopologySort
@@ -39,6 +41,7 @@ class Analyzer(object):
     def __init__(self, location):
         self.location = location
 
+    @contextmanager
     def run(self):
 
         if self.location.metadata.get("fork") is True:
@@ -50,16 +53,8 @@ class Analyzer(object):
         files_queue = executor.create_queue()
         hits = executor.create_queue()
         cleanup = executor.create_queue()
-
-        progress = worker_executor.ProgressBar(queue=files_queue)
-        meta = self.location.metadata.copy()
-        meta["depth"] = 0
-        files_queue.put(
-            base.ScanLocation(
-                location=self.location.location,
-                metadata=meta
-            )
-        )
+        progress = progressbar.QueueProgressBar(queue=files_queue, desc="Analyzing files")
+        files_queue.put(self.location)
 
         try:
             while files_queue.qsize() or sum([not x.ready() for x in executor.jobs]):
@@ -93,9 +88,8 @@ class Analyzer(object):
                         "queue": files_queue,
                         "hits": hits,
                         "cleanup": cleanup,
-                        "metadata": self.location.metadata,
+                        "metadata": self.location.metadata.copy(),
                     }
-
                     executor.apply_async(func=self._worker, kwds=kwargs)
 
                 except queue.Empty:
@@ -117,7 +111,7 @@ class Analyzer(object):
             while hits.qsize():
                 hits_items.append(hits.get())
 
-            return hits_items
+            yield hits_items
         finally:
             progress.close()
             while cleanup.qsize():
@@ -186,7 +180,11 @@ class Analyzer(object):
         collected = []
 
         for f in utils.walk(item.location):
-            new_item = item.create_child(f, strip_path=item.strip_path)
+            new_item = item.create_child(
+                f,
+                parent=item.parent,
+                strip_path=item.strip_path
+            )
             collected.append(new_item)
             topo.add_node(Path(new_item.location).absolute())
 

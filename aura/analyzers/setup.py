@@ -2,12 +2,13 @@
 Analyzer for setup.py python package files
 """
 import pprint
-from dataclasses import dataclass
+
+from packaging.utils import canonicalize_name
 
 from . import rules
 from .python.nodes import String, Call, Dictionary
 from .base import NodeAnalyzerV2
-from ..utils import Analyzer, normalize_name
+from ..utils import Analyzer
 from .. import config
 
 
@@ -142,8 +143,8 @@ class SetupPy(NodeAnalyzerV2):
         For example typosquatting "requestes" could install itself as "requests"
         """
         # Normalize name
-        source = normalize_name(source)
-        target = normalize_name(target)
+        source = canonicalize_name(source)
+        target = canonicalize_name(target)
         if source == target:
             return True
         elif target.startswith(source + "."):

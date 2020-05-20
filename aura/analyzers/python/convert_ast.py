@@ -16,6 +16,13 @@ def visit_Str(context):
     context.replace(node)
 
 
+def visit_Bytes(context):
+    node = Bytes(context.node["s"])
+    node.line_no = context.node["lineno"]
+    node.col = context.node["col_offset"]
+    context.replace(node)
+
+
 def visit_Num(context):
     node = Number(context.node["n"])
     node.line_no = context.node["lineno"]
@@ -47,7 +54,7 @@ def visit_Assign(context):
     # TODO: fixme when len(targets) > 1
     target = context.node["targets"][0]
 
-    if isinstance(target, Var) and target.var_type == "name":
+    if type(target) == Var and target.var_type == "name":
         target = target.name()
 
     new_node = Var(target, context.node["value"])
@@ -77,6 +84,7 @@ def visit_Attribute(context):
     new_node = Attribute(target, context.node["attr"], context.node["ctx"]["_type"])
     new_node.line_no = context.node["lineno"]
     new_node.col = context.node["col_offset"]
+    new_node._original = context.node
 
     context.replace(new_node)
 
@@ -86,6 +94,7 @@ def visit_ImportFrom(context):
     new_node.level = context.node.get("level")
     new_node.line_no = context.node["lineno"]
     new_node.col = context.node["col_offset"]
+    new_node._original = context.node
 
     for x in context.node["names"]:
         alias = x["asname"] if x["asname"] else x["name"]
@@ -97,6 +106,7 @@ def visit_ImportFrom(context):
 
 def visit_Import(context):
     new_node = Import()
+    new_node._original = context.node
     new_node.line_no = context.node["lineno"]
     new_node.col = context.node["col_offset"]
 
@@ -242,6 +252,7 @@ VISITORS = {
     "Tuple": visit_List,
     "Set": visit_List,
     "Str": visit_Str,
+    "Bytes": visit_Bytes,
     "Num": visit_Num,
     "Dict": visit_Dict,
     "Expr": visit_Expr,
@@ -271,9 +282,6 @@ class ASTVisitor(Visitor):
     """
     This class converts JSON serialized AST tree to appropriate dataclasses if possible
     """
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
 
     def _visit_node(self, context):
         if type(context.node) != dict:

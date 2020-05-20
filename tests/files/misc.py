@@ -4,6 +4,7 @@ import pickle
 from tempfile import mktemp as m
 
 import requests
+from ctypes import *
 
 listen_server = lambda x: None
 listen_server('0.0.0.0')
@@ -18,6 +19,7 @@ temp_file = m()
 
 requests.get("https://example.com", verify=False)
 
+windll.kernel32.VirtualAlloc("Pretend there are valid arguments")
 
 class Pickploit:
     def __reduce__(self):

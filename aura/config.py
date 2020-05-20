@@ -9,7 +9,9 @@ import configparser
 from pathlib import Path
 from functools import lru_cache
 from logging.handlers import RotatingFileHandler
+from typing import Optional
 
+import tqdm
 import jsonschema
 
 
@@ -23,7 +25,6 @@ CFG = configparser.ConfigParser(default_section="default", allow_no_value=True)
 CFG_PATH = None
 SEMANTIC_RULES = None
 LOG_FMT = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-LOG_STREAM = logging.StreamHandler()
 LOG_ERR = None
 # This is used to trigger breakpoint during AST traversing of specific lines
 DEBUG_LINES = set()
@@ -47,17 +48,33 @@ if os.environ.get("AURA_DEBUG_LEAKS"):
     gc.set_debug(gc.DEBUG_LEAK)
 
 
+class TqdmLoggingHandler(logging.Handler):
+    def __init__(self, level=logging.NOTSET):
+        super().__init__(level)
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            tqdm.tqdm.write(msg, file=sys.stderr)
+            self.flush()
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except:
+            self.handleError(record)
+
+
 def configure_logger(level):
+    logging.captureWarnings(capture=True)
     logger.setLevel(level)
-    LOG_STREAM.setLevel(level)
-    LOG_STREAM.setFormatter(LOG_FMT)
-    logger.addHandler(LOG_STREAM)
+    log_stream = TqdmLoggingHandler(level=level)
+    log_stream.setFormatter(LOG_FMT)
+    logger.addHandler(log_stream)
     if LOG_ERR is not None:
         logger.addHandler(LOG_ERR)
 
 
 # Helper for loading API tokens for external integrations
-def get_token(name):
+def get_token(name: str) -> str:
     value = CFG.get("api_tokens", name, fallback=None)
     # If the token is not specified in the config, fall back to the env variable
     if value is None:
@@ -66,20 +83,34 @@ def get_token(name):
     return value
 
 
-def get_relative_path(name):
+def get_relative_path(name: str) -> Path:
     """
     Fetch a path to the file based on configuration and relative path of Aura
     """
+    if os.path.isabs(name):
+        return Path(name)
+
     pth = CFG.get("aura", name)
     return Path(CFG_PATH).parent.joinpath(pth)
 
 
-def get_logger(name):
+def get_logger(name: str) -> logging.Logger:
     _log = logging.getLogger(name)
-    # _log.addHandler(LOG_STREAM)
     if LOG_ERR is not None:
         _log.addHandler(LOG_ERR)
     return _log
+
+
+def get_int(pth: str, fallback: Optional[int]=None) -> int:
+    data = CFG
+
+    for part in pth.split("."):
+        if part in data:
+            data = data[part]
+        else:
+            return fallback
+
+    return int(data)
 
 
 @lru_cache()
@@ -95,7 +126,7 @@ def get_score_or_default(score_type: str, fallback: int) -> int:
     return int(CFG.get("score", score_type, fallback=fallback))
 
 
-def find_configuration():
+def find_configuration() -> Path:
     pth = Path(os.environ.get("AURA_CFG", "config.ini"))
     if pth.is_absolute():
         return pth
@@ -150,9 +181,6 @@ def load_config():
             CFG.get("aura", "log-level", fallback="warning").upper()
         )
 
-    logging.basicConfig(
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.ERROR
-    )
     configure_logger(log_level)
 
     if not sys.warnoptions:

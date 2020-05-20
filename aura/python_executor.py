@@ -15,6 +15,7 @@ from shutil import which
 from typing import List
 
 from . import config
+from .exceptions import PythonExecutorError
 
 
 LOGGER = config.get_logger(__name__)
@@ -39,6 +40,8 @@ def run_with_interpreters(*, metadata=None, **kwargs):
         )
 
     interpreters = list(config.CFG["interpreters"].items())
+    executor_exception = None
+
     for name, interpreter in interpreters:
         # If interpreter is not directly an executable, find out it's location via `witch` lookup
         if not os.path.isfile(interpreter):
@@ -52,8 +55,12 @@ def run_with_interpreters(*, metadata=None, **kwargs):
                     metadata["interpreter_path"] = interpreter
 
                 return output
-        except json.JSONDecodeError:
+        except PythonExecutorError as exc:
+            executor_exception = exc
             continue
+
+    if executor_exception is not None:
+        raise executor_exception
 
 
 def execute_interpreter(*, command: List[str], interpreter: str, stdin=None):
@@ -79,6 +86,14 @@ def execute_interpreter(*, command: List[str], interpreter: str, stdin=None):
         try:
             payload = proc.stdout
             return json.loads(payload)
-        except Exception:
+        except json.JSONDecodeError:
             LOGGER.exception(f"Error decoding interpreter JSON: {repr(payload)}")
-            raise
+            new_exception = PythonExecutorError("Error decoding python interpreter JSON")
+            new_exception.stdout = payload
+            new_exception.stderr = proc.stderr
+            raise new_exception
+    else:
+        exc = PythonExecutorError(f"Interpreter exited with non-zero status code: {proc.returncode}")
+        exc.stderr = proc.stderr
+        exc.stdout = proc.stdout
+        raise exc

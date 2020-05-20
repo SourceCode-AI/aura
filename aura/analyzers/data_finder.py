@@ -5,11 +5,15 @@ import re
 import os
 import base64
 import binascii
+import tempfile
+from typing import Union
 
 from . import rules
 from .base import NodeAnalyzerV2
+from .python.nodes import Context
 from ..utils import Analyzer
 from ..pattern_matching import PatternMatcher
+from ..uri_handlers.base import ScanLocation
 from .. import config
 
 
@@ -20,8 +24,13 @@ BASE64_REGEX = re.compile(
 
 @Analyzer.ID("data_finder")
 class DataFinder(NodeAnalyzerV2):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__min_blob_size = config.get_int("aura.min-blob-size", 100)
+
+
     """Extracts artifacts from the source code such sa URLs or Base64 blobs"""
-    def node_String(self, context):
+    def node_String(self, context: Context):
         val = context.node.value
         pth = os.fspath(context.visitor.normalized_path)
 
@@ -40,21 +49,66 @@ class DataFinder(NodeAnalyzerV2):
                     signature=f"data_finder#base64_blob#{hash(result)}#{hash(pth)}",
                 )
             except UnicodeError:
-                return
+                pass
             except binascii.Error:
-                return
+                pass
+
+        if len(val) >= self.__min_blob_size:
+            yield self.__export_blob(val, context)
+
+    def node_Binary(self, context: Context):
+        if len(context.node.value) >= self.__min_blob_size:
+            yield self.__export_blob(context.node.value, context)
+
+    def __export_blob(self, blob: Union[bytes, str], context: Context) -> ScanLocation:
+        tmp_dir = tempfile.mkdtemp(prefix="aura_pkg__sandbox_blob_")
+        file_pth = os.path.join(tmp_dir, "blob")
+
+        location = context.visitor.location.create_child(
+            parent=f"{str(context.visitor.location)}:{context.node.line_no}",
+            new_location=tmp_dir,
+            cleanup=True,
+            strip_path=tmp_dir
+        )
+
+        if type(blob) == str:
+            mode = "w"
+        else:
+            mode = "wb"
+
+        with open(file_pth, mode) as fd:
+            fd.write(blob)
+            fd.flush()
+
+        return location
 
 
 @Analyzer.ID("string_finder")
 class StringFinder(NodeAnalyzerV2):
     """Find string patterns as defined in the signatures file"""
-    def node_String(self, context):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
         signatures = config.SEMANTIC_RULES.get("strings", [])
-        compiled = PatternMatcher.compile_patterns(signatures=signatures)
+        self.__compiled_signatures = PatternMatcher.compile_patterns(signatures=signatures)
+
+    def node_String(self, context):
         value = str(context.node)
 
-        for hit in PatternMatcher.find_matches(value, compiled):
-            output = rules.Rule(
+        for hit in PatternMatcher.find_matches(value, self.__compiled_signatures):
+            yield self.__generate_hit(context, hit, value)
+
+    def node_Bytes(self, context):
+        try:
+            value = str(context.node)
+        except UnicodeDecodeError:
+            return
+
+        for hit in PatternMatcher.find_matches(value, self.__compiled_signatures):
+            yield self.__generate_hit(context, hit, value)
+
+    def __generate_hit(self, context, hit, value):
+        return rules.Rule(
                 detection_type="StringMatch",
                 message=hit.message,
                 extra={
@@ -67,6 +121,3 @@ class StringFinder(NodeAnalyzerV2):
                 #location=context.visitor.path,
                 tags=set(hit._signature.get("tags", []))
             )
-            yield output
-
-        yield from []

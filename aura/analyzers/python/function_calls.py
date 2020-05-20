@@ -22,8 +22,8 @@ class FunctionCallAnalyzer(NodeAnalyzerV2):
 
     def node_Call(self, context):
         for sig in self.__function_defs:
-            match = sig.match(context.node)
-            if match is not True:
+            match = sig.match_node(context)
+            if not match:
                 continue
 
             sig_id = sig.signature.get("_id") or sig.signature["name"]
@@ -32,7 +32,7 @@ class FunctionCallAnalyzer(NodeAnalyzerV2):
                 score = sig.signature.get("score", 0),
                 message = sig.signature["message"],
                 node=context.node,
-                tags=set(sig.signature.get("tags", [])),
+                tags=set(sig.signature.get("tags", [])) | {sig_id},
                 extra = {
                     "function": context.node.cached_full_name
                 },

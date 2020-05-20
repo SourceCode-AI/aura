@@ -1,11 +1,12 @@
 import inspect
 import importlib
 import importlib.util
-from typing import List, Optional, Callable, Union
+from typing import List, Optional
 
 import pkg_resources
 
 from . import exceptions
+from .type_definitions import AnalyzerType, ScanLocation
 from .analyzers.base import NodeAnalyzerV2
 from .analyzers.rules import Rule
 from .analyzers.python.visitor import Visitor
@@ -14,7 +15,7 @@ from .analyzers.python.readonly import ReadOnlyAnalyzer
 PLUGIN_CACHE = {}
 
 
-def initialize_analyzer(analyzer: Union[NodeAnalyzerV2, Callable]) -> Callable:
+def initialize_analyzer(analyzer: AnalyzerType) -> AnalyzerType:
     """
     Initialize the analyzer (if needed)
     If analyzer is a subclass of ``NodeAnalyzerV2``, create an instance of it and add it to read only hooks
@@ -30,8 +31,7 @@ def initialize_analyzer(analyzer: Union[NodeAnalyzerV2, Callable]) -> Callable:
         raise ValueError(f"Could not initialize the '{analyzer}' analyzer")
 
 
-
-def load_entrypoint(name) -> dict:
+def load_entrypoint(name: str) -> dict:
     global PLUGIN_CACHE
     if PLUGIN_CACHE.get(name):
         return PLUGIN_CACHE[name]
@@ -52,7 +52,7 @@ def load_entrypoint(name) -> dict:
     return data
 
 
-def get_analyzers(names: Optional[List[str]]=None) -> List[Callable]:
+def get_analyzers(names: Optional[List[str]]=None) -> List[AnalyzerType]:
     """
     Retrieve the given analyzers
     If list of analyzer names is not provided then a default set of analyzers from entrypoint is used
@@ -113,10 +113,10 @@ def get_analyzers(names: Optional[List[str]]=None) -> List[Callable]:
     return analyzers
 
 
-def get_analyzer_group(names):
+def get_analyzer_group(names: Optional[List[str]]):
     analyzers = get_analyzers(names)
 
-    def _run_analyzers(location):
+    def _run_analyzers(location: ScanLocation):
         ast_analysis = False
         for x in analyzers:
             if isinstance(x, NodeAnalyzerV2):
@@ -130,9 +130,21 @@ def get_analyzer_group(names):
                 yield from visitor()
             except exceptions.ASTParseError:
                 yield Rule(
+                    location=location.location,
                     detection_type="ASTParseError",
                     message="Unable to parse the source code",
                     signature=f"ast_parse_error#{str(location)}",
+                )
+            except exceptions.PythonExecutorError as exc:
+                yield Rule(
+                    location=location.location,
+                    detection_type="ASTParseError",
+                    message="Unable to parse the source code",
+                    signature=f"ast_parse_error#{str(location)}",
+                    extra={
+                        "stdout": exc.stdout,
+                        "stderr": exc.stderr
+                    }
                 )
 
     return _run_analyzers

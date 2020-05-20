@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 import shutil
 import tempfile
 import pathlib
@@ -59,8 +60,10 @@ class PyPiHandler(URIHandler, PackageProvider):
         for f in self.package.download_release(
             dest=self.opts["download_dir"], release=self.release
         ):
+            loc = self.opts["download_dir"] / f
             yield ScanLocation(
-                location=self.opts["download_dir"] / f,
+                location=loc,
+                strip_path=os.fspath(self.opts["download_dir"]),
                 metadata={
                     "depth": 0
                 }

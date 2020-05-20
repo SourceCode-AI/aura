@@ -11,7 +11,6 @@ from contextlib import contextmanager
 import pytz
 import requests
 import requirements
-from packaging import version
 from dateutil import parser
 
 
@@ -23,14 +22,6 @@ from .mirror import LocalMirror
 
 
 LOGGER = config.get_logger(__name__)
-CONSTRAINS = {
-    "<": lambda x, ver: x < ver,
-    "<=": lambda x, ver: x <= ver,
-    "!=": lambda x, ver: x != ver,
-    "==": lambda x, ver: x == ver,
-    ">=": lambda x, ver: x >= ver,
-    ">": lambda x, ver: x > ver,
-}
 
 
 class PypiPackage:
@@ -84,53 +75,18 @@ class PypiPackage:
                 # FIXME: reference lost # req = utils.filter_empty_dict(dict(req))
                 self.requirements.append(req)
 
-    def find_release(self, constrains=(), find_highest=True):
-        """
-        Find the releases of a package matching the given constrains
-        Constrains are list of tuples with 2 elements in form (constrain, version)
-        The constrain itself is a string such as '<', '>=', '!=' as defined by requirements format
-        Version is a string of version to which the constrain apply
-
-        :param constrains: list of constrains
-        :param find_highest: Flag; just the highest possible version should be returned or all matching versions
-        :return: list of matching version or just the highest version (or None if no matches found)
-        """
-        conditions = []
-        for cond, c_ver in constrains:
-            c_ver = version.parse(c_ver)
-
-            if cond in CONSTRAINS:
-                condition = functools.partial(CONSTRAINS[cond], ver=c_ver)
-            else:
-                continue
-
-            conditions.append(condition)
-
-        releases = [version.parse(x) for x in self["releases"].keys()]
-        releases = list(
-            filter(lambda x: all(map(lambda cond: cond(x), conditions)), releases)
-        )
-        if find_highest:
-            if releases:
-                return str(max(releases))
-            else:
-                return None
-        else:
-            return [str(x) for x in releases]
-
     def get_latest_release(self):
         return self.info["info"]["version"]
 
-    def download_release(self, dest, release="latest"):
+    def download_release(self, dest, release="latest", all=True):
         dest = Path(dest)
-
-        if release == "latest":
-            release = self.get_latest_release()
-
-        urls = self.info["releases"][release]
         files = []
 
-        for url in urls:
+        filtered = self.filter_package_types(release=release)
+        if not all:
+            filtered = filtered[:1]
+
+        for url in filtered:
             with open(dest / url["filename"], "wb") as fd:
                 utils.download_file(url["url"], fd)
             files.append(url["filename"])
@@ -151,6 +107,31 @@ class PypiPackage:
             ) as tmp_file:
                 utils.download_file(url.geturl(), tmp_file)
                 yield Path(tmp_file.name)
+
+    def filter_package_types(self, release="latest", packagetype=None):
+        if release == "latest":
+            release = self.get_latest_release()
+
+        releases = self.info["releases"][release]
+        types = set(x.get("packagetype") for x in releases)
+
+        if "sdist" in types and packagetype is None:
+            packagetype = "sdist"
+
+        pkgs = []
+
+        for pkg in releases:
+            if packagetype == "all":
+                pkgs.append(pkg)
+            elif packagetype and pkg.get("packagetype") == packagetype:
+                pkgs.append(pkg)
+            else:
+                pkgs.append(pkg)
+
+        # FIXME: sort by highest release version
+        # example with sub-releases: mxnet_tensorrt_cu90
+
+        return pkgs
 
 
 class PackageScore:

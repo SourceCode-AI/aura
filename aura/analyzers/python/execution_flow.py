@@ -12,22 +12,10 @@ from ..rules import Rule
 from ... import config
 
 
-@Analyzer.ID("execution_flow")
+@Analyzer.ID("execution_flow")  # Rename
 class ExecutionFlow(NodeAnalyzerV2):
     """Analyze code execution flow to find semantic module imports and function calls"""
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.reset_hook()
-
-    def _visit_node(self, context: Context):
-        if isinstance(context.node, Import):
-            yield from self.__check_import(context)
-        else:
-            pass
-            # print(type(context.node))
-
-    def __check_import(self, context):  # TODO: should be rename to node_Import?
+    def node_Import(self, context):
         node = context.node
 
         for norm in node.get_modules():
@@ -58,11 +46,4 @@ class ExecutionFlow(NodeAnalyzerV2):
                 raise
 
             hit.informational = hit.score == 0
-
             yield hit
-
-    def post_analysis(self, analyzer):
-        analyzer.hits.extend(self.hits)
-
-    def reset_hook(self):
-        self.hits = []

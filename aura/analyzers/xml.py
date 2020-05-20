@@ -1,6 +1,5 @@
 import os
-from pathlib import Path
-from dataclasses import dataclass
+from typing import Generator
 from xml.etree.ElementTree import ParseError
 
 from defusedxml import cElementTree
@@ -26,40 +25,47 @@ ALLOWED_MIMES = (
 )
 
 
-def scan(pth: str, **mode):  # TODO: use ScanLocation instead of pth
+def scan(location: ScanLocation, **mode) -> Generator[Rule, None, None]:
+    """
+    Attempt to parse the XML using defused XML and the mode options to turn protections on/off
+    When an exception is raised for supported XML problems a detection is yielded back to the analyzer
+    """
     try:
-        cElementTree.parse(pth, **mode)
+        cElementTree.parse(location.str_location, **mode)
     except EntitiesForbidden:
         yield Rule(
-            detection_type="MalformedXML",
-            message="Malformed or malicious XML",
+            detection_type = "MalformedXML",
+            message = "Malformed or malicious XML",
             score = get_score_or_default("malformed-xml-entities", 100),
             extra = {
                 "type": "entities"
             },
-            signature = f"malformed_xml#entities#{pth}",
+            location=location.location,
+            signature = f"malformed_xml#entities#{str(location)}",
             tags = {"malformed_xml", "xml_entities"}
         )
     except DTDForbidden:
         yield Rule(
-            detection_type="MalformedXML",
-            message="Malformed or malicious XML",
+            detection_type = "MalformedXML",
+            message = "Malformed or malicious XML",
             score = get_score_or_default("malformed-xml-dtd", 20),
             extra = {
                 "type": "dtd"
             },
-            signature = f"malformed_xml#dtd#{pth}",
+            location=location.location,
+            signature = f"malformed_xml#dtd#{str(location)}",
             tags = {"malformed_xml", "xml_dtd"}
         )
     except ExternalReferenceForbidden:
         yield Rule(
-            detection_type="MalformedXML",
-            message="Malformed or malicious XML",
+            detection_type = "MalformedXML",
+            message = "Malformed or malicious XML",
             score = get_score_or_default("malformed-xml-external-reference", 100),
             extra = {
                 "type": "external_reference"
             },
-            signature = f"malformed_xml#external_reference#{pth}",
+            location=location.location,
+            signature = f"malformed_xml#external_reference#{str(location)}",
             tags = {"malformed_xml", "xml_external_reference"}
         )
     except NotSupportedError:
@@ -75,15 +81,14 @@ def analyze(location: ScanLocation):
     """
     Detect malformed or potentially malicious XML files
     """
-    pth = os.fspath(location.location)
-    if pth.endswith(".xml"):
+    if location.str_location.endswith(".xml"):
         pass
     elif location.metadata["mime"] not in ALLOWED_MIMES:
         return
 
-    # Parsing will stop at the first error
+    # Parsing will stop at the first error so we can't set `True` to all the options as it will shadow the problem
     # We want to catch also combinations of problems so enumerate each option
-    yield from scan(pth, forbid_dtd=True, forbid_entities=False, forbid_external=False)
-    yield from scan(pth, forbid_dtd=False, forbid_entities=True, forbid_external=False)
-    yield from scan(pth, forbid_dtd=False, forbid_entities=False, forbid_external=True)
+    yield from scan(location, forbid_dtd=True, forbid_entities=False, forbid_external=False)
+    yield from scan(location, forbid_dtd=False, forbid_entities=True, forbid_external=False)
+    yield from scan(location, forbid_dtd=False, forbid_entities=False, forbid_external=True)
 

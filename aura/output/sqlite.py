@@ -1,4 +1,5 @@
 import json
+import os
 import sqlite3
 from pathlib import Path
 from typing import List
@@ -75,29 +76,37 @@ class SQLiteOutput(AuraOutput):
         cur = self.db.cursor()
 
         try:
-            input = hits[0]._metadata
-            try:
-                cur.execute(
-                    """
-                    INSERT INTO inputs (input, location, metadata)
-                    VALUES (?, ?, ?)
-                """,
-                    [
-                        str(input["path"]),
-                        hits[0].location,
-                        json.dumps(input, default=json_encoder),
-                    ],
-                )
-                input_id = cur.lastrowid
-            except sqlite3.IntegrityError:
-                input_id = cur.execute(
-                    "SELECT id FROM inputs WHERE input=?", (str(input["path"]),)
-                ).fetchone()[0]
-
+            input_ids = {}
             stored_files = set()
 
             for h in hits:
+                norm_path = h.location
+                if norm_path not in input_ids:
+                    try:
+                        cur.execute(
+                            """
+                            INSERT INTO inputs (input, location, metadata)
+                            VALUES (?, ?, ?)
+                        """,
+                            [
+                                os.fspath(h._metadata["path"]),
+                                h.location,
+                                json.dumps(h._metadata, default=json_encoder),
+                            ],
+                        )
+                        input_id = cur.lastrowid
+                    except sqlite3.IntegrityError:
+                        input_id = cur.execute(
+                            "SELECT id FROM inputs WHERE location=?",
+                            (h.location,)
+                        ).fetchone()[0]
+                    finally:
+                        input_ids[norm_path] = input_id
+                else:
+                    input_id = input_ids[norm_path]
+
                 full_path = Path(h._metadata["path"])
+
                 if h.location not in stored_files:
                     with full_path.open("rb") as fd:
                         content = fd.read()

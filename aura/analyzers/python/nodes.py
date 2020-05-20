@@ -6,7 +6,6 @@ from __future__ import annotations
 import os
 import typing
 import inspect
-import weakref
 from abc import ABCMeta, abstractmethod
 from enum import Enum
 from pathlib import Path
@@ -16,7 +15,9 @@ from collections.abc import Hashable
 from dataclasses import dataclass, InitVar, field
 from functools import partial, total_ordering, wraps
 
-from ...stack import Stack, CallGraph
+import chardet
+
+from ...stack import Stack
 from ...utils import KeepRefs
 from ... import exceptions
 
@@ -254,6 +255,9 @@ class Dictionary(ASTNode):  #  TODO: implement methods from ASTNode
 class Number(ASTNode):
     value: int
 
+    def __int__(self):
+        return self.value
+
     def _visit_node(self, context: Context):
         pass
 
@@ -288,6 +292,9 @@ class String(ASTNode):
     def __str__(self):
         return str(self.value)
 
+    def __bytes__(self):
+        return self.value.encode("utf-8")
+
     def _visit_node(self, context: Context):
         pass
 
@@ -297,6 +304,35 @@ class String(ASTNode):
         d["value"] = self.value
         return d
 
+@dataclass
+class Bytes(ASTNode):
+    value: bytes
+
+    def __post_init__(self):
+        super().__post_init__()
+
+        if type(self.value) == str:
+            self.value = self.value.encode()
+
+    def _visit_node(self, context: Context):
+        pass
+
+    def __str__(self):
+
+        try:
+            return self.value.decode()
+        except UnicodeDecodeError:
+            encoding = chardet.detect(self.value)["encoding"]
+            return self.value.decode(encoding)
+
+    def __bytes__(self):
+        return self.value
+
+    @property
+    def json(self):
+        d = super().json
+        d["value"] = self.value
+        return d
 
 @dataclass
 class List(ASTNode):
@@ -409,6 +445,10 @@ class Attribute(ASTNode):
     attr: str
     action: str
 
+    def __post_init__(self):
+        super(Attribute, self).__post_init__()
+        self.__original_source = None
+
     def __repr__(self):
         return f"Attribute({repr(self.source)} . {repr(self.attr)})"
 
@@ -416,9 +456,8 @@ class Attribute(ASTNode):
     def full_name(self):
         if self._full_name is not None:
             return self._full_name
-
-        if isinstance(self.source, Import):
-            self._full_name = f"{self.source.names[self._original]}.{self.attr}"
+        if isinstance(self.source, Import) and self.__original_source in self.source.names:
+            self._full_name = f"{self.source.names[self.__original_source]}.{self.attr}"
             return self._full_name
         elif isinstance(self.source, (Attribute, Call)):
             return f"{self.source.full_name}.{self.attr}"
@@ -435,10 +474,10 @@ class Attribute(ASTNode):
         return d
 
     def _visit_node(self, context):
-        if isinstance(self.source, str):
+        if type(self.source) == str:
             try:
+                self.__original_source = self.source
                 target = context.stack[self.source]
-                self._original = self.source
                 if (
                     isinstance(target, Var)
                     and target.var_type == "assign"
@@ -801,7 +840,7 @@ class Arguments(ASTNode):  # TODO: not used yet
     def _visit_node(self, context):
         if self.args:
             for x in self.args:
-                if isinstance(x, str):
+                if type(x) == str:
                     context.stack[x] = self
 
         # TODO: add to stack other arguments
@@ -940,8 +979,12 @@ class Import(ASTNode):
     names: dict = field(default_factory=dict)
     level = None
 
-    def _visit_node(self, context):
+    def _visit_node(self, context: Context):
         for name, target in self.names.items():
+            if name == "*":
+                imp_name = target.rstrip(".*")
+                context.shared_state.setdefault("wildcard_imports", set()).add(imp_name)
+
             context.stack[name] = self
 
     def get_modules(self) -> typing.List[str]:
@@ -1186,19 +1229,21 @@ class Context:
     stack: Stack = field(default_factory=Stack)
     depth: int = 0
     modified: bool = False
+    shared_state: dict = field(default_factory=dict)
 
     @property
     def call_graph(self):
         return self.visitor.call_graph
 
     def as_child(self, node: NodeType, replace=lambda x: None) -> Context:
-        return self.__class__(
+        return Context(
             parent=self,
             node=node,
             depth=self.depth + 1,
             visitor=self.visitor,
             replace=replace,
             stack=self.stack,
+            shared_state=self.shared_state
         )
 
     def visit_child(self, stack=None, *args, **kwargs):

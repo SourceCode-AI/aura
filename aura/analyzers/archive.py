@@ -2,12 +2,9 @@ import os
 import tempfile
 import tarfile
 import zipfile
-import mimetypes
 from pathlib import Path
-from dataclasses import dataclass
 from typing import Generator, Union
 
-import magic
 
 from .rules import Rule
 from ..uri_handlers.base import ScanLocation
@@ -115,8 +112,17 @@ def filter_tar(
         elif member.isdir():
             yield member
         elif member.issym() or member.islnk():
-            # TODO: generate a hit
             # https://en.wikipedia.org/wiki/Tar_(computing)#Tarbomb
+            yield Rule(
+                detection_type="ArchiveAnomaly",
+                message="Archive contain a member that is a link.",
+                signature=f"archive_anomaly#link#{path}#{pth}",
+                score=config.get_score_or_default("archive-member-is-link", 100),
+                extra = {
+                    "archive_path": pth,
+                    "reason": "member_is_link"
+                }
+            )
             continue
         elif member.isfile():
             if max_size is not None and member.size > max_size:
@@ -173,6 +179,7 @@ def archive_analyzer(*, location: ScanLocation):
     logger.info("Extracting to: '{}' [{}]".format(tmp_dir, mime))
 
     yield location.create_child(
+        parent=str(location),
         new_location=tmp_dir,
         cleanup=True,
     )

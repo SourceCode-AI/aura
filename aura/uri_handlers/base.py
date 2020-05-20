@@ -7,6 +7,7 @@ import urllib.parse
 import mimetypes
 import tempfile
 import shutil
+import copy
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -18,6 +19,7 @@ import magic
 
 from .. import config
 from ..utils import KeepRefs
+from ..exceptions import PythonExecutorError
 from ..analyzers import find_imports
 from ..analyzers.rules import DataProcessing, Rule
 
@@ -53,7 +55,7 @@ class URIHandler(ABC):
         global HANDLERS
 
         if not HANDLERS:
-            handlers = {}  # TODO: migrate to use plugins.load_entrypoint
+            handlers = {}
             for x in pkg_resources.iter_entry_points("aura.uri_handlers"):
                 hook = x.load()
                 handlers[hook.scheme] = hook
@@ -113,9 +115,12 @@ class ScanLocation(KeepRefs):
                 self.metadata["mime"] = mimetypes.guess_type(self.location)[0]
 
             if self.metadata["mime"] == "text/x-python" and "no_imports" not in self.metadata:
-                imports = find_imports.find_imports(self.location, metadata=self.metadata)
-                if imports:
-                    self.metadata["py_imports"] = imports
+                try:
+                    imports = find_imports.find_imports(self.location, metadata=self.metadata)
+                    if imports:
+                        self.metadata["py_imports"] = imports
+                except PythonExecutorError:
+                    pass
 
     def __str__(self):
         return self.strip(self.str_location)
@@ -150,7 +155,7 @@ class ScanLocation(KeepRefs):
 
     def create_child(self, new_location: Union[str, Path], metadata=None, **kwargs) -> ScanLocation:
         if metadata is None:
-            metadata = self.metadata.copy()
+            metadata = copy.deepcopy(self.metadata)
             metadata["depth"] = self.metadata["depth"] + 1
 
         for x in ("mime", "interpreter_path", "interpreter_name"):
@@ -176,13 +181,14 @@ class ScanLocation(KeepRefs):
         else:
             strip_path = self.strip_path
 
-        child = self.__class__(
+        child = ScanLocation(
             location=new_location,
             metadata=metadata,
             strip_path=strip_path,
             parent=parent,
             cleanup=kwargs.get("cleanup", False)
         )
+
         return child
 
     def strip(self, target: Union[str, Path]) -> str:
@@ -227,7 +233,8 @@ class ScanLocation(KeepRefs):
             return DataProcessing(
                 message = f"Maximum processing depth reached",
                 extra = {
-                    "reason": "max_depth"
+                    "reason": "max_depth",
+                    "location": str(self)
                 },
                 signature = f"data_processing#max_depth#{str(self)}"
             )

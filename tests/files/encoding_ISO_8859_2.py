@@ -1,4 +1,4 @@
 #-*- coding: iso-8859-2 -*-
 
-print("čučoriedka")
+print("Čučoriedka lôžku vylízala")
 eval("pass")

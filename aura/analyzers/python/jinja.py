@@ -65,7 +65,7 @@ class JinjaAnalyzer(base.NodeAnalyzerV2):
 
             taints[name] = kw._taint_class
 
-        if type(context.node.args[0]) not in (String, str):
+        if len(context.node.args) == 0 or type(context.node.args[0]) not in (String, str):
             logger.warn(f"Unable to determine jinja template location for template located in '{context.visitor.normalized_path}'#{context.node.line_no}")
             return
 

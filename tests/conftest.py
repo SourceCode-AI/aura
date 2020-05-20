@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import tempfile
 import contextlib
@@ -24,6 +25,8 @@ MIRROR_FILES = {
         }
     )
 }
+
+REGEX_TYPE = type(re.compile(""))
 
 
 cli = None
@@ -69,10 +72,12 @@ class Fixtures(object):
         runner = CliRunner(mix_stderr=False)
         result = runner.invoke(cli.cli, args=args)
 
-        if check_exit_code:
-            assert result.exit_code == 0, result.stdout
+
         if result.exception and type(result.exception) != SystemExit:
             raise result.exception
+
+        if check_exit_code:
+            assert result.exit_code == 0, result.stdout
 
         return result
 
@@ -132,7 +137,7 @@ def match_rule(source, target) -> bool:
         source = source._asdict()
 
     # Check if target is a regex and apply it to source string
-    if isinstance(target, Pattern) and type(source) == str:
+    if (isinstance(target, Pattern) or isinstance(target, REGEX_TYPE)) and type(source) == str:
         return bool(target.match(source))
 
     if type(target) != type(source):
@@ -149,6 +154,9 @@ def match_rule(source, target) -> bool:
     # Check that all the keys from a target are present in the source using recursive fuzzy match
     for x in target.keys():
         # Fail if the key is not present in a source  or is of a different type then target
+        if type(target[x]) == REGEX_TYPE and type(source[x]) == str:
+            return bool(target[x].match(source[x]))
+
         if type(target[x]) != type(source.get(x)):
             return False
         # Recurse if target key value is a dict
@@ -260,7 +268,7 @@ def mock_pypi_rest_api(fixtures):
         file_pth = fixtures.path(f"mirror/{filename}")
         assert os.path.exists(file_pth)
         with open(file_pth, "rb") as fd:
-            return (200, {}, fd.read())
+            return (200, {'Content-length': str(os.stat(file_pth).st_size)}, fd.read())
 
 
     def _callback(request):

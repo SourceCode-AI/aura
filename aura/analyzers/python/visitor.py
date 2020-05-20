@@ -14,7 +14,8 @@ from typing import Optional, Tuple
 
 import pkg_resources
 
-from .nodes import Context, ASTNode, CallGraph
+from .nodes import Context, ASTNode
+from ...stack import CallGraph
 from .. import python_src_inspector
 from ...uri_handlers.base import ScanLocation
 from ...exceptions import ASTParseError
@@ -68,8 +69,8 @@ class Visitor:
         self.hits = []
         self.path = location.location
         self.normalized_path: str = str(location)
-        self.max_iterations = int(config.CFG["aura"].get("max-ast-iterations", 500))
-        self.max_queue_size = int(config.CFG["aura"].get("max-ast-queue-size", 10000))
+        self.max_iterations = config.get_int("aura.max-ast-iterations", 500)
+        self.max_queue_size = config.get_int("aura.max-ast-queue-size", 10000)
 
     @classmethod
     def from_visitor(cls, visitor: Visitor):
@@ -242,13 +243,13 @@ class Visitor:
                 breakpoint()
             context.node._visit_node(context)
 
-    def __visit_dict(self, key, context):
+    def __visit_dict(self, key: str, context: Context):
         context.visit_child(
             node=context.node[key],
             replace=partial(self._replace_generic, key=key, context=context),
         )
 
-    def __visit_list(self, idx, item, context):
+    def __visit_list(self, idx: int, item, context: Context):
         context.visit_child(
             node=item,
             replace=partial(self._replace_generic, key=idx, context=context),

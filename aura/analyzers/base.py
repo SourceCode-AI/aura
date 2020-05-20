@@ -1,6 +1,6 @@
 from .python.readonly import ReadOnlyAnalyzer
 from .. import exceptions
-from ..utils import Analyzer
+from ..utils import Analyzer   # Imported for convenience
 
 
 class NodeAnalyzerV2:

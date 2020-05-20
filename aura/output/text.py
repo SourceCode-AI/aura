@@ -4,8 +4,8 @@ from prettyprinter import pformat
 
 from click import echo, secho, style
 
-from ..analyzers.rules import ModuleImport
 from .. import utils
+from .. import config
 from ..exceptions import MinimumScoreNotReached
 from .base import AuraOutput
 
@@ -21,8 +21,8 @@ class PrettyReport:
     [A-Za-z] # a letter
     """, re.VERBOSE).sub
 
-    def __init__(self, width=80):
-        self.width = width  # TODO: add config option
+    def __init__(self):
+        self.width = config.get_int("aura.text-output-width", 120)
 
     @classmethod
     def ansi_length(cls, line:str):
@@ -36,7 +36,7 @@ class PrettyReport:
         remaining_len = self.width - len(left) - len(right)
 
         if content_len > remaining_len:
-            line = shorten(line, remaining_len)
+            line = line[:remaining_len-6] + " [...]" #shorten(line, width=remaining_len)
 
         if pos == -1:
             line = line + " "*(remaining_len-content_len)
@@ -61,7 +61,7 @@ class TextOutput(AuraOutput):
 
     def output(self, hits):
         hits = set(hits)
-        imported_modules = {h.name for h in hits if isinstance(h, ModuleImport)}
+        imported_modules = {h.extra["name"] for h in hits if h.name == "ModuleImport"}
 
         try:
             hits = self.filtered(hits)

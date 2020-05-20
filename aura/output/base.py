@@ -35,7 +35,6 @@ class AuraOutput(metaclass=ABCMeta):
             if not t:
                 continue
 
-            # TODO: add test to verify include and exclude tag filters
             if t.startswith("!"):  # It a tag is prefixed with `!` then it means to exclude findings with such tag
                 self.tag_filters.append(lambda x: t[1:] not in x)
             else:

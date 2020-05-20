@@ -28,7 +28,8 @@
     }
   ],
   "sensitive_filenames": [
-    "my_passwords.txt"
+    "my_passwords.txt",
+    ".pypirc"
   ],
   "modules": [
     {

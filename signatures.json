@@ -24,7 +24,8 @@
     ".aws/credentials",
     ".viminfo",
     ".htpasswd",
-    ".fetchmailrc"
+    ".fetchmailrc",
+    "database.yml"
   ],
   "ignore_suspicious_files": [
     ".gitignore",
@@ -43,7 +44,7 @@
           "kind": "keyword_only",
           "annotation": "bool",
           "default": false,
-          "constraint": true
+          "constrain": true
         },
         {
           "name": "kwargs",
@@ -71,7 +72,7 @@
           "kind": "keyword_only",
           "default": true,
           "annotation": "bool",
-          "constraint": false
+          "constrain": false
         },
         {
           "name": "kwargs",
@@ -96,7 +97,7 @@
           "kind": "keyword_only",
           "default": false,
           "annotation": "bool",
-          "constraint": true
+          "constrain": true
         },
         {
           "name": "kwargs",
@@ -106,6 +107,85 @@
       "message": "Setting shell=True is dangerous and allows a shell injection attack",
       "score": 20,
       "tags": ["shell_injection"]
+    },
+    {
+      "_id": "ctypes_memory_allocation",
+      "name": "ctypes.windll.kernel32.VirtualAlloc",
+      "message": "Memory allocation using ctypes",
+      "score": 0,
+      "tags": ["ctypes_memory_alloc"]
+    },
+    {
+      "_id": "ctypes_create_thread",
+      "name": "ctypes.windll.kernel32.CreateThread",
+      "message": "Creating thread using ctypes."
+    },
+    {
+      "_id": "ctypes_create_remote_thread",
+      "name": "ctypes.windll.kernel32.CreateRemoteThread",
+      "message": "Creating remote thread using ctypes"
+    },
+    {
+      "_id": "ctypes_write_process_memory",
+      "name": "ctypes.windll.kernel32.WriteProcessMemory",
+      "message": "Ctypes writing directly into the process memory",
+      "score": 100
+    },
+    {
+      "_id": "ctypes_window_hook",
+      "name": "ctypes.windll.user32.SetWindowsHookExA",
+      "message": "Ctypes creating a hook for the window. Possible sign of keylogger",
+      "score": 100
+    },
+    {
+      "_id": "ctypes_lock_screen",
+      "name": "ctypes.windll.user32.LockWorkStation",
+      "message": "Ctypes locks windows screen",
+      "score": 50
+    },
+    {
+      "_id": "ctypes_is_admin",
+      "name": "ctypes.windll.shell32.IsUserAnAdmin",
+      "message": "Ctypes determining if user is an admin",
+      "score": 100
+    },
+    {
+      "_id": "ctypes_enum_windows",
+      "name": "ctypes.windll.user32.EnumWindows",
+      "message": "Ctypes is enumerating over windows",
+      "score": 10
+    },
+    {
+      "_id": "ctypes_page_execute_read_write",
+      "name": "ctypes.c_int",
+      "signature": [
+        {
+          "name": "value",
+          "annotation": "int",
+          "constrain": 64
+        }
+      ],
+      "message": "Flag PAGE_EXECUTE_READ_WRITE for allocated memory page",
+      "score": 0
+    },
+    {
+      "_id": "ctypes_kernel32_rtlmovememory",
+      "name": "ctypes.windll.kernel32.RtlMoveMemory",
+      "message": "Copying memory between allocated pages",
+      "score": 0
+    },
+    {
+      "_id": "ctypes_kernel32_waitforsingleobject",
+      "name": "ctypes.windll.kernel32.WaitForSingleObject",
+      "message": "Wait until the object is in signaled state or timed-out",
+      "score": 0
+    },
+    {
+      "_id": "ctypes_cfunc_type",
+      "name": "ctypes.CFUNCTYPE",
+      "message": "CFUNCTYPE allows creating a pointer to memory location containing executable code",
+      "score": 100,
+      "tags": ["ctypes_cfunc_type", "possible_malware"]
     },
     {
       "_id": "dangerous_pickle",
@@ -286,16 +366,9 @@
   ],
   "strings": [
     {
-      "id": "api_endpoint",
-      "type": "regex",
-      "pattern": "^(https?://.{5,}|/[-a-z_\\d/\\.]{3,}|([^ \\\\]*/[^ \\\\]{2,}){2,})$",
-      "message": "hardcoded API endpoint",
-      "flags": "I"
-    },
-    {
       "id": "all_interfaces",
       "type": "regex",
-      "pattern": "0.0.0.0",
+      "pattern": "^0\\.0\\.0\\.0(:\\d{2,6})?$",
       "message": "Binding to all interfaces may unwillingly expose non-protected interface",
       "score": 10
     },

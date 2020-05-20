@@ -33,5 +33,12 @@ class MinimumScoreNotReached(AuraException):
     pass
 
 
+class PythonExecutorError(AuraException):
+    def __init__(self, *args, **kwargs):
+        super(PythonExecutorError, self).__init__(*args, **kwargs)
+        self.stdout = None
+        self.stderr = None
+
+
 class ASTParseError(AuraException):
     pass

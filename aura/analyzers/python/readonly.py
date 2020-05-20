@@ -1,6 +1,7 @@
 import typing
 
 from .. import rules
+from ...uri_handlers.base import ScanLocation
 from .visitor import Visitor
 from .nodes import Context
 
@@ -18,12 +19,22 @@ class ReadOnlyAnalyzer(Visitor):
             for x in self.hooks:
                 x.post_analysis(self)
 
+            hits = []
+            locations = []
+
             for x in self.hits:
+                if type(x) == ScanLocation:
+                    locations.append(x)
+                    continue
+                else:
+                    hits.append(x)
+
                 if x.location is None:
                     x.location = self.location.location
 
-            rules.Rule.lookup_lines(self.hits, location=self.location)
-            yield from self.hits
+            rules.Rule.lookup_lines(hits, location=self.location)
+            yield from hits
+            yield from locations
 
         finally:
             for x in self.hooks:

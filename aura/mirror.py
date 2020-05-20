@@ -5,7 +5,8 @@ import typing
 from pathlib import Path
 from urllib.parse import urlparse, ParseResult
 
-from . import utils
+from packaging.utils import canonicalize_name
+
 from .exceptions import NoSuchPackage
 from .config import CFG
 
@@ -41,8 +42,8 @@ class LocalMirror(object):
             return json.loads(fd.read())
 
     def _lookup_package(self, package_name):
-        package_name = utils.normalize_name(package_name)
-        packages = {utils.normalize_name(x.name): x.name for x in self.list_packages()}
+        package_name = canonicalize_name(package_name)
+        packages = {canonicalize_name(x.name): x.name for x in self.list_packages()}
         lookup = packages.get(package_name)
         if lookup is not None:
             return lookup

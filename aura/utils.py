@@ -10,8 +10,9 @@ from contextlib import contextmanager
 from collections import defaultdict
 from pathlib import Path
 from functools import partial, wraps, lru_cache
-from typing import Generator, Union, List
+from typing import Generator, Union, List, TypeVar, Generic, Mapping, cast
 
+import tqdm
 import requests
 from click import secho
 
@@ -20,9 +21,10 @@ from . import config
 
 logger = config.get_logger(__name__)
 PKG_NORM_CHARS = re.compile(r"[-_.]+")
+T = TypeVar("T")
 
 
-class KeepRefs:
+class KeepRefs(Generic[T]):
     """
     A class that would keep references to all created instances
     https://stackoverflow.com/questions/328851/printing-all-instances-of-a-class
@@ -34,20 +36,20 @@ class KeepRefs:
         self.__refs__[self.__class__].append(weakref.ref(self))
 
     @classmethod
-    def get_instances(cls):
+    def get_instances(cls) -> Generator[T, None, None]:
         for inst_ref in cls.__refs__[cls]:
             inst = inst_ref()
             if inst is not None:
                 yield inst
 
 
-def walk(location) -> Generator[Path, None, None]:
+def walk(location: Union[str, Path]) -> Generator[Path, None, None]:
     if not isinstance(location, Path):
         location = Path(location)
 
     location = location.absolute()
 
-    for x in location.glob("*/*"):
+    for x in location.rglob("*"):
         if x.is_dir():
             continue
         else:
@@ -85,14 +87,6 @@ def md5(
     return ctx.hexdigest() if hex else ctx.digest()
 
 
-def normalize_name(name: str) -> str:
-    """
-    Normalize package name as described in PEP-503
-    https://www.python.org/dev/peps/pep-0503/#normalized-names
-    """
-    return PKG_NORM_CHARS.sub("-", name).lower()
-
-
 def download_file(url: str, fd) -> None:
     """
     Download data from given URL and write it to the file descriptor
@@ -101,12 +95,28 @@ def download_file(url: str, fd) -> None:
     :param url: target url to download the data from
     :param fd: Open file-like descriptor
     """
+    def _(*args, pbar, reader, **kwargs):
+        #  https://github.com/requests/requests/issues/2155
+        data = reader(*args, decode_content=True, **kwargs)
+        pbar.update(len(data))
+        return data
+
     with requests.get(url, stream=True) as r:
+        pbar = tqdm.tqdm(
+            total=int(r.headers['Content-length']),
+            unit="bytes",
+            unit_scale=True,
+            unit_divisor=1024,
+            desc="Downloading file"
+        )
         r.raw.read = partial(
-            r.raw.read, decode_content=True
-        )  #  https://github.com/requests/requests/issues/2155
+            _,
+            reader=r.raw.read,
+            pbar=pbar,
+        )
         shutil.copyfileobj(r.raw, fd)  # https://stackoverflow.com/a/39217788
     fd.flush()
+    pbar.close()
 
 
 def json_encoder(obj):
@@ -127,7 +137,12 @@ def json_encoder(obj):
             return dataclasses.asdict(obj)
 
 
-def lookup_lines(pth, line_nos: list, strip=True, encoding="utf-8"):
+def lookup_lines(
+        pth: str,
+        line_nos: List[int],
+        strip: bool=True,
+        encoding: str="utf-8"
+) -> Mapping[int, str]:
     line_nos = sorted(line_nos)
     lines = {}
     if not line_nos:
@@ -215,9 +230,15 @@ def enrich_exception(*args):
 
 
 @lru_cache()
-def normalize_path(pth: Path, absolute=False, to_str=True):
+def normalize_path(
+        pth: Union[Path, str],
+        absolute: bool=False,
+        to_str: bool=True
+) -> Union[str, Path]:
     if type(pth) == str:
         pth = Path(pth)
+
+    pth = cast(Path, pth)
 
     if absolute:
         pth = pth.absolute()

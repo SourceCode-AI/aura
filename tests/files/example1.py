@@ -67,7 +67,7 @@ def generate_powers(top=20, power=2):
     for x in range(1, top):
         yield x**power
 
-do_stuff() -> int: ...
+def do_stuff() -> int: ...
 
 try:
     do_stuff()

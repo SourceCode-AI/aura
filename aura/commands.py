@@ -8,6 +8,7 @@ import inspect
 from pathlib import Path
 from functools import partial
 from typing import Union
+from contextlib import contextmanager, ExitStack
 
 import click
 from prettyprinter import pprint
@@ -38,7 +39,7 @@ def check_requirement(pkg):
 
     handler = URIHandler.from_uri(f"{pkg['path']}")
     try:
-        metadata = {
+        metadata = {  # FIXME, add to item scan location
             "uri_input": "pkg_path",
             "source": "package_manager",
             "pm_data": pkg,
@@ -48,9 +49,8 @@ def check_requirement(pkg):
 
         for location in handler.get_paths():
             # print(f"Enumerating: {location}")
-            scan = scan_worker(location, metadata)
-
-            scan.pprint()
+            with scan_worker(location) as scan:
+                scan.pprint()
 
         typosquatting = typos.check_name(pkg["name"])
         if typosquatting:
@@ -67,19 +67,15 @@ def check_requirement(pkg):
         handler.cleanup()
     sys.exit(1)
 
-
-def scan_worker(item: ScanLocation, metadata: dict) -> list:
-    item_metadata = metadata.copy()
-    if "path" not in item_metadata:
-        item_metadata["path"] = item.location
-
+@contextmanager
+def scan_worker(item: ScanLocation) -> list:
     if not item.location.exists():
-        logger.error(f"Location '{item.location}' does not exists. Skipping")
-        return []
-
-    sandbox = Analyzer(location=item)
-    hits = sandbox.run()
-    return hits
+        logger.error(f"Location '{item.str_location}' does not exists. Skipping")
+        yield []
+    else:
+        sandbox = Analyzer(location=item)
+        with sandbox.run() as hits:
+            yield hits
 
 
 def scan_uri(uri, metadata: Union[list, dict]=None) -> list:
@@ -105,16 +101,19 @@ def scan_uri(uri, metadata: Union[list, dict]=None) -> list:
                 "depth": 0
             })
 
-            for x in handler.get_paths():  # type: ScanLocation
-                all_hits.extend(scan_worker(x, metadata))
+            with ExitStack() as stack:
+                for x in handler.get_paths():  # type: ScanLocation
+                    all_hits.extend(
+                        stack.enter_context(scan_worker(x))
+                    )
 
-            if output_format:
-                formats = AuraOutput.get_output_formats()
-                if output_format not in formats:
-                    raise ValueError(f"Unknown output format: '{output_format}'")
+                if output_format:
+                    formats = AuraOutput.get_output_formats()
+                    if output_format not in formats:
+                        raise ValueError(f"Unknown output format: '{output_format}'")
 
-                output = formats[output_format](metadata=metadata)
-                output.output(hits=all_hits)
+                    output = formats[output_format](metadata=metadata)
+                    output.output(hits=all_hits)
 
         except exceptions.NoSuchPackage:
             logger.warn(f"No such package: {uri}")

@@ -3,7 +3,6 @@ import json
 from .base import AuraOutput
 from ..exceptions import MinimumScoreNotReached
 from ..utils import json_encoder
-from ..analyzers.rules import ModuleImport
 
 
 class JSONOutput(AuraOutput):
@@ -23,7 +22,7 @@ class JSONOutput(AuraOutput):
         data = {
             "hits": [x._asdict() for x in filtered],
             "imported_modules": list(
-                {x.name for x in hits if isinstance(x, ModuleImport)}
+                {x.extra["name"] for x in hits if x.name == "ModuleImport"}
             ),
             "tags": list(tags),
             "metadata": self.metadata,
@@ -37,7 +36,6 @@ class JSONOutput(AuraOutput):
         else:
             with open(self.metadata["output_path"], "w") as fd:
                 fd.write(out)
-
 
     def output_diff(self, diffs):
         data = []
