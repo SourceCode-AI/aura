@@ -57,21 +57,22 @@ def auto_decode(data: bytes) -> str:
         return data.decode(encoding)
 
 
-def check_unpinned(requirement, path) -> Optional[Rule]:
+def check_unpinned(requirement, location) -> Optional[Rule]:
     if not requirement.specs:
         return Rule(
             detection_type="UnpinnedRequirement",
             message=f"Package {requirement.name} is unpinned",
-            signature=f"req_unpinned#{path}#{requirement.name}",
+            signature=f"req_unpinned#{str(location)}#{requirement.name}",
             score=get_score_or_default("requirement-unpinned", 10),
             extra={
                 "package": requirement.name
             },
-            tags={"unpinned_requirement"}
+            tags={"unpinned_requirement"},
+            location=location.location
         )
 
 
-def check_outdated(requirement, path) -> Optional[Rule]:
+def check_outdated(requirement, location) -> Optional[Rule]:
     pypi = package.PypiPackage.from_pypi(requirement.name)
     latest = pypi.get_latest_release()
 
@@ -82,8 +83,9 @@ def check_outdated(requirement, path) -> Optional[Rule]:
         return Rule(
             detection_type="OutdatedRequirement",
             message=f"Package {requirement.name}{specs} is outdated, newest version is {latest}",
-            signature=f"req_outdated#{path}#{requirement.name}#{requirement.specs}#{latest}",
+            signature=f"req_outdated#{str(location)}#{requirement.name}#{requirement.specs}#{latest}",
             score=get_score_or_default("requirement-outdated", 5),
+            location=location.location,
             extra={
                 "package": requirement.name,
                 "specs": specs,
@@ -143,12 +145,12 @@ def analyze_requirements_file(*, location: ScanLocation) -> Generator[Rule, None
 
         try:
             for req in requirements.parse(req_line):
-                hit = check_unpinned(req, norm_pth)
+                hit = check_unpinned(req, location)
                 if hit:
                     yield hit
                     continue
 
-                hit = check_outdated(req, norm_pth)
+                hit = check_outdated(req, location)
                 if hit:
                     yield hit
                     continue

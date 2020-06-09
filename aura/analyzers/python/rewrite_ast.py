@@ -39,42 +39,53 @@ class ASTRewrite(Visitor):
             return
 
         if node.op == "add":
-            if isinstance(node.left, String) and isinstance(node.right, String):
-                new_str = node.right.value + node.left.value
+            if type(node.left) == String and type(node.right) == String:
+                new_str = str(node.right) + str(node.left)
                 new_node = String(value=new_str)
-                # new_node._original = context.node
+                new_node.line_no = node.line_no
+                context.replace(new_node)
+                return True
+            if type(node.left) == Number and type(node.right) == Number:
+                new_node = Number(node.left.value + node.right.value)
+                new_node.line_no = node.line_no
                 context.replace(new_node)
                 return True
         #  TODO cover other cases
 
     def string_slice(self, context):
-        if not isinstance(context.node, dict):
+        if not type(context.node) == Subscript:
             return
-        elif context.node.get("_type") != "Subscript":
-            return
-        elif not isinstance(context.node["value"], String):
+        elif not type(context.node.value) in (String, str):
             return
 
-        lower = context.node["slice"].get("lower")
-        if lower:
-            lower = lower.value
-        else:
-            lower = 0
-
-        upper = context.node["slice"].get("upper")
-        if upper:
-            upper = upper.value
-        else:
-            upper = len(context.node["value"].value)
-
-        step = context.node["slice"].get("step")
-        if step:
-            step = step.value
-        else:
+        step = context.node.slice.get("step")
+        if step is None:
             step = 1
+        elif type(step) == Number:
+            step = int(step)
+        else:
+            return
 
-        sliced_str = context.node["value"].value[lower:upper:step]
-        new_node = String(value=sliced_str)
+        value = str(context.node.value)
+        lower = context.node.slice.get("lower")
+
+        if lower is None:
+            lower = 0 if step >= 0 else len(value)
+        elif type(lower) == Number:
+            lower = int(lower)
+        else:
+            return
+
+        upper = context.node.slice.get("upper")
+        if upper is None:
+            upper = len(value) if step >= 0 else 0
+        elif type(upper) == Number:
+            upper = int(upper)
+        else:
+            return
+
+        sliced_str = value[lower:upper:step]
+        new_node = String(sliced_str)
         context.replace(new_node)
 
     def resolve_variable(self, context: Context):
@@ -228,3 +239,28 @@ class ASTRewrite(Visitor):
         # TODO: check docs if replace takes additional (kw)arguments
         data = str(replace_source).replace(str(context.node.args[0]), str(context.node.args[1]))
         context.replace(String(value=data))
+
+    def unary_op(self, context):
+        if not type(context.node) == dict:
+            return
+        elif context.node.get("_type") != "UnaryOp":
+            return
+
+        if not type(context.node["operand"]) in (Number, int):
+            return
+
+        value = int(context.node["operand"])
+        op_name = context.node["op"]["_type"]
+        if op_name == "UAdd":
+            op = lambda x: +x
+        elif op_name == "USub":
+            op = lambda x: -x
+        elif op_name == "Invert":
+            op = lambda x: ~x
+        else:
+            return
+
+        new_node = Number(value= op(value))
+        new_node.line_no = context.node["lineno"]
+        new_node.col = context.node["col_offset"]
+        context.replace(new_node)

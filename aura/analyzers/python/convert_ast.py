@@ -30,6 +30,11 @@ def visit_Num(context):
     context.replace(node)
 
 
+def visit_Complex(context):
+    node = complex(context.node["real"], context.node["imag"])
+    context.replace(node)
+
+
 def visit_Dict(context):
     context.replace(Dictionary(context.node["keys"], context.node["values"]))
 
@@ -275,6 +280,7 @@ VISITORS = {
     "Continue": visit_Continue,
     "Pass": visit_Pass,
     "ExceptHandler": visit_ExceptHandler,
+    "complex": visit_Complex,
 }
 
 

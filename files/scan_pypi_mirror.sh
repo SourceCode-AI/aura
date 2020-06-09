@@ -26,7 +26,7 @@ else
 fi
 
 scan() {
-  AURA_LOG_LEVEL="ERROR" AURA_NO_PROGRESS=true aura scan --async -f json mirror://$1 -v 1> >(tee -a "aura_mirror_scan/$1.results.json" |jq .) 2> >(tee -a aura_mirror_scan/$1.errors.log >&2)
+  AURA_LOG_LEVEL="ERROR" AURA_NO_PROGRESS=true aura scan --async -f json mirror://$1 -vv 1> >(tee -a "aura_mirror_scan/$1.results.json" |jq .) 2> >(tee -a aura_mirror_scan/$1.errors.log >&2)
   if [ $? -ne 0 ]; then
     echo $1 >>aura_mirror_scan/failed_packages.log
     # Remove results which has 0 score
@@ -45,4 +45,4 @@ export -f scan
 
 echo "Starting Aura scan"
 
-echo $PKGS|tr ' \r' '\n'| parallel --load 80 --memfree 5G --timeout 180 --max-args 1 scan
+echo $PKGS|tr ' \r' '\n'| parallel --load 80 --memfree 5G --timeout 600 --max-args 1 scan

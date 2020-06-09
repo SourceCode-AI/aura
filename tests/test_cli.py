@@ -1,6 +1,8 @@
 import os
 import re
 import json
+import tempfile
+from pathlib import Path
 
 import pytest
 import responses
@@ -128,7 +130,16 @@ def test_ast_parser(fixtures):
     pth = fixtures.path('obfuscated.py')
 
     result = fixtures.get_cli_output(['parse_ast', os.fspath(pth)])
-    # TODO: add functionality to test the parser output
+    assert "aura.analyzers.python.nodes" in result.stdout
+    assert "http://malware.com/CnC" in result.stdout
+    assert "Hello world" in result.stdout
+    assert "adalaraoawa aoalalaeaH" not in result.stdout
+
+    result = fixtures.get_cli_output(['parse_ast', os.fspath(pth), "-s", "raw"])
+    assert "aura.analyzers.python.nodes" not in result.stdout
+    assert "http://malware.com/CnC" not in result.stdout
+    assert "Hello world" not in result.stdout
+    assert "adalaraoawa aoalalaeaH" in result.stdout
 
 
 def test_r2c_integration():
@@ -188,3 +199,18 @@ def test_fetching_pypi_stats():
         assert os.path.exists(f"{f_name}.bak")
         with open(f"{f_name}.bak", "r") as fd:
             assert fd.read() == "hello_world"
+
+
+def test_async_cleanup(fixtures):
+    from aura.uri_handlers import base
+
+    base.cleanup_locations()
+    tmp_dir = Path(tempfile.gettempdir())
+    leftovers = list(tmp_dir.glob("aura_pkg__sandbox*"))
+    assert len(leftovers) == 0, leftovers
+
+    output = fixtures.scan_test_file("mirror/wheel-0.34.2.tar.gz", args=["--async"])
+
+    # Make sure that the temp dir is properly cleaned up also when using async mode
+    leftovers = list(tmp_dir.glob("aura_pkg__sandbox*"))
+    assert len(leftovers) == 0, leftovers

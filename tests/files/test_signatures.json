@@ -25,6 +25,16 @@
       "score": 100,
       "tags": ["obfuscation", "code_execution"],
       "message": "eval/exec usage found in a source code"
+    },
+    {
+      "_id": "dangerous_pickle",
+      "name": {
+        "type": "regex",
+        "pattern": "^(cP|p)ickle\\.loads?$"
+      },
+      "message": "Usage of pickle is very dangerous and easily exploitable",
+      "score": 50,
+      "tags": ["pickle_usage"]
     }
   ],
   "sensitive_filenames": [

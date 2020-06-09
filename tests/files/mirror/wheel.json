@@ -248,6 +248,28 @@
         "url": "https://files.pythonhosted.org/packages/a7/37/947b4329c4a3c72093b6c8e9b4be8c7f10c32dbb78848d3a234ce01c059d/wheel-0.30.0a0.tar.gz"
       }
     ],
+    "0.33.0": [
+      {
+        "comment_text": "",
+        "digests": {
+          "md5": "6731b8ca8703150e2304613a25ff674f",
+          "sha256": "b79ffea026bc0dbd940868347ae9eee36789b6496b6623bd2dec7c7c540a8f99"
+        },
+        "downloads": -1,
+        "filename": "wheel-0.33.0-py2.py3-none-any.whl",
+        "has_sig": false,
+        "md5_digest": "6731b8ca8703150e2304613a25ff674f",
+        "packagetype": "bdist_wheel",
+        "python_version": "py2.py3",
+        "requires_python": ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*",
+        "size": 21497,
+        "upload_time": "2019-02-12T07:09:01",
+        "upload_time_iso_8601": "2019-02-12T07:09:01.453457Z",
+        "url": "https://files.pythonhosted.org/packages/7c/d7/20bd3c501f53fdb0b7387e75c03bd1fce748a1c3dd342fc53744e28e3de1/wheel-0.33.0-py2.py3-none-any.whl",
+        "yanked": false,
+        "yanked_reason": null
+      }
+    ],
     "0.34.0": [
       {
         "comment_text": "",

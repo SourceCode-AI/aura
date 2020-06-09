@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from collections import defaultdict
 from pathlib import Path
 from functools import partial, wraps, lru_cache
-from typing import Generator, Union, List, TypeVar, Generic, Mapping, cast
+from typing import Generator, Union, List, TypeVar, Generic, Mapping, cast, BinaryIO
 
 import tqdm
 import requests
@@ -82,13 +82,15 @@ def md5(
                 if not file_data:
                     break
                 ctx.update(file_data)
+    elif type(data) == str:
+        ctx.update(data.encode("utf-8"))
     else:
-        ctx.update(bytes(data))
+        ctx.update(data)
 
     return ctx.hexdigest() if hex else ctx.digest()
 
 
-def download_file(url: str, fd) -> None:
+def download_file(url: str, fd: BinaryIO) -> None:
     """
     Download data from given URL and write it to the file descriptor
     This function is designed for speed as other approaches are not able to utilize full network speed
@@ -175,45 +177,6 @@ def set_function_attr(**kwargs):
         return func
 
     return attr_decor
-
-
-def imports_to_tree(items: list) -> dict:
-    """
-    Transform a list of imported modules into a module tree
-    """
-    root = {}
-    for x in items:
-        parts = x.split(".")
-        current = root
-        for x in parts:
-            if x not in current:
-                current[x] = {}
-            current = current[x]
-
-    return root
-
-
-def pprint_imports(tree, indent=""):
-    """
-    pretty print the module tree
-    """
-    last = len(tree) - 1
-    for ix, x in enumerate(tree.keys()):
-        subitems = tree.get(x, {})
-
-        # https://en.wikipedia.org/wiki/Box-drawing_character
-        char = ""
-        if ix == last:
-            char += "└"
-        elif ix == 0:
-            char += "┬"
-        else:
-            char += "├"
-
-        print(f"{indent}{char}{x}")
-        if subitems:
-            new_indent = " " if ix == last else "│"
-            pprint_imports(subitems, indent + new_indent)
 
 
 @contextmanager

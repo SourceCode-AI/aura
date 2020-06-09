@@ -7,7 +7,7 @@ import time
 import inspect
 from pathlib import Path
 from functools import partial
-from typing import Union
+from typing import Union, Optional, Tuple
 from contextlib import contextmanager, ExitStack
 
 import click
@@ -153,18 +153,18 @@ def scan_mirror(output_dir: Path):
             # )
 
 
-def parse_ast(path: Union[str, Path], stages=None):
+def parse_ast(path: Union[str, Path], stages: Optional[Tuple[str,...]]=None):
     from .analyzers.python.visitor import Visitor
+
+    if stages:
+        if "raw" in stages and stages.index("raw") > 0:
+            raise ValueError("The 'raw' ast stage must the first one if defined")
 
     meta = {"path": path, "source": "cli"}
 
     location = ScanLocation(location=path, metadata=meta)
 
     v = Visitor.run_stages(location=location, stages=stages)
-
-    tree = json.dumps(v.tree["ast_tree"], default=utils.json_encoder, indent=2)
-    print(tree)
-    print("\n\n---\n\n")
     pprint(v.tree["ast_tree"], indent=2)
 
 

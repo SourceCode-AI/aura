@@ -181,6 +181,11 @@
       "score": 0
     },
     {
+      "_id": "ctypes_kernel32_getvolumeinformationw",
+      "name": "ctypes.windll.kernel32.GetVolumeInformationW",
+      "message": "Get volume information via ctypes"
+    },
+    {
       "_id": "ctypes_cfunc_type",
       "name": "ctypes.CFUNCTYPE",
       "message": "CFUNCTYPE allows creating a pointer to memory location containing executable code",
@@ -226,7 +231,7 @@
     {
       "_id": "open_file",
       "name": "open",
-      "message": "Code if accessing files via open",
+      "message": "Code is accessing files via open",
       "score": 0,
       "tags": ["file_access"]
     },
@@ -375,7 +380,7 @@
     {
       "id": "tmp_folder",
       "type": "regex",
-      "pattern": "^(/tmp|/var/tmp|/dev/shm).*$",
+      "pattern": "^(/tmp|/var/tmp|/dev/shm|C:\\\\{1,2}Windows\\\\Temp\\\\).*$",
       "message": "Hardcoded tmp folder in the source code",
       "score": 10
     },
@@ -386,6 +391,51 @@
       "message": "A possible URL has been found",
       "score": 0,
       "tags": ["url"]
+    },
+    {
+      "id": "netsh_firewall",
+      "type": "regex",
+      "pattern": "netsh (adv)?firewall",
+      "message": "Windows netsh firewall command",
+      "score": 10,
+      "tags": ["windows"]
+    },
+    {
+      "id": "mac_firewall",
+      "type": "regex",
+      "pattern": "^(pfctl|/usr/libexec/ApplicationFirewall/socketfilterfw).*",
+      "message": "Mac os firewall command (packet filtering)",
+      "tags": ["macos"]
+    },
+    {
+      "id": "windows_service",
+      "type": "contains",
+      "pattern": "SysWOW64",
+      "message": "Windows system folder for services",
+      "score": 10,
+      "tags": ["windows"]
+    },
+    {
+      "id": "windows_task_scheduler",
+      "type": "contains",
+      "pattern": "schtasks",
+      "message": "Windows task scheduler",
+      "score": 10,
+      "tags": ["windows"]
+    },
+    {
+      "id": "hosts_file",
+      "type": "regex",
+      "pattern": "^(C:\\\\{1,2}Windows\\\\System32\\\\drivers\\\\etc\\\\hosts|/etc/hosts)$",
+      "message": "Location of hosts file",
+      "score": 5
+    },
+    {
+      "id": "sudo_command",
+      "type": "regex",
+      "pattern": "^sudo .*$",
+      "message": "Executing sudo command",
+      "score": 20
     }
   ]
 }

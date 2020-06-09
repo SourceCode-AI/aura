@@ -11,7 +11,7 @@ def test_secret_finder(fixtures, fuzzy_rule_match):
                 'name': 'user1',
                 'secret': 'pass1'
             },
-            'line_no': 4
+            'line': "requests.get('https://api.github.com/user', auth=HTTPBasicAuth('user1', 'pass1'))"
         },
         {
             'type': 'LeakingSecret',
@@ -19,7 +19,7 @@ def test_secret_finder(fixtures, fuzzy_rule_match):
                 'name': 'super_password',
                 'secret': 'letmein'
             },
-            'line_no': 7
+            "line": 'super_password = "letmein"'
         },
         {
             'type': 'LeakingSecret',
@@ -27,7 +27,7 @@ def test_secret_finder(fixtures, fuzzy_rule_match):
                 'name': 'auth_token',
                 'secret': 'RATATATAXXX'
             },
-            'line_no': 5
+            "line": "requests.get('https://api.github.com/user?auth_token=RATATATAXXX', auth=('user2', 'pass2'))"
         },
         {
             'type': 'LeakingSecret',

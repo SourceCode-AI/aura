@@ -160,6 +160,14 @@ class ExactPattern(StringPatternMatcher):
         return value == self._signature["pattern"]
 
 
+class ContainsPattern(StringPatternMatcher):
+
+    pattern_type = "contains"
+
+    def match_string(self, value: str) -> bool:
+        return self._signature["pattern"] in value
+
+
 class NumberPattern(PatternMatcher):
 
     pattern_type = "number"

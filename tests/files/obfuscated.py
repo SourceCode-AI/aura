@@ -30,6 +30,6 @@ print "test"
 
 cpx = 12 + 3j # complex number
 
-fabulous.pprint("Haealalaoa awaoaralada"[::2])  # String "Hello world" after slicing
+fabulous.pprint("adalaraoawa aoalalaeaH"[::-2])  # String "Hello world" after slicing
 
 eval("print('$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!')")

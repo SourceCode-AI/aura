@@ -14,6 +14,7 @@ from .python.nodes import Context
 from ..utils import Analyzer
 from ..pattern_matching import PatternMatcher
 from ..uri_handlers.base import ScanLocation
+from .. import utils
 from .. import config
 
 
@@ -24,12 +25,12 @@ BASE64_REGEX = re.compile(
 
 @Analyzer.ID("data_finder")
 class DataFinder(NodeAnalyzerV2):
+    """Extracts artifacts from the source code such sa URLs or Base64 blobs"""
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.__min_blob_size = config.get_int("aura.min-blob-size", 100)
 
-
-    """Extracts artifacts from the source code such sa URLs or Base64 blobs"""
     def node_String(self, context: Context):
         val = context.node.value
         pth = os.fspath(context.visitor.normalized_path)
@@ -92,22 +93,22 @@ class StringFinder(NodeAnalyzerV2):
         signatures = config.SEMANTIC_RULES.get("strings", [])
         self.__compiled_signatures = PatternMatcher.compile_patterns(signatures=signatures)
 
-    def node_String(self, context):
+    def node_String(self, context: Context):
         value = str(context.node)
 
         for hit in PatternMatcher.find_matches(value, self.__compiled_signatures):
             yield self.__generate_hit(context, hit, value)
 
-    def node_Bytes(self, context):
+    def node_Bytes(self, context: Context):
         try:
             value = str(context.node)
-        except UnicodeDecodeError:
+        except (UnicodeDecodeError, TypeError):
             return
 
         for hit in PatternMatcher.find_matches(value, self.__compiled_signatures):
             yield self.__generate_hit(context, hit, value)
 
-    def __generate_hit(self, context, hit, value):
+    def __generate_hit(self, context: Context, hit, value: str):
         return rules.Rule(
                 detection_type="StringMatch",
                 message=hit.message,
@@ -115,9 +116,9 @@ class StringFinder(NodeAnalyzerV2):
                     "signature_id": hit._signature["id"],
                     "string": value
                 },
-                signature=f"string_finder#{hit._signature['id']}#{value}#{context.visitor.normalized_path}/{context.node.line_no}",
+                signature=f"string_finder#{hit._signature['id']}#{utils.md5(value)}#{context.visitor.normalized_path}/{context.node.line_no}",
                 score=hit._signature.get("score", 0),
                 node=context.node,
-                #location=context.visitor.path,
+                location=context.visitor.path,
                 tags=set(hit._signature.get("tags", []))
             )

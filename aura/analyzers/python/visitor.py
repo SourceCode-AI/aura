@@ -24,7 +24,6 @@ from ... import config
 
 
 INSPECTOR_PATH = os.path.abspath(python_src_inspector.__file__)
-DEFAULT_STAGES = ("convert", "rewrite", "taint_analysis", "readonly")
 VISITORS = None
 
 logger = config.get_logger(__name__)
@@ -56,7 +55,6 @@ class Visitor:
 
     def __init__(self, *, location: ScanLocation):
         self.location: ScanLocation = location
-        self.kwargs: dict = {}  # TODO: this should be removed, old analyzer class init signature
         self.tree = None
         self.traversed = False
         self.modified = False
@@ -65,7 +63,6 @@ class Visitor:
         self.queue = deque()
         self.call_graph = CallGraph()
 
-        self.metadata = location.metadata  # TODO: check if this could be removed
         self.hits = []
         self.path = location.location
         self.normalized_path: str = str(location)
@@ -81,18 +78,20 @@ class Visitor:
         return obj
 
     @classmethod
-    def run_stages(cls, *, location: ScanLocation, stages: Optional[Tuple[str, ...]]=DEFAULT_STAGES) -> Visitor:
+    def run_stages(cls, *, location: ScanLocation, stages: Optional[Tuple[str, ...]]=None) -> Visitor:
         if not stages:
-            stages = DEFAULT_STAGES
+            stages = config.get_ast_stages()
 
-        v = None
-        previous = Visitor(location=location)
+        v = previous = Visitor(location=location)
         previous.load_tree()
         previous.traverse()
 
         visitors = cls.get_visitors()
 
         for stage in stages:
+            if stage == "raw":
+                continue
+
             assert previous.tree is not None, stage
             if stage not in visitors:
                 raise ValueError("Unknown AST stage: " + stage)
@@ -116,13 +115,13 @@ class Visitor:
         source = self.location.str_location
 
         cmd = [INSPECTOR_PATH, source]
-        self.tree = python_executor.run_with_interpreters(command=cmd, metadata=self.metadata)
+        self.tree = python_executor.run_with_interpreters(command=cmd, metadata=self.location.metadata)
 
         if self.tree is None:
             raise ASTParseError("Unable to parse the source code")
 
-        if "encoding" not in self.metadata and self.tree and self.tree.get("encoding"):
-            self.metadata["encoding"] = self.tree["encoding"]
+        if "encoding" not in self.location.metadata and self.tree and self.tree.get("encoding"):
+            self.location.metadata["encoding"] = self.tree["encoding"]
 
     def push(self, context):
         if len(self.queue) >= self.max_queue_size:

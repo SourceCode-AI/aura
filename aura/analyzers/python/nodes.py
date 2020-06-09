@@ -112,13 +112,23 @@ class TaintLog:
         return log
 
 
+
 class ASTNode(KeepRefs, metaclass=ABCMeta):
-    def __post_init__(self, *args, **kwargs):
+    def __post_init__(self, *args, previous_node=None, **kwargs):
         self._full_name = None
         self._original = None
         self._docs = None
-        self.line_no = None
-        self.col = None
+
+        if isinstance(previous_node, ASTNode):
+            self.line_no = previous_node.line_no
+            self.col = previous_node.col
+        elif type(previous_node) == dict:
+            self.line_no = previous_node.get("lineno")
+            self.col = previous_node.get("col_offset")
+        else:
+            self.line_no = None
+            self.col = None
+
         self.tags = set()
         self._hash = None
         self._taint_class: Taints = Taints.UNKNOWN
@@ -141,7 +151,7 @@ class ASTNode(KeepRefs, metaclass=ABCMeta):
         return self._full_name
 
     @property
-    def json(self):
+    def json(self) -> typing.Mapping[str, typing.Any]:
         data = {
             "AST_Type": self.__class__.__name__,
         }
@@ -259,7 +269,15 @@ class Number(ASTNode):
         return self.value
 
     def _visit_node(self, context: Context):
-        pass
+        if type(self.value) == dict:
+            context.visit_child(
+                node = self.value,
+                replace=partial(self.__replace_value, visitor=context.visitor)
+            )
+
+    def __replace_value(self, value, visitor):
+        self.value = value
+        visitor.modified = True
 
     def __post_init__(self):
         super().__post_init__()
@@ -783,17 +801,17 @@ class Call(ASTNode):
                 inspect.Parameter(name=x, kind=inspect.Parameter.POSITIONAL_ONLY)
             )
 
-        if aura_capture_args:
-            params.append(
-                inspect.Parameter(
-                    name=aura_capture_args, kind=inspect.Parameter.VAR_POSITIONAL
-                )
-            )
-
         for k, v in sig_kwargs.items():
             params.append(
                 inspect.Parameter(
                     name=k, default=v, kind=inspect.Parameter.POSITIONAL_OR_KEYWORD
+                )
+            )
+
+        if aura_capture_args:
+            params.append(
+                inspect.Parameter(
+                    name=aura_capture_args, kind=inspect.Parameter.VAR_POSITIONAL
                 )
             )
 

@@ -200,15 +200,14 @@ def diff_archive(diff):
         return
     elif diff.a_md5 == diff.b_md5:
         return
+    elif not (diff.a_path.is_file() and diff.b_path.is_file()):
+        return
 
-    a_scan_loc = diff.a_scan.create_child(diff.a_path)
-    b_scan_loc = diff.b_scan.create_child(diff.b_path)
-
-    a_hits = list(archive_analyzer(location=a_scan_loc))
+    a_hits = list(archive_analyzer(location=diff.a_scan))
     a_locations = [x for x in a_hits if type(x) == ScanLocation]
     a_hits = [x for x in a_hits if type(x) != ScanLocation]
 
-    b_hits = list(archive_analyzer(location=b_scan_loc))
+    b_hits = list(archive_analyzer(location=diff.b_scan))
     b_locations = [x for x in b_hits if type(x) == ScanLocation]
     b_hits = [x for x in b_hits if type(x) != ScanLocation]
 
@@ -221,7 +220,7 @@ def diff_archive(diff):
         return
 
     # Create a new scan location
-    new_a_location = a_locations[0] if a_locations else a_scan_loc
-    new_b_location = b_locations[0] if b_locations else b_scan_loc
+    new_a_location = a_locations[0] if a_locations else diff.a_scan
+    new_b_location = b_locations[0] if b_locations else diff.b_scan
     new_a_location.metadata["b_scan_location"] = new_b_location
     yield new_a_location

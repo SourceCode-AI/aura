@@ -10,6 +10,66 @@ rule eicar_substring_test {
         all of them
 }
 
+
+rule SuspiciousStrings: suspicious_strings
+{
+    meta:
+        score = 10
+        score_each = true
+    strings:
+        $str1 = "SecEdit"
+        $str2 = "searchfilterhost"
+        $str3 = "WUDFPort"
+        $str4 = "MSASTUIL"
+        $str5 = "WmiPrvSE"
+        $str6 = "wmic process"
+        $str7 = "keylogger" ascii nocase
+        $str8 = "whoami"
+        $str9 = "VIAddVersionKey"  // Version information for nsis keys
+        $str10 = "makensis.exe"
+        $str11 = "defaults write"  // MacOS changing defaults
+        $str12 = "com.apple.loginwindow"  // MacOS login service
+        $str13 = "/etc/init.d/"
+        $str14 = "ui.promptforcredential"
+        $str15 = "[Environment]::UserName"  // powershell
+        $str16 = "[Environment]::UserDomainName"  // powershell
+        $str17 = "osascript -e"
+        $str18 = "Taskkill"
+        $str19 = "rundll32"
+        $str20 = "kextstat"  // macos alternative of lsmod. Display status of loaded kernel extensions (kexts)
+        $str21 = "lsmod"
+        $str22 = "DisableAntiSpyware"  // Windows Defender
+        $str23 = "wevtutil"  // windows eventlog
+        $str24 = "DataExecutionPrevention_SupportPolicy"
+        $str25 = "EnableLUA"  // Windows UAC
+        $str26 = "DisableAntiSpyware"  // MS defender
+        $str27 = "pmset displaysleepnow"  // Mac turn of display
+        $str28 = "xset dpms force off"  // Linux turn of display
+        $str29 = "/var/db/dslocal/nodes/Default/users/"  // OSX Location of hashes
+        $str30 = "attrib +H"  // Hide file on windows
+        $str31 = "chflags hidden"  // hide file on mac
+        $str32 = "vlock"  // Lock screen on linux
+        $str33 = "User.menu/Contents/Resources/CGSession -suspend"  // Lock screen on mac
+        $str34 = "netsh wlan show profiles"  // geting wlan keys
+    condition:
+        any of them
+}
+
+
+rule DeterminingIP: determining_ip
+{
+    meta:
+        score = 50
+    strings:
+        $s1 = "api.ipify.org"
+        $s2 = "freegeoip.net"
+        $s3 = "ipconfig.me"
+        $s4 = "whatismyip.com"
+    condition:
+        any of them
+}
+
+
 rule SuspiciousFile: suspicious_file
 {
     meta:
@@ -40,7 +100,8 @@ rule RegistryKey: registry_key
     meta:
         score = 20
     strings:
-        $pth = /\b(HKEY_LOCAL_MACHINE|HKLM|HKEY_USERS|HKEY_CURRENT_USER)[\\a-z\/\.-_]{5,}/ nocase
+        $pth = /(HKEY_LOCAL_MACHINE|HKLM|HKEY_USERS|HKEY_CURRENT_USER|SOFTWARE|SYSTEM)((\\{1,2}|\/)[a-z\.-_ ]{5,})+/ nocase wide ascii
+        $autorun = "Software\\Microsoft\\Windows\\CurrentVersion\\Run" nocase
     condition:
         any of them
 }
@@ -82,6 +143,26 @@ rule WindowsExecutable: windows_executable
     condition:
         // MZ and PE header
         uint16(0) == 0x5A4D and uint32(uint32(0x3C)) == 0x00004550
+}
+
+
+rule WindowsExecutable2: windows_executable
+{
+    strings:
+        $a = "This program cannot" xor
+    condition:
+        $a
+}
+
+
+rule ChromePath: chrome_path
+{
+    strings:
+        $s1 = "\\Google\\Chrome\\User Data\\Default\\"
+        $s2 = "/Library/Application Support/Google/Chrome/Default/"
+        $s3 = "/.config/google-chrome/Default/"
+    condition:
+        any of them
 }
 
 

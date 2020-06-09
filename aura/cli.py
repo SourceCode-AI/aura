@@ -134,21 +134,28 @@ def scan_mirror(output_dir):
 @cli.command(name="diff")
 @click.argument("pth1", metavar="<FIRST PATH>")
 @click.argument("pth2", metavar="<SECOND PATH>")
-def diff(pth1, pth2):  # TODO: move functionality to commands and remove direct output type
+@click.option("-f", "--format", default="text", help="Output format")
+def diff(pth1, pth2, format="text"):  # TODO: move functionality to commands and remove direct output type
     from .output import text
     pth1 = ScanLocation(Path(pth1))
     pth2 = ScanLocation(Path(pth2))
 
     da = DiffAnalyzer()
-    da.compare(pth1, pth2)
+    da.compare(pth1, pth2, detections=True)
 
-    text.TextOutput().output_diff(da.diffs)
+    output_formats = text.DiffOutputBase.get_output_formats()
+    assert format in output_formats
+    out = output_formats[format]()
+    out.output_diff(da.diffs)
 
 
 @cli.command(name="parse_ast")
-@click.option("--stages", "-s", multiple=True)
 @click.argument("path")
-# @click.option('--raw', is_flag=True, default=False, help="Print raw AST tree as received from parser")
+@click.option(
+    "--stages", "-s",
+    multiple=True,
+    type=click.Choice(["raw"] + list(config.get_installed_stages()), case_sensitive=False)
+)
 def parse_ast(path, stages=None):
     commands.parse_ast(path, stages=stages)
 

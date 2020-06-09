@@ -8,21 +8,33 @@ from aura.analyzers.rules import Rule
 from aura.analyzers import archive
 
 
-def test_suspicious_files():
-    ret = archive.is_suspicious(pth='/etc/shadow', location='something')
-    assert ret is not None
-    # TODO: add fuzzy rule match
-    assert isinstance(ret, Rule)
 
-    ret = archive.is_suspicious(pth='test/../../../../../../etc/shadow', location='something')
-    assert ret is not None
-    # TODO: add fuzzy rule match
-    assert isinstance(ret, Rule)
+@pytest.mark.parametrize(
+    "file_path,is_suspicious",
+    (
+        ("/etc/shadow", True),
+        ("test/../../../../../../etc/shadow", True),
+        ("hello/../wold", True),
+        ("pkg-dist/RECORDS", False),
+        ("single_level", False)
+    )
+)
+def test_is_suspicious_file(file_path, is_suspicious, fuzzy_rule_match):
+    ret = archive.is_suspicious(pth=file_path, location='something')
 
-    ret = archive.is_suspicious('pkg-dist/RECORDS', location='something')
-    assert ret is None
-    # TODO: add fuzzy rule match
-    assert not isinstance(ret, Rule)
+    if is_suspicious:
+        assert ret is not None
+        assert isinstance(ret, Rule)
+        match = {
+            "type": "SuspiciousArchiveEntry",
+            "location": "something",
+            "extra": {
+                "entry_path": file_path
+            }
+        }
+        assert fuzzy_rule_match(ret, match)
+    else:
+        assert ret is None
 
 
 def test_zip_extractor(fixtures):

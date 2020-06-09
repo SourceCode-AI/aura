@@ -53,6 +53,7 @@ class Rule:
 
     def __post_init__(self):
         self._hash = None
+        self._diff_hash = None
 
         if isinstance(self.node, ASTNode) and self.line_no is None:
             self.line_no = self.node.line_no
@@ -154,6 +155,12 @@ class Rule:
             return self.detection_type
         else:
             return self.__class__.__name__
+
+    @property
+    def diff_hash(self) -> int:
+        if self._diff_hash is None:
+            self._diff_hash = hash((self.line, self.name, self.message))
+        return self._diff_hash
 
 
 

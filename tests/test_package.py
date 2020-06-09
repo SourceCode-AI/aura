@@ -44,7 +44,7 @@ def test_package_retrieval(mock_pypi_rest_api):
         assert location.name.endswith(file_name), (location, file_name)
 
     with tempfile.TemporaryDirectory(prefix="aura_pytest_") as tmp:
-        downloaded = pkg.download_release(tmp)
+        downloaded = pkg.download_release(tmp, packagetype="all", release="0.34.2")
         content = os.listdir(tmp)
 
     assert "wheel-0.34.2.tar.gz" in downloaded

@@ -5,6 +5,7 @@ import pkg_resources
 from .. import exceptions
 
 OUTPUT_HANDLERS = None
+DIFF_OUTPUT_HANDLERS = None
 
 
 class AuraOutput(metaclass=ABCMeta):
@@ -13,7 +14,7 @@ class AuraOutput(metaclass=ABCMeta):
             self.metadata = metadata
         else:
             self.metadata = {}
-        self.verbosity = metadata.get("verbosity", 1)
+        self.verbosity = self.metadata.get("verbosity", 1)
 
         self.tag_filters = []
         self.compile_filter_tags()
@@ -42,10 +43,6 @@ class AuraOutput(metaclass=ABCMeta):
 
     @abstractmethod
     def output(self, hits):
-        ...
-
-    @abstractmethod
-    def output_diff(self, diffs):
         ...
 
     def filtered(self, hits):
@@ -91,3 +88,21 @@ class AuraOutput(metaclass=ABCMeta):
                 OUTPUT_HANDLERS[x.name] = handler
 
         return OUTPUT_HANDLERS
+
+
+class DiffOutputBase(metaclass=ABCMeta):
+    @abstractmethod
+    def output_diff(self, diffs):
+        ...
+
+    @classmethod
+    def get_output_formats(cls):
+        global DIFF_OUTPUT_HANDLERS
+
+        if not DIFF_OUTPUT_HANDLERS:
+            DIFF_OUTPUT_HANDLERS = {}
+            for x in pkg_resources.iter_entry_points("aura.diff_output_handlers"):
+                handler = x.load()
+                DIFF_OUTPUT_HANDLERS[x.name] = handler
+
+        return DIFF_OUTPUT_HANDLERS

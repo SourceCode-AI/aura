@@ -1,16 +1,22 @@
 # -*- coding: utf-8 -*-
+from __future__ import annotations
 import math
 import datetime
 import tempfile
-import functools
+import shutil
 import xmlrpc.client
+from functools import partial
 from urllib.parse import urlparse, ParseResult
 from pathlib import Path
+from itertools import product, chain
 from contextlib import contextmanager
+from typing import Optional, Generator, Tuple
 
 import pytz
 import requests
 import requirements
+from packaging.version import Version
+from textdistance import jaccard
 from dateutil import parser
 
 
@@ -18,6 +24,8 @@ from . import config
 from . import github
 from . import utils
 from . import exceptions
+from . import diff
+from .uri_handlers.base import ScanLocation
 from .mirror import LocalMirror
 
 
@@ -33,6 +41,10 @@ class PypiPackage:
         self.source = source
         self.requirements = []
         self._parse_requirements()
+        self.release = "all"
+        self.packagetype = None
+        self.filename = None
+        self.md5 = None
 
     @classmethod
     def from_pypi(cls, name, *args, **kwargs):
@@ -63,6 +75,9 @@ class PypiPackage:
         )
         return list(repo.list_packages())
 
+    def __contains__(self, item):
+        return item in self.info["releases"].keys()
+
     def __getitem__(self, item):
         return self.info[item]
 
@@ -75,14 +90,20 @@ class PypiPackage:
                 # FIXME: reference lost # req = utils.filter_empty_dict(dict(req))
                 self.requirements.append(req)
 
-    def get_latest_release(self):
+    def get_latest_release(self) -> str:
         return self.info["info"]["version"]
 
-    def download_release(self, dest, release="latest", all=True):
+    def download_release(
+        self,
+        dest,
+        all=True,
+        **filters
+    ):
         dest = Path(dest)
         files = []
 
-        filtered = self.filter_package_types(release=release)
+        filtered = self.filter_package_types(**filters)
+
         if not all:
             filtered = filtered[:1]
 
@@ -108,36 +129,170 @@ class PypiPackage:
                 utils.download_file(url.geturl(), tmp_file)
                 yield Path(tmp_file.name)
 
-    def filter_package_types(self, release="latest", packagetype=None):
+    def filter_package_types(
+        self,
+        release="latest",
+        packagetype=None,
+        filename=None,
+        md5=None,
+    ):
         if release == "latest":
             release = self.get_latest_release()
 
-        releases = self.info["releases"][release]
+        if release == "all":
+            releases = list(chain(self.info["releases"].values()))
+        else:
+            releases = self.info["releases"][release]
+
+
         types = set(x.get("packagetype") for x in releases)
 
         if "sdist" in types and packagetype is None:
             packagetype = "sdist"
 
+        filters = (
+            partial(packagetype_filter, packagetype=packagetype),
+            partial(filename_filter, filename=filename),
+            partial(md5_filter, md5=md5)
+        )
         pkgs = []
 
         for pkg in releases:
-            if packagetype == "all":
-                pkgs.append(pkg)
-            elif packagetype and pkg.get("packagetype") == packagetype:
-                pkgs.append(pkg)
-            else:
+            if all(x(pkg) for x in filters):
                 pkgs.append(pkg)
 
-        # FIXME: sort by highest release version
-        # example with sub-releases: mxnet_tensorrt_cu90
-
+        # FIXME: sort by version pkgs.sort(key=lambda x: Version(x), reverse=True)
         return pkgs
+
+    def compare(self, other: PypiPackage, diff_archives=True):
+        info_matrix = self._cmp_info(other)
+        self_score = PackageScore(self.name, package=self)
+        other_score = PackageScore(other.name, package=other)
+
+        import pprint
+        pprint.pprint(info_matrix)
+        pprint.pprint(self_score.get_score_matrix())
+        pprint.pprint(other_score.get_score_matrix())
+
+        self._cmp_archives(other)
+
+    def _yield_cmp_versions(self, other: PypiPackage) -> Generator[Tuple[str, str], None, None]:
+        self_latest = self.get_latest_release()
+        self_parsed = Version(self_latest)
+        other_latest = other.get_latest_release()
+        other_parsed = Version(other_latest)
+
+        yield (self_latest, other_latest)
+        if self_parsed != other_parsed:
+            if self_latest in other:
+                yield (self_latest, self_latest)
+            elif other_latest in self:
+                yield (other_latest, other_latest)
+
+    def _yield_archive_md5(
+        self,
+        self_version,
+        other,
+        other_version,
+    ) -> Generator[Tuple[dict, dict], None, None]:
+        sortkey = lambda x: (-1 if x.get("packagetype") == "sdist" else 0)
+
+        self_releases = sorted(self.info["releases"][self_version], key=sortkey)
+        other_releases = sorted(other.info["releases"][other_version], key=sortkey)
+        all_candidates = []
+
+        for x, y in product(self_releases, other_releases):
+            # Make sure these attributes are equal between releases
+            if x.get("packagetype") != y.get("packagetype"):
+                continue
+            elif x.get("python_version") != y.get("python_version"):
+                continue
+
+            all_candidates.append((x, y))
+
+        if all_candidates:
+            yield all_candidates[0]
+        else:
+            # If there are no candidates after filtering, fallback to just take the first ones from each
+            yield (self_releases[0], other_releases[0])
+
+    def _cmp_info(self, other: PypiPackage) -> dict:
+        matrix = {}
+
+        sum1 = self["info"]["summary"] or ""
+        sum2 = other["info"]["summary"] or ""
+        sum_sim = jaccard.normalized_similarity(sum1, sum2)
+        matrix["description_similarity"] = sum_sim
+        matrix["similar_description"] = (sum_sim >= 0.8)
+
+        page1 = self["info"]["home_page"] or ""
+        page2 = other["info"]["home_page"] or ""
+        matrix["same_homepage"] = (page1 == page2)
+
+        docs1 = self["info"]["docs_url"] or ""
+        docs2 = other["info"]["docs_url"] or ""
+        matrix["same_docs"] = (docs1 == docs2)
+
+        releases1 = set(self["releases"].keys())
+        releases2 = set(other["releases"].keys())
+        matrix["has_subreleases"] = releases1.issuperset(releases2)
+
+        return matrix
+
+    def _cmp_archives(self, other: PypiPackage):
+        diff_candidates = []
+        temp_dir = Path(tempfile.mkdtemp(prefix="aura_pkg_diff_"))
+
+        try:
+            for self_version, other_version in self._yield_cmp_versions(other):
+                for self_archive, other_archive in self._yield_archive_md5(self_version, other, other_version):
+                    diff_candidates.append((self_archive, other_archive))
+
+            for (x, y) in diff_candidates:
+                x_path = temp_dir / x["md5_digest"]
+                x_path.mkdir()
+                x_path /= x["filename"]
+
+                with x_path.open("wb") as fd:
+                    utils.download_file(x["url"], fd)
+
+                x_loc = ScanLocation(
+                    location=x_path,
+                    strip_path=str(x_path.parent),
+                    metadata={"release": x}
+                )
+
+                y_path = temp_dir / y["md5_digest"]
+                y_path.mkdir()
+                y_path /= y["filename"]
+
+                with y_path.open("wb") as fd:
+                    utils.download_file(y["url"], fd)
+
+                y_loc = ScanLocation(
+                    location=y_path,
+                    strip_path=str(y_path.parent),
+                    metadata={"release": y}
+                )
+
+                differ = diff.DiffAnalyzer()
+                differ.compare(x_loc, y_loc, detections=True)
+                differ.pprint()
+
+        finally:
+            if temp_dir.exists():
+                shutil.rmtree(temp_dir)
 
 
 class PackageScore:
-    def __init__(self, package_name):
+    def __init__(self, package_name: str, package: Optional[PypiPackage]=None):
         self.package_name = package_name
-        self.pkg = PypiPackage.from_pypi(package_name)
+
+        if package is None:
+            self.pkg = PypiPackage.from_pypi(package_name)
+        else:
+            self.pkg = package
+
         self.now = pytz.UTC.localize(datetime.datetime.utcnow())
         self.github = None
 
@@ -245,8 +400,32 @@ class PackageScore:
         return score_matrix
 
 
+def packagetype_filter(release, packagetype="all") -> bool:
+    if packagetype == "all":
+        return True
+    elif packagetype and release.get("packagetype") == packagetype:
+        return True
+    else:
+        return False
+
+
+def filename_filter(release, filename=None) -> bool:
+    if filename is None:
+        return True
+
+    return (release["filename"] == filename)
+
+
+def md5_filter(release, md5=None) -> bool:
+    if md5 is None:
+        return True
+
+    return (md5 == release["md5_digest"])
+
+
 if __name__ == "__main__":
     import sys, pprint
 
-    pkg_score = PackageScore(sys.argv[1])
-    pprint.pprint(pkg_score.get_score_matrix())
+    pkg1 = PypiPackage.from_pypi(sys.argv[1])
+    pkg2 = PypiPackage.from_pypi(sys.argv[2])
+    pkg1.compare(pkg2)

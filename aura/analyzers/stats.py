@@ -17,6 +17,7 @@ def analyze(*, location: ScanLocation):
         informational=True,
         extra={
             "mime": location.metadata["mime"],
+            "size": location.location.stat().st_size
         },
         location=loc,
         signature=f"file_stats#{loc}"

@@ -89,7 +89,7 @@
         {
           "type": "object",
           "properties": {
-            "type": {"const": "regex"},
+            "type": {"enum": ["regex", "exact", "contains", "glob"]},
             "pattern": {"type": "string"},
             "message": {"type": "string"},
             "flags": {"type": "string"}

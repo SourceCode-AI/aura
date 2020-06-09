@@ -18,6 +18,7 @@ jinja2==2.11.2
 pytest-randomly==3.3.1
 tqdm==4.46.0
 pytz==2020.1
+textdistance==4.2.0
 
 #Extras
 defusedxml==0.6.0

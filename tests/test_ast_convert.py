@@ -12,6 +12,7 @@ def create_context(data):
     )
     return ctx
 
+
 def get_raw_ast(source_code):
     out = visitor.get_ast_tree('-', bytes(source_code, 'utf-8'))
     return out['ast_tree']['body']
@@ -19,7 +20,7 @@ def get_raw_ast(source_code):
 
 def test_string(fixtures):
     raw = fixtures.get_raw_ast('"Hello world"')[0]['value']
-    assert isinstance(raw, dict)
+    assert type(raw) == dict
     assert raw['_type'] == 'Str'
     ctx = create_context(raw)
     out = []

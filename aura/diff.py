@@ -5,19 +5,24 @@ Utilities for computing diffs
 
 import os
 import re
-import sys
 import tempfile
 import shutil
 import pprint
+from typing import Union, Optional, List
 from pathlib import Path
+from itertools import chain
+from collections import defaultdict
 from dataclasses import dataclass, field
 
 import magic
+from textdistance import jaccard as sim_hash
 from git import Repo, Diff as GitDiff, Blob
 from blinker import signal
 
 from . import utils
 from . import plugins
+from .analyzers.rules import Rule
+from .package_analyzer import Analyzer
 from .uri_handlers.base import ScanLocation
 
 
@@ -27,33 +32,46 @@ DIFF_EXCLUDE = re.compile(r"^Binary files .+ differ$")
 @dataclass()
 class Diff:
     operation: str
-    a_size: str
-    b_size: str
+    a_size: Optional[int]
+    b_size: Optional[int]
     a_scan: ScanLocation
     b_scan: ScanLocation
-    a_ref: str = None
-    b_ref: str = None
-    a_md5: str = None
-    b_md5: str = None
-    a_mime: str = None
-    b_mime: str = None
+    a_ref: Optional[str] = None
+    b_ref: Optional[str] = None
+    a_md5: Optional[str] = None
+    b_md5: Optional[str] = None
+    a_mime: Optional[str] = None
+    b_mime: Optional[str] = None
     diff: str = ''
     similarity: float = 0.0
 
+    new_detections: Optional[List[Rule]] = None
+    removed_detections: Optional[List[Rule]] = None
+
     def __post_init__(self):
         assert self.operation in ("A", "D", "M", "R")
+        # a_path, b_path = self.a_path, self.b_path
+        #
+        # if a_path and b_path:
+        #     a_content = self.a_path.read_bytes()
+        #     b_content = self.b_path.read_bytes()
+        #     self.similarity = sim_hash.normalized_similarity(a_content, b_content)
 
     @property
-    def a_path(self) -> Path:
+    def a_path(self) -> Optional[Path]:
         if self.a_scan.location.is_file():
             return self.a_scan.location
+        elif self.a_ref is None:
+            return None
         else:
             return self.a_scan.location / self.a_ref
 
     @property
-    def b_path(self) -> Path:
+    def b_path(self) -> Optional[Path]:
         if self.b_scan.location.is_file():
             return self.b_scan.location
+        elif self.b_ref is None:
+            return None
         else:
             return self.b_scan.location / self.b_ref
 
@@ -106,7 +124,23 @@ class Diff:
         else:
             data["b_size"] = 0
 
+        if data.get("a_md5") and data["a_md5"] == data.get("b_md5"):
+            data["similarity"] = 1.0
+        elif git_diff.a_blob and git_diff.b_blob:
+            a_content = git_diff.a_blob.data_stream.read()
+            b_content = git_diff.b_blob.data_stream.read()
+            data["similarity"] = sim_hash.normalized_similarity(a_content, b_content)
+
         return cls(**data)
+
+    def add_detections(self, a_detections: List[Rule], b_detections: List[Rule]):
+        duplicates = set(x.diff_hash for x in a_detections) & set(x.diff_hash for x in b_detections)
+        self.new_detections = [x for x in b_detections if x.diff_hash not in duplicates]
+        self.removed_detections = [x for x in a_detections if x.diff_hash not in duplicates]
+
+    def pprint(self):
+        from prettyprinter import pprint as pp
+        pp(self)
 
 
 class DiffAnalyzer:
@@ -148,7 +182,7 @@ class DiffAnalyzer:
     def _on_diff_type_dict(self, sender, ctx):
         pprint.pprint(sender)
 
-    def compare(self, a_path: ScanLocation, b_path: ScanLocation, ctx=None):
+    def compare(self, a_path: ScanLocation, b_path: ScanLocation, ctx=None, detections=False):
         if a_path.location.is_file() and b_path.location.is_file():
             self._diff_files(a_path, b_path, ctx)
         elif b_path.location.is_dir() and a_path.location.is_dir():
@@ -157,30 +191,14 @@ class DiffAnalyzer:
             # TODO: be able to compare an archive and a directory
             raise ValueError(f"FS type mismatch: {str(a_path)}, {str(b_path)}")
 
+        if detections:
+            _ = DiffDetections(self.diffs, a_path, b_path)
+
+
     def _diff_dirs(self, a_path: ScanLocation, b_path: ScanLocation, ctx):
         self._diff_git(a_path, b_path, ctx)
 
     def _diff_files(self, a_path: ScanLocation, b_path: ScanLocation, ctx):
-
-        # TODO: refactor to use the archive unpacker as analyzer
-        # if a_mime in Unpacker.supported_mime_types and b_mime in Unpacker.supported_mime_types:
-        #     if ctx is None:
-        #         ctx = {}
-        #
-        #     a_archive = Unpacker(path=a_path, mime=a_mime)
-        #     b_archive = Unpacker(path=b_path, mime=b_mime)
-        #
-        #     a_ref = ctx.get('a_ref')
-        #     if (not a_ref) or (a_ref and not os.fspath(a_path).endswith(a_ref)):
-        #         a_ref = utils.construct_path(a_path, parent=a_ref)
-        #         ctx['a_ref'] = a_ref
-        #
-        #     b_ref = ctx.get('b_ref')
-        #     if (not b_ref) or (a_ref and not os.fspath(a_path).endswith(a_ref)):
-        #         b_ref = utils.construct_path(b_path, parent=a_ref)
-        #         ctx['b_ref'] = b_ref
-        #
-        #     self.compare(Path(a_archive.tmp_dir), Path(b_archive.tmp_dir), ctx=ctx)
         self._diff_git(a_path, b_path, ctx)
 
     def _diff_git(self, a_path: ScanLocation, b_path: ScanLocation, ctx=None):
@@ -264,7 +282,7 @@ class DiffAnalyzer:
                 if isinstance(x, Blob):
                     same_files.add(x.path)
 
-            for diff in a_commit.diff(b_commit, create_patch=True):
+            for diff in a_commit.diff(b_commit, create_patch=True, M=True, l=100, B=True, C=True):
                 if diff.a_path in same_files:
                     same_files.remove(diff.a_path)
 
@@ -281,3 +299,61 @@ class DiffAnalyzer:
 
         finally:
             shutil.rmtree(tmp)
+
+    def pprint(self):
+        from .output import text
+        out = text.TextDiffOutput()
+        out.output_diff(self.diffs)
+
+
+@dataclass()
+class DiffDetections:
+    def __init__(self, file_diffs: List[Diff], a_location: ScanLocation, b_location: ScanLocation):
+        self.file_diffs: List[Diff] = file_diffs
+        self.a_loc: ScanLocation = a_location
+        self.b_loc: ScanLocation = b_location
+        self.orphans = []
+
+        a_refs = {}
+        b_refs = {}
+
+        for d in file_diffs:
+            if d.a_ref:
+                a_refs[d.a_ref] = d
+            if d.b_ref:
+                b_refs[d.b_ref] = d
+
+        self.a_hits = self.scan_location(self.a_loc)
+        a_pairs, a_orphans = self.pair_hits(a_refs, self.a_hits)
+
+        self.b_hits = self.scan_location(self.b_loc)
+        b_pairs, b_orphans = self.pair_hits(b_refs, self.b_hits)
+
+        for d in file_diffs:
+            a_detections = a_pairs.get(d.a_ref, [])
+            b_detections = b_pairs.get(d.b_ref, [])
+            d.add_detections(a_detections, b_detections)
+
+    def scan_location(self, location):
+        sandbox = Analyzer(location=location)
+        with sandbox.run() as hits:
+            return hits
+
+    def pair_hits(self, diff_refs, hits):
+        orphans = []
+        matches = defaultdict(list)
+        sorted_refs = sorted(diff_refs.keys(), key=lambda x: len(x), reverse=True)
+
+        for hit in hits:
+            if hit.detection_type == "FileStats":
+                continue
+
+            for ref in sorted_refs:
+
+                if hit.location and hit.location.startswith(ref):
+                    matches[ref].append(hit)
+                    break
+            else:
+                orphans.append(hit)
+
+        return matches, orphans

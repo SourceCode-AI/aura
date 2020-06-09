@@ -26,6 +26,7 @@ from ..analyzers.rules import DataProcessing, Rule
 
 logger = config.get_logger(__name__)
 HANDLERS = {}
+CLEANUP_LOCATIONS = set()
 
 
 class URIHandler(ABC):
@@ -40,7 +41,7 @@ class URIHandler(ABC):
         return parsed_uri.scheme == cls.scheme
 
     @classmethod
-    def from_uri(cls, uri) -> Union[URIHandler, None]:
+    def from_uri(cls, uri: str) -> Optional[URIHandler]:
         parsed = urllib.parse.urlparse(uri)
         cls.load_handlers()
 
@@ -92,7 +93,7 @@ class ScanLocation(KeepRefs):
     location: Path
     metadata: dict = field(default_factory=dict)
     cleanup: bool = False
-    parent: Union[str, None] = None
+    parent: Optional[str] = None
     strip_path: str = ""
 
     def __post_init__(self):
@@ -101,6 +102,9 @@ class ScanLocation(KeepRefs):
             self.location = Path(self.location)
         else:
             self.__str_location = os.fspath(self.location)
+
+        if self.cleanup:
+            CLEANUP_LOCATIONS.add(self.location)
 
         self.__str_parent = None
 
@@ -111,7 +115,7 @@ class ScanLocation(KeepRefs):
         if self.location.is_file():
             self.metadata["mime"] = magic.from_file(self.str_location, mime=True)
 
-            if self.metadata["mime"] in ("text/plain", "application/octet-stream"):
+            if self.metadata["mime"] in ("text/plain", "application/octet-stream", "text/none"):
                 self.metadata["mime"] = mimetypes.guess_type(self.location)[0]
 
             if self.metadata["mime"] == "text/x-python" and "no_imports" not in self.metadata:
@@ -143,7 +147,7 @@ class ScanLocation(KeepRefs):
         return self.__str_parent
 
     @property
-    def filename(self) -> Union[str, None]:
+    def filename(self) -> Optional[str]:
         if self.location.is_file():
             return self.location.name
         else:
@@ -254,8 +258,15 @@ def cleanup_locations():
         if not obj.cleanup:
             continue
 
+        if obj.location in CLEANUP_LOCATIONS:
+            CLEANUP_LOCATIONS.remove(obj.location)
+
         if obj.location.exists():
             shutil.rmtree(obj.location)
+
+    for location in CLEANUP_LOCATIONS:  # type: Path
+        if location.exists():
+            shutil.rmtree(location)
 
 
 atexit.register(cleanup_locations)

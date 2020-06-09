@@ -33,6 +33,9 @@ class SecretsAnalyzer(base.NodeAnalyzerV2):
         yield from self._gen_hit(context, name, secret, extra={"type": "variable"})
 
     def _gen_hit(self, context, name, secret, **extra):
+        if len(secret) < 5:
+            return
+
         hit = LeakingSecret(
             message="Possible sensitive leaking secret",
             extra={"name": name, "secret": secret},
@@ -40,8 +43,6 @@ class SecretsAnalyzer(base.NodeAnalyzerV2):
             signature=f"leaking_secret#{context.visitor.normalized_path}#{context.node.line_no}",
         )
 
-        if len(secret) < 5:
-            return
 
         hit.extra.update(extra)
         yield hit

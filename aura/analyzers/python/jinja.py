@@ -180,9 +180,9 @@ class JinjaTemplateVisitor(Visitor):
             if taints:
                 context.node.add_taint(taint=max(taints), context=context)
         elif context.node.is_type(jnodes.Name):
-            if context.node.name in self.metadata["taints"]:
+            if context.node.name in self.location.metadata["taints"]:
                 context.node.add_taint(
-                    self.metadata["taints"][context.node.name], context
+                    self.location.metadata["taints"][context.node.name], context
                 )
 
         if (
@@ -195,8 +195,8 @@ class JinjaTemplateVisitor(Visitor):
                 message="Tainted input passed to sink in the jinja template",
                 score=100,
                 line_no=lineno,
-                signature=f"jinja#taint_analysis#{self.metadata['path']}#{lineno}",
-                location=self.metadata["path"],
+                signature=f"jinja#taint_analysis#{str(self.location)}#{lineno}",
+                location=self.location.location,
             )
             hit.tags |= {
                 "jinja",

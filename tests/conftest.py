@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import inspect
 import tempfile
 import contextlib
 from pathlib import Path
@@ -22,6 +23,10 @@ MIRROR_FILES = {
         {
             "name": "wheel-0.34.2.tar.gz",
             "path": "packages/75/28/521c6dc7fef23a68368efefdcd682f5b3d1d58c2b90b06dc1d0b805b51ae"
+        },
+        {
+            "name": "wheel-0.33.0-py2.py3-none-any.whl",
+            "path": "packages/7c/d7/20bd3c501f53fdb0b7387e75c03bd1fce748a1c3dd342fc53744e28e3de1/wheel-0.33.0-py2.py3-none-any.whl"
         }
     )
 }
@@ -139,6 +144,10 @@ def match_rule(source, target) -> bool:
     # Check if target is a regex and apply it to source string
     if (isinstance(target, Pattern) or isinstance(target, REGEX_TYPE)) and type(source) == str:
         return bool(target.match(source))
+
+    # Check if target is a function (that should return bool)
+    if inspect.isfunction(target):
+        return target(source)
 
     if type(target) != type(source):
         return False

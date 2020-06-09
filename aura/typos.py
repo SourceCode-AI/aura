@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional, Generator, Iterable, Tuple, Callable, List
 
 import dateutil.parser
+import textdistance
 from packaging.utils import canonicalize_name
 
 from . import diff
@@ -55,7 +56,7 @@ class TypoAnalyzer(object):
 
         # Switch the packages in place if they are in wrong order
         if releases2 and not releases1 or self.releases2[0] < self.releases1[0]:
-            self.pk1, self.pkg2 = self.pkg2, self.pkg1
+            self.pkg1, self.pkg2 = self.pkg2, self.pkg1
             self.releases1, self.releases2 = self.releases2, self.releases1
 
     def analyze(self):
@@ -64,8 +65,9 @@ class TypoAnalyzer(object):
     def analyze_info_data(self):
         sum1 = self.pkg1.package["info"]["summary"] or ""
         sum2 = self.pkg2.package["info"]["summary"] or ""
-        # TODO: migrate as ssdeep is no longer a dependency of Aura
-        # self.flags['similar_description'] = (ssdeep.compare(ssdeep.hash(sum1), ssdeep.hash(sum2)) > 80)
+        desc_similarity = textdistance.jaccard.normalized_similarity(sum1, sum2)
+        self.flags["description_similarity"] = desc_similarity
+        self.flags["similar_description"] = (desc_similarity > 0.8)
 
         page1 = self.pkg1.package["info"]["home_page"] or ""
         page2 = self.pkg2.package["info"]["home_page"] or ""

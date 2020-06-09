@@ -12,6 +12,7 @@ from logging.handlers import RotatingFileHandler
 from typing import Optional
 
 import tqdm
+import pkg_resources
 import jsonschema
 
 
@@ -28,6 +29,7 @@ LOG_FMT = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)
 LOG_ERR = None
 # This is used to trigger breakpoint during AST traversing of specific lines
 DEBUG_LINES = set()
+DEFAULT_AST_STAGES = ("convert", "rewrite", "taint_analysis", "readonly")
 
 if "AURA_DEBUG_LINES" in os.environ:
     DEBUG_LINES = set(int(x.strip()) for x in os.environ["AURA_DEBUG_LINES"].split(","))
@@ -223,6 +225,25 @@ def get_default_tag_filters() -> typing.List[str]:
         return []
 
     return list(CFG["tags"].keys())
+
+
+def get_installed_stages() -> typing.Generator[str,None,None]:
+    for x in pkg_resources.iter_entry_points("aura.ast_visitors"):
+        yield x.name
+
+
+def get_ast_stages() -> typing.Tuple[str,...]:
+    cfg_value = CFG["aura"].get("ast-stages", fallback=None)
+    if cfg_value is None:
+        return DEFAULT_AST_STAGES
+
+    stages = []
+    for x in cfg_value.split():
+        if not x:
+            continue
+        stages.append(x)
+
+    return tuple(stages)
 
 
 load_config()
