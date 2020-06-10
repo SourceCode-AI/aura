@@ -6,7 +6,7 @@ from aura.analyzers import find_imports
 
 AURA_CMD_IMPORTS = {
     (1, ('Analyzer',), 'package_analyzer'),
-    (1, ('AuraOutput',), 'output.base'),
+    (1, ('ScanOutputBase', 'DiffOutputBase'), 'output.base'),
     (1, ('PypiPackage',), 'package'),
     (1, ('URIHandler', 'ScanLocation'), 'uri_handlers.base')
 }
@@ -28,4 +28,4 @@ def test_get_imports():
         data = (imp[0], pkgs, imp[2])
         converted.add(data)
 
-    assert len(AURA_CMD_IMPORTS - converted) == 0, converted
+    assert len(AURA_CMD_IMPORTS - converted) == 0, (AURA_CMD_IMPORTS-converted)

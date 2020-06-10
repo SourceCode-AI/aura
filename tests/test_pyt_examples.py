@@ -119,7 +119,7 @@ def test_XSS_form(fixtures):
 
 def test_XSS_no_vuln(fixtures):
     output = fixtures.scan_test_file('pyt_examples/XSS_no_vuln.py')
-    assert len(output['hits']) == 0, output['hits']
+    assert len(output['detections']) == 0, output['detections']
 
 
 def test_xss_reassign(fixtures):
@@ -130,7 +130,7 @@ def test_xss_reassign(fixtures):
 
 def test_XSS_sanitized(fixtures):
     output = fixtures.scan_test_file('pyt_examples/XSS_sanitised.py')
-    assert len(output['hits']) == 0, output['hits']
+    assert len(output['detections']) == 0, output['detections']
 
 
 def test_XSS_url(fixtures):
@@ -147,7 +147,7 @@ def test_XSS_param(fixtures):
 
 def test_XSS_variable_assign_no_vuln(fixtures):
     output = fixtures.scan_test_file('pyt_examples/XSS_variable_assign_no_vuln.py')
-    assert len(output['hits']) == 0, output['hits']
+    assert len(output['detections']) == 0, output['detections']
 
 
 def test_XSS_variable_multiple_assign(fixtures):

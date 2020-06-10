@@ -115,9 +115,9 @@ class Fixtures(object):
     def scan_and_match(self, input_file, matches):
         output = self.scan_test_file(input_file)
         for x in matches:
-            assert any(match_rule(h, x) for h in output["hits"]), (x, output["hits"])
+            assert any(match_rule(h, x) for h in output["detections"]), (x, output["detections"])
 
-        for hit in output["hits"]:
+        for hit in output["detections"]:
             assert hit["type"] != "ASTParseError"
 
 

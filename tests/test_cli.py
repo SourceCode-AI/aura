@@ -23,10 +23,8 @@ def test_simple_cli_analysis(exec_mode, fixtures):
 
 
 @pytest.mark.extended
-def test_complex_cli_analysis(fixtures, fuzzy_rule_match):
-    output = fixtures.scan_test_file("obfuscated.py")
-
-    hits = [
+def test_complex_cli_analysis(fixtures):
+    matches = [
         {
             "type": "StringMatch",
             "extra": {
@@ -59,8 +57,7 @@ def test_complex_cli_analysis(fixtures, fuzzy_rule_match):
         }
     ]
 
-    for x in hits:
-        assert any(fuzzy_rule_match(h, x) for h in output['hits']), x
+    fixtures.scan_and_match("obfuscated.py", matches)
 
 
 @pytest.mark.extended
@@ -84,13 +81,13 @@ def test_custom_analyzer(fixtures):
         ReadOnlyAnalyzer.hooks = hooks
 
 
-def test_min_score_option(fixtures):
+def test_scan_min_score_option(fixtures):
     output = fixtures.scan_test_file(
-        "obfuscated.py", args=["--min-score", 1000], decode=False
+        "obfuscated.py", args=["-f", "json://-?min_score=1000"], decode=False
     )
     assert len(output.output.strip()) == 0, output.output
 
-    output = fixtures.scan_test_file("obfuscated.py", args=["--min-score", 10])
+    output = fixtures.scan_test_file("obfuscated.py", args=["-f", "json://-?min_score=10"])
     assert type(output) == dict
     assert output["score"] > 0
 
@@ -114,7 +111,7 @@ def test_tag_filtering(tag_filter, fixtures):
 
     output = fixtures.scan_test_file("shelli.py", args=args)
 
-    for hit in output["hits"]:
+    for hit in output["detections"]:
         for tag in tag_filter:
             if tag.startswith("!"):
                 assert tag[1:] not in hit["tags"], (tag, hit)

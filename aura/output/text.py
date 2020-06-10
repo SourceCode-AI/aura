@@ -1,14 +1,16 @@
 import re
+import sys
+from dataclasses import dataclass
 from textwrap import shorten, wrap
 from prettyprinter import pformat
-from typing import Optional
+from typing import Optional, Any
 
 from click import echo, secho, style
 
 from .. import utils
 from .. import config
 from ..exceptions import MinimumScoreNotReached
-from .base import AuraOutput, DiffOutputBase
+from .base import ScanOutputBase, DiffOutputBase
 
 
 # Reference for unicode box characters:
@@ -22,15 +24,19 @@ class PrettyReport:
     [A-Za-z]) # a letter
     """, re.VERBOSE)
 
-    def __init__(self):
+    def __init__(self, fd=None):
         self.width = config.get_int("aura.text-output-width", 120)
+        self.fd = fd
 
     @classmethod
     def ansi_length(cls, line:str):
         return len(cls.ANSI_RE.sub("", line))
 
     def print_separator(self, sep="\u2504", left="\u251C", right="\u2524"):
-        secho(f"{left}{sep*(self.width-2)}{right}")
+        secho(f"{left}{sep*(self.width-2)}{right}", file=self.fd)
+
+    def print_thick_separator(self):
+        self.print_separator(left="\u255E", sep="\u2550", right="\u2561")
 
     def print_top_separator(self):
         self.print_separator(left="\u2552", sep="\u2550", right="\u2555")
@@ -42,7 +48,7 @@ class PrettyReport:
         text_len = self.ansi_length(text)
         ljust = (self.width-4-text_len)//2
         rjust = self.width-4-text_len-ljust
-        secho(f"{left}{infill*ljust} {text} {infill*rjust}{right}")
+        secho(f"{left}{infill*ljust} {text} {infill*rjust}{right}", file=self.fd)
 
     def align(self, line, pos=-1, left="\u2502 ", right=" \u2502"):
         content_len = self.ansi_length(line)
@@ -62,7 +68,7 @@ class PrettyReport:
         else:
             line = " "*(remaining_len-content_len) + line
 
-        echo(f"{left}{line}{right}")
+        secho(f"{left}{line}{right}", file=self.fd)
 
     def wrap(self, text, left="\u2502 ", right=" \u2502"):
         remaining_len=self.width - len(left) - len(right)
@@ -75,8 +81,9 @@ class PrettyReport:
             self.align(line, left=left, right=right)
 
 
+@dataclass()
 class TextBase:
-    formatter = PrettyReport()
+    _formatter: Optional[PrettyReport] = None
 
     def _format_detection(
             self,
@@ -86,13 +93,13 @@ class TextBase:
             top_separator=True,
             bottom_separator=True
     ):
-        out = self.formatter
+        out = self._formatter
         if top_separator:
             out.print_top_separator()
 
         if header is None:
             header = style(hit["type"], "green", bold=True)
-        out.align(header)
+        out.print_heading(header)
 
         out.print_separator()
         out.wrap(hit["message"])
@@ -156,18 +163,29 @@ class TextBase:
         return root
 
 
-class TextOutput(AuraOutput, TextBase):
-    formatter = PrettyReport()
 
-    def output(self, hits):
-        hits = set(hits)
-        imported_modules = {h.extra["name"] for h in hits if h.name == "ModuleImport"}
+class TextScanOutput(ScanOutputBase, TextBase):
+    _fd: Any = None
 
-        try:
-            hits = self.filtered(hits)
-        except MinimumScoreNotReached:
+    def __enter__(self):
+        if self.output_location == "-":
+            self._formatter = PrettyReport(fd=sys.stdout)
             return
 
+        self._fd = open(self.output_location, "w")
+        self._formatter = PrettyReport(fd=self._fd)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self._fd:
+            self._fd.close()
+
+    @classmethod
+    def is_supported(cls, parsed_uri) -> bool:
+        return parsed_uri.scheme == "text"
+
+    def output(self, hits, scan_metadata: dict):
+        hits = set(hits)
+        imported_modules = {h.extra["name"] for h in hits if h.name == "ModuleImport"}
         score = 0
         tags = set()
 
@@ -177,41 +195,62 @@ class TextOutput(AuraOutput, TextBase):
 
         score = sum(x.score for x in hits)
 
-        if score < self.metadata.get("min_score", 0):
+        if score < self.min_score:
             return
 
-        secho("\n")  # Empty line for readability
-        self.formatter.print_top_separator()
-        self.formatter.print_heading(style(f"Scan results for {self.metadata.get('name', 'N/A')}", fg="bright_green"))
+        secho("\n", file=self._fd)  # Empty line for readability
+        self._formatter.print_top_separator()
+        self._formatter.print_heading(style(f"Scan results for {scan_metadata.get('name', 'N/A')}", fg="bright_green"))
         score_color = "bright_green" if score == 0 else "bright_red"
-        self.formatter.align(style(f"Scan score: {score}", fg=score_color, bold=True))
+        self._formatter.align(style(f"Scan score: {score}", fg=score_color, bold=True))
 
         if len(tags) > 0:
-            self.formatter.align(f"Tags:")
+            self._formatter.align(f"Tags:")
             for t in tags:
-                self.formatter.align(f" - {t}")
+                self._formatter.align(f" - {t}")
 
         if imported_modules:
-            self.formatter.print_heading("Imported modules")
+            self._formatter.print_heading("Imported modules")
             for line in self.pprint_imports(self.imports_to_tree(imported_modules)):
-                self.formatter.align(line)
+                self._formatter.align(line)
         else:
-            self.formatter.print_heading("No imported modules detected")
+            self._formatter.print_heading("No imported modules detected")
 
         if hits:
-            self.formatter.print_heading("Code detections")
+            self._formatter.print_heading("Code detections")
             for h in hits:
-                self._format_detection(h._asdict())
+                self._formatter.print_thick_separator()
+                self._format_detection(h._asdict(), top_separator=False, bottom_separator=False)
         else:
-            self.formatter.print_heading(style("No code detections has been triggered", fg="bright_green"))
-            self.formatter.print_bottom_separator()
+            self._formatter.print_heading(style("No code detections has been triggered", fg="bright_green"))
+
+        self._formatter.print_bottom_separator()
 
 
+@dataclass()
 class TextDiffOutput(DiffOutputBase, TextBase):
-    def output_diff(self, diffs):
-        out = self.formatter
+    _fd: Any = None
 
-        for diff in diffs:
+    def __enter__(self):
+        if self.output_location == "-":
+            self._formatter = PrettyReport(fd=sys.stdout)
+            return
+
+        self._fd = open(self.output_location, "w")
+        self._formatter = PrettyReport(fd=self._fd)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self._fd:
+            self._fd.close()
+
+    @classmethod
+    def is_supported(cls, parsed_uri) -> bool:
+        return parsed_uri.scheme == "text"
+
+    def output_diff(self, diffs):
+        out = PrettyReport(fd=self._fd)
+
+        for diff in self.filtered(diffs):
             out.print_separator(left="\u2552", sep="\u2550", right="\u2555")
 
             if diff.operation in ("M", "R"):
@@ -226,7 +265,7 @@ class TextDiffOutput(DiffOutputBase, TextBase):
                 out.align(style(f"File removed", fg="green"))
                 out.align(f"Path: {style(diff.a_ref, fg='bright_blue')}")
 
-            if diff.diff:
+            if diff.diff and self.patch:
                 out.print_heading("START OF DIFF")
 
                 for diff_line in diff.diff.splitlines():

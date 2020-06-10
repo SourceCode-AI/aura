@@ -2,7 +2,7 @@
 def test_secret_finder(fixtures, fuzzy_rule_match):
     output = fixtures.scan_test_file('secrets.py')
 
-    assert len(output['hits']) > 0
+    assert len(output['detections']) > 0
 
     matches = [
         {
@@ -40,7 +40,7 @@ def test_secret_finder(fixtures, fuzzy_rule_match):
     ]
 
     for x in matches:
-        assert any(fuzzy_rule_match(h, x) for h in output['hits']), x
+        assert any(fuzzy_rule_match(h, x) for h in output['detections']), x
 
     no_match = [
         {
@@ -51,5 +51,5 @@ def test_secret_finder(fixtures, fuzzy_rule_match):
         }
     ]
     for x in no_match:
-        for h in output['hits']:
+        for h in output['detections']:
             assert not fuzzy_rule_match(h, x)

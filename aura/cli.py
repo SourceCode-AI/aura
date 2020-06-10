@@ -59,7 +59,6 @@ def cli(ctx, **kwargs):
     type=click.INT,
     help="Output only scans with at least minimum score",
 )
-@click.option("--output-path", help="Output all data into the SQLite database")
 @click.option("--benchmark", is_flag=True)
 @click.option("--benchmark-sort", default="cumtime")
 @click.option(
@@ -134,19 +133,13 @@ def scan_mirror(output_dir):
 @cli.command(name="diff")
 @click.argument("pth1", metavar="<FIRST PATH>")
 @click.argument("pth2", metavar="<SECOND PATH>")
-@click.option("-f", "--format", default="text", help="Output format")
-def diff(pth1, pth2, format="text"):  # TODO: move functionality to commands and remove direct output type
-    from .output import text
-    pth1 = ScanLocation(Path(pth1))
-    pth2 = ScanLocation(Path(pth2))
-
-    da = DiffAnalyzer()
-    da.compare(pth1, pth2, detections=True)
-
-    output_formats = text.DiffOutputBase.get_output_formats()
-    assert format in output_formats
-    out = output_formats[format]()
-    out.output_diff(da.diffs)
+@click.option("-f", "--format", default="text", help="Output URI format")
+def diff(pth1, pth2, format="text"):
+    commands.data_diff(
+        a_path=pth1,
+        b_path=pth2,
+        format_uri=format
+    )
 
 
 @cli.command(name="parse_ast")

@@ -23,9 +23,10 @@ from . import utils
 from . import mirror
 from . import plugins
 from . import typos
+from . import diff
 from . import worker_executor
 from .package import PypiPackage
-from .output.base import AuraOutput
+from .output.base import ScanOutputBase, DiffOutputBase
 
 
 logger = config.get_logger(__name__)
@@ -86,6 +87,8 @@ def scan_uri(uri, metadata: Union[list, dict]=None) -> list:
         output_format = metadata.get("format", "text")
         all_hits = []
 
+        fmt = ScanOutputBase.from_uri(output_format)
+
         try:
             handler = URIHandler.from_uri(uri)
 
@@ -107,13 +110,13 @@ def scan_uri(uri, metadata: Union[list, dict]=None) -> list:
                         stack.enter_context(scan_worker(x))
                     )
 
-                if output_format:
-                    formats = AuraOutput.get_output_formats()
-                    if output_format not in formats:
-                        raise ValueError(f"Unknown output format: '{output_format}'")
-
-                    output = formats[output_format](metadata=metadata)
-                    output.output(hits=all_hits)
+                try:
+                    filtered_hits = fmt.filtered(all_hits)
+                except exceptions.MinimumScoreNotReached:
+                    pass
+                else:
+                    with fmt:
+                        fmt.output(hits=filtered_hits, scan_metadata=metadata)
 
         except exceptions.NoSuchPackage:
             logger.warn(f"No such package: {uri}")
@@ -126,6 +129,19 @@ def scan_uri(uri, metadata: Union[list, dict]=None) -> list:
 
         logger.info(f"Scan finished in {time.time() - start} s")
         return all_hits
+
+
+def data_diff(a_path: str, b_path: str, format_uri="text"):
+    a_loc = ScanLocation(Path(a_path))
+    b_loc = ScanLocation(Path(b_path))
+
+    out_format = DiffOutputBase.from_uri(format_uri)
+
+    analyzer = diff.DiffAnalyzer()
+    analyzer.compare(a_loc, b_loc, detections=out_format.detections)
+
+    with out_format:
+        out_format.output_diff(analyzer.diffs)
 
 
 def scan_mirror(output_dir: Path):

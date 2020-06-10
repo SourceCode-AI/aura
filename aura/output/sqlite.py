@@ -1,24 +1,31 @@
 import json
 import os
 import sqlite3
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List
+from typing import List, Any
 
-from .base import AuraOutput
+from .base import ScanOutputBase
 from ..analyzers.rules import Rule
 from ..utils import json_encoder
-from ..exceptions import MinimumScoreNotReached
+from ..exceptions import MinimumScoreNotReached, InvalidOutput
 
 
-class SQLiteOutput(AuraOutput):
-    def __init__(self, metadata):
-        super(SQLiteOutput, self).__init__(metadata=metadata)
-        self.db = None
-        self.path = metadata.get("output_path")
-        if self.path is None:
-            raise ValueError("Argument --output-path is required with sqlite output")
+@dataclass()
+class SQLiteScanOutput(ScanOutputBase):
+    _db: Any = None
 
-    def __create_tables(self):
+    def __enter__(self):
+        if self.output_location == "-":
+            raise InvalidOutput("SQLite format can't output to stdout")
+
+        self._db = sqlite3.connect(self.output_location)
+        self._initialize_db()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._db.close()
+
+    def _create_tables(self):
         INPUT_SCHEMA = """
             CREATE TABLE IF NOT EXISTS inputs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,33 +55,27 @@ class SQLiteOutput(AuraOutput):
             )
         """
 
-        with self.db:
-            self.db.execute(INPUT_SCHEMA)
-            self.db.execute(HIT_SCHEMA)
-            self.db.execute(FILES_SCHEMA)
+        with self._db:
+            self._db.execute(INPUT_SCHEMA)
+            self._db.execute(HIT_SCHEMA)
+            self._db.execute(FILES_SCHEMA)
 
-    def __initialize_db(self):
-        self.db = sqlite3.connect(self.path)
-        self.db.enable_load_extension(True)
-        opts = [x[0] for x in self.db.execute("PRAGMA compile_options").fetchall()]
+    def _initialize_db(self):
+        self._db.enable_load_extension(True)
+        opts = [x[0] for x in self._db.execute("PRAGMA compile_options").fetchall()]
         if "ENABLE_JSON1" not in opts:
             raise EnvironmentError(
                 f"SQLite doesn't have support for JSON1, compile opts: {', '.join(opts)}"
             )
 
-        self.__create_tables()
+        self._create_tables()
 
-    def output(self, hits: List[Rule]):
-        try:
-            self.filtered(hits)
-        except MinimumScoreNotReached:
-            return
+    @classmethod
+    def is_supported(cls, parsed_uri) -> bool:
+        return parsed_uri.scheme == "sqlite"
 
-        if self.db is None:
-            self.__initialize_db()
-
-        cur = self.db.cursor()
-
+    def output(self, hits: List[Rule], scan_metadata: dict):
+        cur = self._db.cursor()
         try:
             input_ids = {}
             stored_files = set()
@@ -128,13 +129,8 @@ class SQLiteOutput(AuraOutput):
                         input_id,
                     ),
                 )
-
         except:
-            self.db.rollback()
+            self._db.rollback()
             raise
         else:
-            self.db.commit()
-
-    def output_diff(self, diffs):
-        # TODO
-        raise NotImplementedError("todo")
+            self._db.commit()

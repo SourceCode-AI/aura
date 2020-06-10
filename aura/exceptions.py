@@ -9,6 +9,10 @@ class InvalidLocation(AuraException):
     pass
 
 
+class InvalidOutput(AuraException):
+    pass
+
+
 class InvalidArchiveMember(AuraException):
     pass
 

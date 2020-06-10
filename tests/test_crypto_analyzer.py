@@ -1,9 +1,5 @@
 
 def test_crypto(fixtures, fuzzy_rule_match):
-    output = fixtures.scan_test_file("crypto.py")
-
-    #assert len(output['hits']) == 4
-
     matches = [
         {
             'type': 'CryptoKeyGeneration',
@@ -23,5 +19,4 @@ def test_crypto(fixtures, fuzzy_rule_match):
         }
     ]
 
-    for x in matches:
-        assert any(fuzzy_rule_match(h, x) for h in output['hits']), x
+    fixtures.scan_and_match("crypto.py", matches)

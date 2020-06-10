@@ -1,57 +1,53 @@
-import os
-import json
 import tempfile
 import sqlite3
+from pathlib import Path
 
 import pytest
 
 
-def test_output_formats(fixtures):
+def test_text_scan_output(fixtures):
     """
     Test different output formats
     """
-
     scan_path = fixtures.path('flask_app.py')
 
     # Test plain text output
     cli = fixtures.get_cli_output(['scan', scan_path, '--format', 'text'])
     output = cli.output
-    assert '---[ Scan results for ' in output
+    assert 'Scan results for ' in output
     assert 'Scan score: ' in output
+    # TODO: add more patterns to test for in text output
 
-    # Test JSON output
-    cli = fixtures.get_cli_output(['scan', scan_path, '--format', 'json'])
-    output = json.loads(cli.output)
-    assert output.get('name')
-    assert len(output.get('hits', [])) > 3
 
-    # Test SQLite output
-    with tempfile.NamedTemporaryFile(prefix="aura_test_", suffix=".sqlite") as db_path:
-        _ = fixtures.get_cli_output(
-            ['scan', scan_path, '--format', 'sqlite', '--output-path', db_path.name]
-        )
-        db = sqlite3.connect(db_path.name)
-        db.row_factory = sqlite3.Row
 
-        inputs = [dict(x) for x in db.execute('SELECT * FROM inputs').fetchall()]
-        assert len(inputs) > 1
+def test_sqlite_scan_output(fixtures, tmp_path: Path):
+    scan_path = fixtures.path("flask_app.py")
+    db_path = tmp_path / "aura_test_output.sqlite"
+    _ = fixtures.get_cli_output(
+        ['scan', scan_path, '--format', f'sqlite://{db_path}']
+    )
+    db = sqlite3.connect(db_path)
+    db.row_factory = sqlite3.Row
 
-        input_ids = {
-            x["location"].split("/")[-1]: x["id"] for x in inputs
-        }
+    inputs = [dict(x) for x in db.execute('SELECT * FROM inputs').fetchall()]
+    assert len(inputs) >= 1
 
-        hits = [dict(x) for x in db.execute('SELECT * FROM hits').fetchall()]
-        assert len(hits) > 3
+    input_ids = {
+        x["location"].split("/")[-1]: x["id"] for x in inputs
+    }
 
-        files = [dict(x) for x in db.execute(
-            'SELECT * FROM files WHERE id=?',
-            (input_ids["flask_app.py"],)
-        ).fetchall()]
-        assert len(files) == 1
+    hits = [dict(x) for x in db.execute('SELECT * FROM hits').fetchall()]
+    assert len(hits) > 3
 
-        with open(scan_path, 'rb') as fd:
-            data = fd.read()
-            assert data == files[0]['data']
+    files = [dict(x) for x in db.execute(
+        'SELECT * FROM files WHERE id=?',
+        (input_ids["flask_app.py"],)
+    ).fetchall()]
+    assert len(files) == 1
+
+    with open(scan_path, 'rb') as fd:
+        data = fd.read()
+        assert data == files[0]['data']
 
 
 def test_non_existing(fixtures):
@@ -83,27 +79,27 @@ def test_non_existing(fixtures):
         "sqlite"
     )
 )
-def test_output_not_created_when_below_minimum_score(output_type, fixtures):
+def test_output_not_created_when_below_minimum_score(output_type, fixtures, tmp_path: Path):
     """
     Test that an output file is never created if the minimum score is never reached
     This also tests that the output results are not outputted on stdout
     """
-    with tempfile.TemporaryDirectory(prefix="aura_pytest_tempd_") as tmpd:
-        cli = fixtures.scan_test_file(
-            "misc.py",
-            decode=False,
-            args=[
-                "--format", output_type,
-                "--min-score", 1000,
-                "--output-path", f"{tmpd}/aura_output"
-            ]
-        )
 
-        assert len(os.listdir(tmpd)) == 0
-        assert not os.path.exists(f"{tmpd}/aura_output")
+    out_file = tmp_path / "aura_test_output"
 
-        for keyword in ("os.system", "eval", "__reduce__"):
-            assert keyword not in cli.stdout, (keyword, cli.stdout)
+    cli = fixtures.scan_test_file(
+        "misc.py",
+        decode=False,
+        args=[
+            "--format", f"{output_type}://{out_file}?min_score=1000",
+        ]
+    )
+
+    assert len(list(tmp_path.iterdir())) == 0
+    assert not out_file.exists()
+
+    for keyword in ("os.system", "eval", "__reduce__"):
+        assert keyword not in cli.stdout, (keyword, cli.stdout)
 
 
 @pytest.mark.parametrize(
@@ -123,7 +119,7 @@ def test_output_path_formatting(scan_file, fixtures):
     - Paths should not contain parts of a temporary directory
     """
     temp_prefix = tempfile.gettempdir()
-    output = fixtures.scan_test_file(scan_file)["hits"]
+    output = fixtures.scan_test_file(scan_file)["detections"]
 
     for hit in output:
         location: str = hit.get("location")

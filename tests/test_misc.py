@@ -108,11 +108,11 @@ def test_fs_structure_detections(fixtures, fuzzy_rule_match, tmp_path):
     output = fixtures.scan_test_file(str(tmp_path))
 
     for m in matches:
-        assert any(fuzzy_rule_match(x, m) for x in output["hits"]), m
+        assert any(fuzzy_rule_match(x, m) for x in output["detections"]), m
 
     exclude = {
         "extra": {
             "file_name": ".empty.txt"
         }
     }
-    assert not any(fuzzy_rule_match(x, exclude) for x in output["hits"])
+    assert not any(fuzzy_rule_match(x, exclude) for x in output["detections"])
