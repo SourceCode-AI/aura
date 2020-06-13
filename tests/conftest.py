@@ -58,7 +58,7 @@ class Fixtures(object):
 
     def scan_test_file(self, name, decode=True, args=None):
         pth = self.path(name)
-        cmd = ['scan', os.fspath(pth), '--format', 'json', '-v']
+        cmd = ['scan', os.fspath(pth), '--format', 'json']
 
         if args:
             cmd += args

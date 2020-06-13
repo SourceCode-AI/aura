@@ -163,6 +163,5 @@ class Rule:
         return self._diff_hash
 
 
-
 class DataProcessing(Rule):
     pass

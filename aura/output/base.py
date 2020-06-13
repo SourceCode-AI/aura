@@ -30,21 +30,25 @@ class ScanOutputBase(metaclass=ABCMeta):
         pass
 
     @classmethod
-    def from_uri(cls, uri: str) -> ScanOutputBase:
+    def from_uri(cls, uri: str, opts: Optional[dict] = None) -> ScanOutputBase:
+        if opts is None:
+            opts = {}
+
         parsed = parse.urlparse(uri)
         parsed_qs = dict(parse.parse_qsl(parsed.query, keep_blank_values=True))
 
+        if set(opts.keys()) & set(parsed_qs.keys()):
+            raise exceptions.InvalidOutput("You can't specify the same options both via uri and command line options at the same time")
+
         for fmt_name, fmt in cls.get_all_output_formats().items():
             if fmt_name == uri:   # This will match "text" so we don't need to specify "text://<something>"
-                return fmt()
+                return fmt(**opts)
 
             if fmt.is_supported(parsed_uri=parsed):
                 fmt_class = fmt
                 break
         else:
             raise exceptions.InvalidOutput("No such output format")
-
-        opts = {}
 
         # TODO: add support for tags from uri
 
@@ -109,6 +113,8 @@ class ScanOutputBase(metaclass=ABCMeta):
             if self.verbosity < 2 and x.informational and x.score == 0:
                 continue
             elif not all(f(tags) for f in self.tag_filters):
+                continue
+            elif self.verbosity < 3 and x.name == "ASTParseError" and x._metadata.get("source") == "blob":
                 continue
             else:
                 processed.append(x)

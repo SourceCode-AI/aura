@@ -87,7 +87,7 @@ def scan_uri(uri, metadata: Union[list, dict]=None) -> list:
         output_format = metadata.get("format", "text")
         all_hits = []
 
-        fmt = ScanOutputBase.from_uri(output_format)
+        fmt = ScanOutputBase.from_uri(output_format, opts=metadata.get("output_opts"))
 
         try:
             handler = URIHandler.from_uri(uri)

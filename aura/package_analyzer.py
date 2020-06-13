@@ -87,8 +87,7 @@ class Analyzer(object):
                         "location": item,
                         "queue": files_queue,
                         "hits": hits,
-                        "cleanup": cleanup,
-                        "metadata": self.location.metadata.copy(),
+                        "cleanup": cleanup
                     }
                     executor.apply_async(func=self._worker, kwds=kwargs)
 
@@ -128,32 +127,28 @@ class Analyzer(object):
         queue: queue.Queue,
         hits: multiprocessing.Array,
         cleanup: queue.Queue,
-        metadata=None,  # TODO: remove metadata as it's already part of location/item
     ):
         try:
             path = location.location
 
-            if not isinstance(metadata.get("flags"), set):
-                metadata["flags"] = set()
+            if not type(location.metadata.get("flags")) == set:  # TODO: move to class constructor
+                location.metadata["flags"] = set()
 
-            if "parent" not in metadata:
-                metadata["parent"] = path
-
-            metadata["path"] = path
-            metadata["normalized_path"] = str(location)
+            location.metadata["path"] = path
+            location.metadata["normalized_path"] = str(location)
 
             m = magic.from_file(location.str_location, mime=True)
 
             for x in path.parts:  # TODO: move this somewhere else
                 if TEST_REGEX.match(x):
-                    metadata["flags"].add("test-code")
+                    location.metadata["flags"].add("test-code")
                     break
 
             logger.debug(f"Analyzing file '{location.str_location}' {m}")
             # TODO: let analyzer specify mime_types
             #    return
 
-            analyzers = plugins.get_analyzer_group(metadata.get("analyzers", []))
+            analyzers = plugins.get_analyzer_group(location.metadata.get("analyzers", []))
 
             for x in analyzers(location=location):
                 if isinstance(x, base.ScanLocation):
@@ -164,11 +159,11 @@ class Analyzer(object):
                 else:
                     if x.location:
                         x.location = location.strip(x.location)
-                    x.tags |= metadata[
+                    x.tags |= location.metadata[
                         "flags"
                     ]  #  TODO: remove once moved somewhere else
                     if x._metadata is None:
-                        x._metadata = metadata
+                        x._metadata = location.metadata
 
                     hits.put(x)
         finally:

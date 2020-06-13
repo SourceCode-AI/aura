@@ -50,12 +50,12 @@ def cli(ctx, **kwargs):
 
 @cli.command(name="scan", help=scan_help_text())
 @click.argument("uri", metavar="<SCAN_URI>")
-@click.option("-v", "--verbose", count=True)
+@click.option("-v", "--verbose", default=None, count=True)
 @click.option("-a", "--analyzer", multiple=True, help="Specify analyzer(s) to run")
 @click.option("-f", "--format", "out_type", default="text", help="Output format")
 @click.option(
     "--min-score",
-    default=0,
+    default=None,
     type=click.INT,
     help="Output only scans with at least minimum score",
 )
@@ -71,25 +71,30 @@ def cli(ctx, **kwargs):
 @click.option("--no-async", "fork_mode", flag_value=False)
 def scan(
     uri,
-    verbose=0,
+    verbose=None,
     analyzer=None,
     out_type="text",
-    min_score=0,
-    output_path=None,
+    min_score=None,
     benchmark=False,
     benchmark_sort="cumtime",
     filter_tags=None,
     fork_mode=False
 ):
+
+    output_opts = {}
+    if min_score is not None:
+        output_opts["min_score"] = min_score
+
+    if verbose is not None:
+        output_opts["verbosity"] = verbose + 1
+
     meta = {
-        "verbosity": verbose,
         "format": out_type,
-        "min_score": min_score,
         "analyzers": analyzer,
-        "output_path": output_path,
         "source": "cli",
         "filter_tags": filter_tags,
-        "fork": fork_mode
+        "fork": fork_mode,
+        "output_opts": output_opts
     }
     if benchmark:
         import cProfile, pstats, io

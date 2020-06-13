@@ -71,6 +71,7 @@ class DataFinder(NodeAnalyzerV2):
             cleanup=True,
             strip_path=tmp_dir
         )
+        location.metadata["source"] = "blob"
 
         if type(blob) == str:
             mode = "w"
