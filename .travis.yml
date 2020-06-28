@@ -10,9 +10,9 @@ before_install:
   - GIT_TAG=$(git describe --long --tags --dirty --always)
   - DOCKER_REPO="rootlug/aura-security"
   - IMAGE_NAME="${DOCKER_REPO}:${BRANCH}-${GIT_TAG}"
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 
 stages:
-  - login_docker
   - build
   - test
   - deploy_prod
@@ -20,10 +20,6 @@ stages:
 
 jobs:
   include:
-    - stage: login_docker
-      script:
-        - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-
     - stage: build
       script:
         - docker build -t $IMAGE_NAME .
