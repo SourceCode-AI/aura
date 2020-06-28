@@ -8,7 +8,8 @@ services:
 before_install:
   - BRANCH=$(git branch| grep \* |cut -d ' ' -f2)
   - GIT_TAG=$(git describe --long --tags --dirty --always)
-  - IMAGE_NAME="rootlug/aura-security:${GIT_TAG}"
+  - DOCKER_REPO="rootlug/aura-security"
+  - IMAGE_NAME="${DOCKER_REPO}:${BRANCH}-${GIT_TAG}"
 
 stages:
   - login_docker
@@ -20,13 +21,13 @@ stages:
 jobs:
   include:
     - stage: login_docker
-      if: (branch = master) OR (branch = dev)
       script:
         - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 
     - stage: build
       script:
         - docker build -t $IMAGE_NAME .
+        - docker push $IMAGE_NAME
 
     - stage: test
       script:
@@ -35,15 +36,16 @@ jobs:
     - stage: deploy_prod
       if: branch = master
       script:
-        - docker tag $IMAGE_NAME rootlug/aura-security:latest
-        - docker push rootlug/aura-security:latest
+        - docker pull $IMAGE_NAME
+        - docker tag $IMAGE_NAME ${DOCKER_REPO}:latest
+        - docker push ${DOCKER_REPO}:latest
 
     - stage: deploy_dev
       if: branch = dev
       script:
-        - docker tag $IMAGE_NAME rootlug/aura-security:dev
-        - docker push rootlug/aura-security:dev
-
+        - docker pull $IMAGE_NAME
+        - docker tag $IMAGE_NAME ${DOCKER_REPO}:dev
+        - docker push ${DOCKER_REPO}:dev
 
 notifications:
   email:
