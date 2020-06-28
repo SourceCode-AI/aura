@@ -1,6 +1,7 @@
-import json
 from dataclasses import dataclass
 from typing import Any
+
+import rapidjson as json
 
 from .base import ScanOutputBase, DiffOutputBase
 from ..diff import Diff
@@ -66,12 +67,16 @@ class JSONDiffOutput(DiffOutputBase):
     def is_supported(cls, parsed_uri) -> bool:
         return parsed_uri.scheme == "json"
 
-    def output_diff(self, diffs):
+    def output_diff(self, diff_analyzer):
         payload = {
+            "tables": [],
             "diffs": []
         }
 
-        for d in self.filtered(diffs):  # type: Diff
+        for table in diff_analyzer.tables:
+            payload["tables"].append(table.asdict())
+
+        for d in self.filtered(diff_analyzer.diffs):  # type: Diff
             diff = {
                 "operation": d.operation,
                 "a_ref": d.a_ref,

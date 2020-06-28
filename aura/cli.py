@@ -52,7 +52,7 @@ def cli(ctx, **kwargs):
 @click.argument("uri", metavar="<SCAN_URI>")
 @click.option("-v", "--verbose", default=None, count=True)
 @click.option("-a", "--analyzer", multiple=True, help="Specify analyzer(s) to run")
-@click.option("-f", "--format", "out_type", default="text", help="Output format")
+@click.option("-f", "--format", "out_type", multiple=True, help="Output format")
 @click.option(
     "--min-score",
     default=None,
@@ -73,20 +73,22 @@ def scan(
     uri,
     verbose=None,
     analyzer=None,
-    out_type="text",
+    out_type=("text",),
     min_score=None,
     benchmark=False,
     benchmark_sort="cumtime",
     filter_tags=None,
     fork_mode=False
 ):
-
     output_opts = {}
     if min_score is not None:
         output_opts["min_score"] = min_score
 
     if verbose is not None:
         output_opts["verbosity"] = verbose + 1
+
+    if not out_type:
+        out_type = ("text",)
 
     meta = {
         "format": out_type,
@@ -138,12 +140,29 @@ def scan_mirror(output_dir):
 @cli.command(name="diff")
 @click.argument("pth1", metavar="<FIRST PATH>")
 @click.argument("pth2", metavar="<SECOND PATH>")
-@click.option("-f", "--format", default="text", help="Output URI format")
-def diff(pth1, pth2, format="text"):
+@click.option("-f", "--format", multiple=True, help="Output URI format")
+@click.option("--detections/--no-detections", "detections", is_flag=True, default=True)
+@click.option("--patch/--no-patch", "patch", is_flag=True, default=True)
+@click.option("--output-same-renames", "same_renames", flag_value=True)
+@click.option("--no-same-renames", "same_renames", flag_value=False)
+def diff(pth1, pth2, *, format=None, detections=True, patch=None, same_renames=None):
+    if not format:
+        format = ("text",)
+
+    output_opts = {
+        "detections": detections
+    }
+
+    if patch is not None:
+        output_opts["patch"] = patch
+    if same_renames is not None:
+        output_opts["output_same_renames"] = same_renames
+
     commands.data_diff(
         a_path=pth1,
         b_path=pth2,
-        format_uri=format
+        format_uri=format,
+        output_opts=output_opts
     )
 
 

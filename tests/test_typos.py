@@ -8,19 +8,6 @@ from aura import cli
 from aura import typos
 
 
-def test_analyze_info_data():
-    uri1 = 'pypi://requests2'
-    uri2 = 'pypi://requests'
-    ta = typos.TypoAnalyzer(uri1, uri2)
-    ta.analyze_info_data()
-    assert ta.flags['same_docs'] is True
-    assert ta.flags['same_homepage'] is False
-
-    uri2 = 'pypi://simplejson'
-    ta = typos.TypoAnalyzer(uri1, uri2)
-    ta.analyze_info_data()
-    assert ta.flags['same_homepage'] is False
-
 
 def test_distance():
     ratios = typos.diff_distance("requests", "requestes")

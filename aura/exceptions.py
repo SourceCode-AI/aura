@@ -37,6 +37,10 @@ class MinimumScoreNotReached(AuraException):
     pass
 
 
+class UnsupportedDiffLocation(InvalidLocation):
+    pass
+
+
 class PythonExecutorError(AuraException):
     def __init__(self, *args, **kwargs):
         super(PythonExecutorError, self).__init__(*args, **kwargs)

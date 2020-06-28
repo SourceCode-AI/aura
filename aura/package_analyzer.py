@@ -14,8 +14,6 @@ from pathlib import Path
 from typing import Union
 from contextlib import contextmanager
 
-import magic
-
 from . import utils
 from . import config
 from . import plugins
@@ -27,7 +25,6 @@ from .analyzers.find_imports import TopologySort
 
 
 logger = config.get_logger(__name__)
-TEST_REGEX = re.compile(r"^test(_.+|s)?$")
 
 
 @dataclasses.dataclass
@@ -129,22 +126,7 @@ class Analyzer(object):
         cleanup: queue.Queue,
     ):
         try:
-            path = location.location
-
-            if not type(location.metadata.get("flags")) == set:  # TODO: move to class constructor
-                location.metadata["flags"] = set()
-
-            location.metadata["path"] = path
-            location.metadata["normalized_path"] = str(location)
-
-            m = magic.from_file(location.str_location, mime=True)
-
-            for x in path.parts:  # TODO: move this somewhere else
-                if TEST_REGEX.match(x):
-                    location.metadata["flags"].add("test-code")
-                    break
-
-            logger.debug(f"Analyzing file '{location.str_location}' {m}")
+            logger.debug(f"Analyzing file '{location.str_location}' {location.metadata.get('mime')}")
             # TODO: let analyzer specify mime_types
             #    return
 

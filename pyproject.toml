@@ -1,0 +1,123 @@
+[tool.poetry]
+name = "aura"
+version = "2.0a1"
+description = "Security auditing and static analysis for python"
+authors = [
+    "Martin Carnogursky <intense.feel@gmail.com>"
+]
+repository = "https://github.com/RootLUG/aura"
+readme = "README.md"
+license = "GPL-3.0-or-later"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Security",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)"
+]
+packages = [
+    { include = "aura" },
+    { include = "tests", format = "sdist" }
+]
+include = [
+    "README.md",
+    "LICENSE.txt",
+    "aura/config_schema.json"
+]
+
+[tool.poetry.dependencies]
+python = "^3.7 || ^3.8"
+blinker = "~1.4"
+requirements-parser = "~0.2.0"
+packaging = "~20.4"
+lxml = "~4.5.1"
+python-magic = "~0.4.18"
+click = "~7.1.2"
+simplejson = "~3.17.0"
+colorama = "~0.4.3"
+requests = "~2.24.0"
+GitPython = "~3.1.3"
+jsonschema = "~3.2.0"
+prettyprinter = "~0.18.0"
+jinja2 = "~2.11.2"
+tqdm = "~4.46.0"
+pytz = "~2020.1"
+textdistance = "~4.2.0"
+python-tlsh = "~3.17.0"
+defusedxml = "~0.6.0"
+python-rapidjson = "~0.9.1"
+# TODO: Extras, autodetect their presence in aura
+yara-python = { version = "~4.0.1", optional = true}
+networkx = { version = "~2.4", optional = true}
+cssselect = { version = "~1.1.0", optional = true}
+
+[tool.poetry.extras]
+full = ["yara-python", "networkx", "cssselect"]
+
+[tool.poetry.dev-dependencies]
+responses = "^0.10.15"
+pytest = "^5.4.2"
+pytest-cov = "^2.8.1"
+pytest-randomly = "^3.4.0"
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
+
+[tool.poetry.urls]
+"Bug Tracker" = "https://github.com/RootLUG/aura/issues"
+
+[tool.poetry.scripts]
+aura = "aura.cli:main"
+apip = "aura.apip:main"
+
+# Aura entry points for plugins
+
+[tool.poetry.plugins."aura.uri_handlers"]
+pypi = "aura.uri_handlers.pypi:PyPiHandler"
+mirror = "aura.uri_handlers.mirror:MirrorHandler"
+git = "aura.uri_handlers.git:GitRepoHandler"
+local = "aura.uri_handlers.local:LocalFileHandler"
+
+[tool.poetry.plugins."aura.ast_visitors"]
+convert = "aura.analyzers.python.convert_ast:ASTVisitor"
+rewrite = "aura.analyzers.python.rewrite_ast:ASTRewrite"
+taint_analysis = "aura.analyzers.python.taint.visitor:TaintAnalysis"
+readonly = "aura.analyzers.python.readonly:ReadOnlyAnalyzer"
+
+[tool.poetry.plugins."aura.output_handlers"]
+text = "aura.output.text:TextScanOutput"
+sqlite = "aura.output.sqlite:SQLiteScanOutput"
+json = "aura.output.json:JSONScanOutput"
+
+[tool.poetry.plugins."aura.diff_output_handlers"]
+text = "aura.output.text:TextDiffOutput"
+json = "aura.output.json:JSONDiffOutput"
+sqlite = "aura.output.sqlite:SQLiteDiffOutput"
+
+[tool.poetry.plugins."aura.diff_hooks"]
+diff_archive = "aura.analyzers.archive:diff_archive"
+
+[tool.poetry.plugins."aura.analyzers"]
+archive = "aura.analyzers.archive:archive_analyzer"
+sensitive_files = "aura.analyzers.fs_struct:analyze_sensitive"
+suspicious_files = "aura.analyzers.fs_struct:analyze_suspicious"
+req_analyzer = "aura.analyzers.requirements_analyzer:analyze_requirements_file"
+yara = "aura.analyzers.yara_scan:analyze"
+xml = "aura.analyzers.xml:analyze"
+function_calls = "aura.analyzers.python.function_calls:FunctionCallAnalyzer"
+execution_flow = "aura.analyzers.python.execution_flow:ExecutionFlow"
+setup_py = "aura.analyzers.setup:SetupPy"
+data_finder = "aura.analyzers.data_finder:DataFinder"
+string_finder = "aura.analyzers.data_finder:StringFinder"
+wheel = "aura.analyzers.wheel:analyze_wheel"
+jinja = "aura.analyzers.python.jinja:JinjaAnalyzer"
+sqli = "aura.analyzers.python.sqli:SQLi"
+misc = "aura.analyzers.python.misc:MiscAnalyzer"
+crypto_gen_key = "aura.analyzers.python.crypto:CryptoGenKey"
+secrets = "aura.analyzers.python.secrets:SecretsAnalyzer"
+taint_analysis = "aura.analyzers.python.taint.base:TaintDetection"
+stats = "aura.analyzers.stats:analyze"

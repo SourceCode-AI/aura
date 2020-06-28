@@ -15,17 +15,17 @@ from typing import Optional, Generator, Tuple
 import pytz
 import requests
 import requirements
+import rapidjson as json
 from packaging.version import Version
+from packaging.utils import canonicalize_name
 from textdistance import jaccard
-from dateutil import parser
-
 
 from . import config
 from . import github
 from . import utils
 from . import exceptions
-from . import diff
 from .uri_handlers.base import ScanLocation
+from .output import table
 from .mirror import LocalMirror
 
 
@@ -48,6 +48,7 @@ class PypiPackage:
 
     @classmethod
     def from_pypi(cls, name, *args, **kwargs):
+        name = canonicalize_name(name)
         resp = requests.get(f"https://pypi.org/pypi/{name}/json")
         if resp.status_code == 404:
             LOGGER.error(f"Package {name} does not exists on PyPI")
@@ -60,6 +61,8 @@ class PypiPackage:
 
     @classmethod
     def from_local_mirror(cls, name, *args, **kwargs):
+        name = canonicalize_name(name)
+
         if cls.mirror is None:
             cls.mirror = LocalMirror()
 
@@ -164,17 +167,9 @@ class PypiPackage:
         # FIXME: sort by version pkgs.sort(key=lambda x: Version(x), reverse=True)
         return pkgs
 
-    def compare(self, other: PypiPackage, diff_archives=True):
-        info_matrix = self._cmp_info(other)
-        self_score = PackageScore(self.name, package=self)
-        other_score = PackageScore(other.name, package=other)
-
-        import pprint
-        pprint.pprint(info_matrix)
-        pprint.pprint(self_score.get_score_matrix())
-        pprint.pprint(other_score.get_score_matrix())
-
-        self._cmp_archives(other)
+    @property
+    def score(self) -> PackageScore:  # TODO: add caching
+        return PackageScore(self.name, package=self)
 
     def _yield_cmp_versions(self, other: PypiPackage) -> Generator[Tuple[str, str], None, None]:
         self_latest = self.get_latest_release()
@@ -216,30 +211,32 @@ class PypiPackage:
             # If there are no candidates after filtering, fallback to just take the first ones from each
             yield (self_releases[0], other_releases[0])
 
-    def _cmp_info(self, other: PypiPackage) -> dict:
-        matrix = {}
+    def _cmp_info(self, other: PypiPackage) -> table.Table:
+        info_table = table.Table(metadata={"title": "PyPI metadata diff"})
 
         sum1 = self["info"]["summary"] or ""
         sum2 = other["info"]["summary"] or ""
         sum_sim = jaccard.normalized_similarity(sum1, sum2)
-        matrix["description_similarity"] = sum_sim
-        matrix["similar_description"] = (sum_sim >= 0.8)
+        info_table += ("Description Similarity", sum_sim)
+
+        is_similar_desc = (sum_sim >= 0.8)
+        info_table += ("Similar Description", is_similar_desc)
 
         page1 = self["info"]["home_page"] or ""
         page2 = other["info"]["home_page"] or ""
-        matrix["same_homepage"] = (page1 == page2)
+        info_table += ("Same homepage", (page1 == page2))
 
         docs1 = self["info"]["docs_url"] or ""
         docs2 = other["info"]["docs_url"] or ""
-        matrix["same_docs"] = (docs1 == docs2)
+        info_table += ("Same documentation URL", (docs1 == docs2))
 
         releases1 = set(self["releases"].keys())
         releases2 = set(other["releases"].keys())
-        matrix["has_subreleases"] = releases1.issuperset(releases2)
+        info_table += ("Has Subreleases", releases1.issuperset(releases2))
 
-        return matrix
+        return info_table
 
-    def _cmp_archives(self, other: PypiPackage):
+    def _cmp_archives(self, other: PypiPackage) -> Generator[Tuple[ScanLocation, ScanLocation], None, None]:
         diff_candidates = []
         temp_dir = Path(tempfile.mkdtemp(prefix="aura_pkg_diff_"))
 
@@ -274,10 +271,7 @@ class PypiPackage:
                     strip_path=str(y_path.parent),
                     metadata={"release": y}
                 )
-
-                differ = diff.DiffAnalyzer()
-                differ.compare(x_loc, y_loc, detections=True)
-                differ.pprint()
+                yield x_loc, y_loc
 
         finally:
             if temp_dir.exists():
@@ -305,6 +299,21 @@ class PackageScore:
 
         self.github = github.GitHub.from_url(self.repo_url)
 
+    def score_pypi_downloads(self) -> int:
+        pth = config.get_relative_path("pypi_stats")
+
+        if not (pth and pth.exists()):
+            return 0
+
+        with pth.open() as fd:
+            for line in fd:
+                line = json.loads(line)
+                pkg_name = canonicalize_name(line["package_name"])
+                if pkg_name == self.package_name:
+                    return math.ceil(math.log(int(line.get("downloads", 0)), 10))
+
+        return 0
+
     def score_github_stars(self) -> int:
         if self.github is None:
             return 0
@@ -323,66 +332,67 @@ class PackageScore:
 
         return math.ceil(math.log(len(self.github.contributors), 10))
 
-    def score_last_commit(self) -> int:
+    def score_last_commit(self) -> bool:
         if self.github is None:
-            return 0
+            return False
 
-        last_commit = parser.parse(self.github.repo["pushed_at"])
+        last_commit = utils.parse_iso_8601(self.github.repo["pushed_at"])
 
         if last_commit + datetime.timedelta(days=31*3) >= self.now:
-            return 1
+            return True
         else:
-            return 0
+            return False
 
-    def score_is_new_on_github(self) -> int:
+    def score_is_new_on_github(self) -> bool:
         if self.github is None:
-            return 0
+            return False
 
-        created = parser.parse(self.github.repo["created_at"])
+        created = utils.parse_iso_8601(self.github.repo["created_at"])
 
         if created + datetime.timedelta(days=31*6) <= self.now:
-            return 1
+            return True
         else:
-            return 0
+            return False
 
-    def has_multiple_releases(self) -> int:
+    def has_multiple_releases(self) -> bool:
         if len(self.pkg["releases"]) > 1:
-            return 1
+            return True
         else:
-            return 0
+            return False
 
-    def has_source_repository(self) -> int:
+    def has_source_repository(self) -> bool:
         if self.pkg["info"]["project_urls"].get("Source"):
-            return 1
+            return True
         else:
-            return 0
+            return False
 
-    def has_documentation(self) -> int:
+    def has_documentation(self) -> bool:
         if self.pkg["info"]["project_urls"].get("Documentation"):
-            return 1
+            return True
         else:
-            return 0
+            return False
 
-    def has_homepage(self) -> int:
+    def has_homepage(self) -> bool:
         if self.pkg["info"]["project_urls"].get("Homepage"):
-            return 1
+            return True
         else:
-            return 0
+            return False
 
-    def has_wheel(self) -> int:
+    def has_wheel(self) -> bool:
         for r in self.pkg["urls"]:
             if r["packagetype"] == "bdist_wheel":
-                return 1
-        return 0
+                return True
+        return False
 
-    def has_sdist_source(self):
+    def has_sdist_source(self) -> bool:
         for r in self.pkg["urls"]:
             if r["packagetype"] == "sdist" and r.get("python_version") == "source":
-                return 1
-        return 0
+                return True
+        return False
 
-    def get_score_matrix(self):
+    def get_score_matrix(self) -> dict:
         score_matrix = {
+            "pypi_downloads": self.score_pypi_downloads(),
             "github_stars": self.score_github_stars(),
             "forks": self.score_github_forks(),
             "contributors": self.score_github_contributors(),
@@ -398,6 +408,20 @@ class PackageScore:
         total = sum(score_matrix.values())
         score_matrix["total"] = total
         return score_matrix
+
+    def get_score_table(self) -> table.Table:
+        score_table = table.Table(metadata={"title": f"Package score for '{self.package_name}'"})
+
+        for k, v in self.get_score_matrix().items():
+            row = (table.Column(k), table.Column(v))
+
+            if k == "total":
+                row[0].metadata["style"] = row[1].metadata["style"] = {"fg": "blue", "bold": True}
+
+            score_table += row  # TODO: convert k/id to human text
+
+        return score_table
+
 
 
 def packagetype_filter(release, packagetype="all") -> bool:
@@ -421,11 +445,3 @@ def md5_filter(release, md5=None) -> bool:
         return True
 
     return (md5 == release["md5_digest"])
-
-
-if __name__ == "__main__":
-    import sys, pprint
-
-    pkg1 = PypiPackage.from_pypi(sys.argv[1])
-    pkg2 = PypiPackage.from_pypi(sys.argv[2])
-    pkg1.compare(pkg2)

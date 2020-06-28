@@ -1,10 +1,7 @@
 import tempfile
 import os
-import re
-import json
-import shutil
 from pathlib import Path
-from dataclasses import is_dataclass, asdict
+from dataclasses import asdict
 
 from aura import diff
 from aura.uri_handlers.base import ScanLocation
@@ -248,70 +245,6 @@ def test_diff_archives(fixtures, fuzzy_rule_match):
     )
 
     diffs = [asdict(x) for x in d.diffs]
-
-    for match in matches:
-        assert any(fuzzy_rule_match(x, match) for x in diffs), (match, diffs)
-
-
-def test_diff_json_output(fixtures, fuzzy_rule_match):
-    arch1 = fixtures.path("mirror/wheel-0.34.2-py2.py3-none-any.whl")
-    arch2 = fixtures.path("mirror/wheel-0.33.0-py2.py3-none-any.whl")
-
-    matches = [
-        {
-            "operation": "R",
-            "a_ref": "wheel-0.34.2-py2.py3-none-any.whl",
-            "b_ref": "wheel-0.33.0-py2.py3-none-any.whl",
-            "a_size": 26502,
-            "b_size": 21497,
-            "a_mime": "application/zip",
-            "b_mime": "application/zip",
-            "a_md5": "8a2e3b6aca9665a0c6abecc4f4ea7090",
-            "b_md5": "6731b8ca8703150e2304613a25ff674f",
-        },
-        {
-            "operation": "M",
-            "a_ref": re.compile(r".*/wheel-0\.34\.2-py2\.py3-none-any\.whl\$wheel/wheelfile\.py$"),
-            "b_ref": re.compile(r".*/wheel-0\.33\.0-py2\.py3-none-any\.whl\$wheel/wheelfile\.py$"),
-            "a_size": 7298,
-            "b_size": 7168,
-            "a_mime": "text/x-python",
-            "b_mime": "text/x-python",
-            "a_md5": "8d4db173db397856d959ad08cd4745e7",
-            "b_md5": "f92b90ab7015c47a95553f4224551229",
-            "similarity": lambda x: x > 0.9,
-            "diff": lambda x: len(x) > 100
-        },
-        {
-            "operation": "M",
-            "a_ref": re.compile(r".*/wheel-0\.34\.2-py2\.py3-none-any\.whl\$wheel/cli/pack\.py$"),
-            "b_ref": re.compile(r".*/wheel-0\.33\.0-py2\.py3-none-any\.whl\$wheel/cli/pack\.py$"),
-            "a_size": 3208,
-            "b_size": 2268,
-            "a_mime": "text/x-python",
-            "b_mime": "text/x-python",
-            "a_md5": "67ba28165400d5b8c829d1b78989de45",
-            "b_md5": "57241c2632d667f1f5bac5ce77fecfd7",
-            "similarity": lambda x: x> 0.7,
-            "diff": lambda x: len(x) > 100
-        },
-        {
-            "operation": "D",
-            "a_ref": re.compile(r".*/wheel-0\.34\.2-py2\.py3-none-any\.whl\$wheel/macosx_libfile\.py$"),
-            "b_ref": None,
-            "a_size": 11858,
-            "b_size": 0,
-            "a_mime": "text/plain",
-            "b_mime": None,
-            "a_md5": "10e61b8b920752320dbe0562f75f81d5",
-            "b_md5": None,
-            "similarity": 0,
-        }
-    ]
-
-    raw_output = fixtures.get_cli_output(["diff", arch1, arch2, "-f", "json"])
-    output = json.loads(raw_output.stdout)
-    diffs = output["diffs"]
 
     for match in matches:
         assert any(fuzzy_rule_match(x, match) for x in diffs), (match, diffs)

@@ -79,7 +79,7 @@ def test_package_score(mock_github, mock_pypi_rest_api):
     assert matrix["is_new"] == 1
     assert matrix["last_commit"] == 1
     assert matrix["multiple_releases"] == 1
-    assert matrix["total"] == 19
+    assert matrix["total"] >= 19
 
     # Make the package seem outdated
     pkg.now = pytz.UTC.localize(

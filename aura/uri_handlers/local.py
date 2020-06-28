@@ -1,11 +1,14 @@
 # -*- coding: utf-8 -*-
 import pathlib
+from itertools import product
 from urllib.parse import ParseResult
 
 from .base import URIHandler, ScanLocation
+from ..exceptions import UnsupportedDiffLocation
 
 
 class LocalFileHandler(URIHandler):
+    default = True
     scheme = "file"
     help = """
     Local file handler:\n
@@ -34,10 +37,19 @@ class LocalFileHandler(URIHandler):
             }
         )
 
+    def get_diff_paths(self, other: URIHandler):
+        if isinstance(other, LocalFileHandler):
+            for loc1, loc2 in product(self.get_paths(), other.get_paths()):
+                if loc1.location.is_dir():
+                    loc1.strip_path = str(loc1.location.absolute())
+
+                if loc2.location.is_dir():
+                    loc2.strip_path = str(loc2.location.absolute())
+
+                yield loc1, loc2
+        else:
+            raise UnsupportedDiffLocation()
+
     @property
     def exists(self) -> bool:
         return self.path.exists()
-
-
-# Set this as the default handler
-LocalFileHandler.default = True

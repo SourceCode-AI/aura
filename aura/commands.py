@@ -87,7 +87,10 @@ def scan_uri(uri, metadata: Union[list, dict]=None) -> list:
         output_format = metadata.get("format", "text")
         all_hits = []
 
-        fmt = ScanOutputBase.from_uri(output_format, opts=metadata.get("output_opts"))
+        if type(output_format) not in (list, tuple):
+            output_format = (output_format,)
+
+        formatters = [ScanOutputBase.from_uri(x, opts=metadata.get("output_opts")) for x in output_format]
 
         try:
             handler = URIHandler.from_uri(uri)
@@ -110,13 +113,14 @@ def scan_uri(uri, metadata: Union[list, dict]=None) -> list:
                         stack.enter_context(scan_worker(x))
                     )
 
-                try:
-                    filtered_hits = fmt.filtered(all_hits)
-                except exceptions.MinimumScoreNotReached:
-                    pass
-                else:
-                    with fmt:
-                        fmt.output(hits=filtered_hits, scan_metadata=metadata)
+                for formatter in formatters:
+                    try:
+                        filtered_hits = formatter.filtered(all_hits)
+                    except exceptions.MinimumScoreNotReached:
+                        pass
+                    else:
+                        with formatter:
+                            formatter.output(hits=filtered_hits, scan_metadata=metadata)
 
         except exceptions.NoSuchPackage:
             logger.warn(f"No such package: {uri}")
@@ -131,17 +135,28 @@ def scan_uri(uri, metadata: Union[list, dict]=None) -> list:
         return all_hits
 
 
-def data_diff(a_path: str, b_path: str, format_uri="text"):
-    a_loc = ScanLocation(Path(a_path))
-    b_loc = ScanLocation(Path(b_path))
+def data_diff(a_path: str, b_path: str, format_uri=("text",), output_opts=None):
+    if output_opts is None:
+        output_opts = {}
 
-    out_format = DiffOutputBase.from_uri(format_uri)
+    uri_handler1, uri_handler2 = URIHandler.diff_from_uri(a_path, b_path)
+
+    if type(format_uri) not in (tuple, list):
+        format_uri = (format_uri,)
+
+    formatters = [DiffOutputBase.from_uri(x, opts=output_opts) for x in format_uri]
+
+    if "detections" in output_opts:
+        detections = output_opts["detections"]
+    else:
+        detections = any(x.detections for x in formatters)
 
     analyzer = diff.DiffAnalyzer()
-    analyzer.compare(a_loc, b_loc, detections=out_format.detections)
+    analyzer.compare(uri_handler1, uri_handler2, detections=detections)
 
-    with out_format:
-        out_format.output_diff(analyzer.diffs)
+    for formatter in formatters:
+        with formatter:
+            formatter.output_diff(analyzer)
 
 
 def scan_mirror(output_dir: Path):

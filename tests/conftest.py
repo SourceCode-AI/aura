@@ -36,7 +36,7 @@ REGEX_TYPE = type(re.compile(""))
 
 cli = None
 Rule = None
-cfg_path = os.fspath(Path(__file__).parent / 'files' / 'test_config.ini')
+cfg_path = os.fspath(Path(__file__).parent / "files" / "test_config.ini")
 
 os.environ['AURA_CFG'] = cfg_path
 assert os.environ.get('AURA_CFG') == cfg_path
@@ -47,7 +47,7 @@ class MatchFound(ValueError):
 
 
 class Fixtures(object):
-    BASE_PATH = Path(__file__).parent / 'files'
+    BASE_PATH = Path(__file__).parent / "files"
 
     def path(self, path: str='') -> str:
         return os.fspath(self.BASE_PATH / path)
@@ -58,10 +58,13 @@ class Fixtures(object):
 
     def scan_test_file(self, name, decode=True, args=None):
         pth = self.path(name)
-        cmd = ['scan', os.fspath(pth), '--format', 'json']
+        cmd = ["scan", os.fspath(pth)]
 
         if args:
             cmd += args
+
+        if ("--format" not in cmd) and ("-f" not in cmd):
+            cmd += ["--format", "json"]
 
         result = self.get_cli_output(cmd)
         if decode:

@@ -6,117 +6,13 @@ import xmlrpc.client
 from pathlib import Path
 from typing import Optional, Generator, Iterable, Tuple, Callable, List
 
-import dateutil.parser
-import textdistance
 from packaging.utils import canonicalize_name
 
-from . import diff
 from . import config
-from .uri_handlers.base import URIHandler, ScanLocation
 
 
 logger = config.get_logger(__name__)
 WAREHOUSE_XML_RPC = "https://pypi.python.org/pypi"
-
-
-class TypoAnalyzer(object):
-    def __init__(self, uri1, uri2):
-        self.pkg1 = URIHandler.from_uri(uri1)
-        if self.pkg1 is None:
-            raise ValueError(f"Invalid uri: '{uri1}'")
-
-        self.pkg2 = URIHandler.from_uri(uri2)
-        if self.pkg2 is None:
-            raise ValueError(f"Invalid uri: '{uri2}'")
-
-        self.mirror = None  # local_mirror
-        self.flags = {}
-        #  self.__order()
-        # self.analyze()
-
-    def __order(self):
-        """
-        Order the given 2 packages so the first one is the "original" and 2nd is a typosquatting candidate
-        By "original" here we mean that package pointed to by pkg1 was released before pkg2 as it is very unlikely,
-        that an older package is typosquatting newer package
-
-        Some analysis methods require this order that the pkg2 is the potentionally offending package
-        """
-        releases1 = [
-            dateutil.parser.parse(x["upload_time"])
-            for x in itertools.chain(*self.pkg1.package["releases"].values())
-        ]
-        releases2 = [
-            dateutil.parser.parse(x["upload_time"])
-            for x in itertools.chain(*self.pkg2.package["releases"].values())
-        ]
-
-        self.releases1 = (min(releases1), max(releases1)) if releases1 else (None, None)
-        self.releases2 = (min(releases2), max(releases2)) if releases2 else (None, None)
-
-        # Switch the packages in place if they are in wrong order
-        if releases2 and not releases1 or self.releases2[0] < self.releases1[0]:
-            self.pkg1, self.pkg2 = self.pkg2, self.pkg1
-            self.releases1, self.releases2 = self.releases2, self.releases1
-
-    def analyze(self):
-        self.analyze_info_data()
-
-    def analyze_info_data(self):
-        sum1 = self.pkg1.package["info"]["summary"] or ""
-        sum2 = self.pkg2.package["info"]["summary"] or ""
-        desc_similarity = textdistance.jaccard.normalized_similarity(sum1, sum2)
-        self.flags["description_similarity"] = desc_similarity
-        self.flags["similar_description"] = (desc_similarity > 0.8)
-
-        page1 = self.pkg1.package["info"]["home_page"] or ""
-        page2 = self.pkg2.package["info"]["home_page"] or ""
-        self.flags["same_homepage"] = page1 == page2
-
-        docs1 = self.pkg1.package["info"]["docs_url"] or ""
-        docs2 = self.pkg2.package["info"]["docs_url"] or ""
-        self.flags["same_docs"] = docs1 == docs2
-
-        releases1 = set(self.pkg1.package["releases"].keys())
-        releases2 = set(self.pkg2.package["releases"].keys())
-        self.flags["has_subreleases"] = releases2.issubset(releases1)
-
-    def diff_releases(self, original_release=None, other_release=None):
-        ver = (
-            self.pkg2.package["info"]["version"]
-            if other_release is None
-            else other_release
-        )
-
-        if original_release is None:
-            # Check if there are any releases
-            if ver is None:
-                return
-
-            if (
-                ver in self.pkg1.package["releases"]
-            ):  #  If there's a matching release, diff against it
-                self.diff_releases(original_release=ver)
-            # Diff against latest release
-            # self.diff_releases(original_release=self.pkg1['info']['version'])
-            return
-
-        for x in self.pkg1.package["releases"][original_release]:
-            for y in self.pkg2.package["releases"][ver]:
-                if x["packagetype"] != y["packagetype"]:
-                    continue
-
-                with self.pkg1.package.url2local(
-                    x["url"]
-                ) as pth1, self.pkg2.package.url2local(y["url"]) as pth2:
-                    ctx = {"a_ref": x["filename"], "b_ref": y["filename"]}
-                    da = diff.DiffAnalyzer()
-                    da.compare(
-                        ScanLocation(pth1),
-                        ScanLocation(pth2),
-                        ctx=ctx
-                    )
-                    #FIXME: da.pprint()
 
 
 def threshold_or_default(threshold: Optional[int]) -> int:
@@ -124,7 +20,7 @@ def threshold_or_default(threshold: Optional[int]) -> int:
     Return default threshold if none is set otherwise proxy the value
     """
     if threshold is None:
-        return int(config.CFG["aura"].get("pypi_download_threshold", fallback=10000))
+        return config.get_int("aura.pypi_download_threshold", fallback=10000)
     else:
         return threshold
 

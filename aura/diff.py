@@ -10,20 +10,21 @@ import shutil
 import pprint
 from typing import Union, Optional, List
 from pathlib import Path
-from itertools import chain
 from collections import defaultdict
 from dataclasses import dataclass, field
 
 import magic
-from textdistance import jaccard as sim_hash
+import tlsh
 from git import Repo, Diff as GitDiff, Blob
 from blinker import signal
 
 from . import utils
 from . import plugins
+from .output.table import Table
+from .exceptions import UnsupportedDiffLocation
 from .analyzers.rules import Rule
 from .package_analyzer import Analyzer
-from .uri_handlers.base import ScanLocation
+from .uri_handlers.base import ScanLocation, URIHandler
 
 
 DIFF_EXCLUDE = re.compile(r"^Binary files .+ differ$")
@@ -129,7 +130,10 @@ class Diff:
         elif git_diff.a_blob and git_diff.b_blob:
             a_content = git_diff.a_blob.data_stream.read()
             b_content = git_diff.b_blob.data_stream.read()
-            data["similarity"] = sim_hash.normalized_similarity(a_content, b_content)
+            h1 = tlsh.hash(a_content)
+            h2 = tlsh.hash(b_content)
+            if h1 and h2:
+                data["similarity"] = (300.0 - tlsh.diffxlen(h1, h2)) / 300
 
         return cls(**data)
 
@@ -147,6 +151,7 @@ class DiffAnalyzer:
     def __init__(self):
         self.hits = []
         self.diffs = []
+        self.tables = []
         self.same_files = set()
         self.diff_hit = signal("aura:diff")
         self.diff_hit.connect(self.on_diff)
@@ -182,8 +187,39 @@ class DiffAnalyzer:
     def _on_diff_type_dict(self, sender, ctx):
         pprint.pprint(sender)
 
-    def compare(self, a_path: ScanLocation, b_path: ScanLocation, ctx=None, detections=False):
-        if a_path.location.is_file() and b_path.location.is_file():
+    def compare(
+        self,
+        a_path: Union[ScanLocation, URIHandler],
+        b_path: Union[ScanLocation, URIHandler],
+        ctx=None,
+        detections=False
+    ):
+        # TODO: add a check if one is URIHandler and the other one is Path or ScanLocation
+        if isinstance(a_path, URIHandler) and isinstance(b_path, URIHandler):
+            try:
+                for item in a_path.get_diff_paths(b_path):
+                    if isinstance(item, Table):
+                        self.tables.append(item)
+                        continue
+
+                    loc1, loc2 = item
+                    self.compare(loc1, loc2, detections=detections)
+                    if detections:
+                        DiffDetections(self.diffs, loc1, loc2)
+
+            except UnsupportedDiffLocation:
+                for item in b_path.get_diff_paths(a_path):
+                    if isinstance(item, Table):
+                        self.tables.append(item)
+                        continue
+
+                    loc2, loc1 = item
+                    self.compare(loc1, loc2, detections=detections)
+                    if detections:
+                        DiffDetections(self.diffs, loc1, loc2)
+
+            return
+        elif a_path.location.is_file() and b_path.location.is_file():
             self._diff_files(a_path, b_path, ctx)
         elif b_path.location.is_dir() and a_path.location.is_dir():
             self._diff_dirs(a_path, b_path, ctx)
@@ -193,7 +229,6 @@ class DiffAnalyzer:
 
         if detections:
             _ = DiffDetections(self.diffs, a_path, b_path)
-
 
     def _diff_dirs(self, a_path: ScanLocation, b_path: ScanLocation, ctx):
         self._diff_git(a_path, b_path, ctx)
@@ -306,7 +341,6 @@ class DiffAnalyzer:
         out.output_diff(self.diffs)
 
 
-@dataclass()
 class DiffDetections:
     def __init__(self, file_diffs: List[Diff], a_location: ScanLocation, b_location: ScanLocation):
         self.file_diffs: List[Diff] = file_diffs
@@ -349,7 +383,6 @@ class DiffDetections:
                 continue
 
             for ref in sorted_refs:
-
                 if hit.location and hit.location.startswith(ref):
                     matches[ref].append(hit)
                     break

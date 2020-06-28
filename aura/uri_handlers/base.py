@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import atexit
 import urllib.parse
 import mimetypes
@@ -9,17 +10,19 @@ import tempfile
 import shutil
 import copy
 from abc import ABC, abstractmethod
+from itertools import product
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Union, Optional
+from typing import Union, Optional, Generator, Tuple
 from warnings import warn
 
+import tlsh
 import pkg_resources
 import magic
 
 from .. import config
 from ..utils import KeepRefs
-from ..exceptions import PythonExecutorError
+from ..exceptions import PythonExecutorError, UnsupportedDiffLocation
 from ..analyzers import find_imports
 from ..analyzers.rules import DataProcessing, Rule
 
@@ -27,6 +30,7 @@ from ..analyzers.rules import DataProcessing, Rule
 logger = config.get_logger(__name__)
 HANDLERS = {}
 CLEANUP_LOCATIONS = set()
+TEST_REGEX = re.compile(r"^test(_.+|s)?$")
 
 
 class URIHandler(ABC):
@@ -52,6 +56,18 @@ class URIHandler(ABC):
         return cls.default(parsed)
 
     @classmethod
+    def diff_from_uri(cls, uri1: str, uri2: str) -> Tuple[URIHandler, URIHandler]:
+        cls.load_handlers()
+        parsed1 = urllib.parse.urlparse(uri1)
+        parsed2 = urllib.parse.urlparse(uri2)
+
+        for handler1, handler2 in product(HANDLERS.values(), repeat=2):
+            if handler1.is_supported(parsed1) and handler2.is_supported(parsed2):
+                return (handler1(parsed1), handler2(parsed2))
+
+        return (cls.default(parsed1), cls.default(parsed2))
+
+    @classmethod
     def load_handlers(cls):
         global HANDLERS
 
@@ -75,17 +91,21 @@ class URIHandler(ABC):
         return True
 
     @abstractmethod
-    def get_paths(self):
-        raise NotImplementedError("Need to be re-implemented in the child class")
+    def get_paths(self) -> Generator[ScanLocation, None, None]:
+        ...
+
+    def get_diff_paths(self, other: URIHandler) -> Generator[Tuple[ScanLocation, ScanLocation], None, None]:
+        raise UnsupportedDiffLocation()
 
     def cleanup(self):
         pass
 
 
-class PackageProvider:
+class PackageProvider(ABC):
     @property
+    @abstractmethod
     def package(self):
-        raise NotImplementedError("Need to be re-implemented in child class")
+        ...
 
 
 @dataclass
@@ -95,6 +115,8 @@ class ScanLocation(KeepRefs):
     cleanup: bool = False
     parent: Optional[str] = None
     strip_path: str = ""
+    tlsh: Optional[str] = None
+    size: Optional[int] = None
 
     def __post_init__(self):
         if type(self.location) == str:
@@ -108,11 +130,26 @@ class ScanLocation(KeepRefs):
 
         self.__str_parent = None
 
+        self.metadata["path"] = self.location
+        self.metadata["normalized_path"] = str(self)
+
+        if not self.metadata.get("flags"):
+            self.metadata["flags"] = set()
+
         if self.metadata.get("depth") is None:
             self.metadata["depth"] = 0
             warn("Depth is not set for the scan location", stacklevel=2)
 
+        for x in self.location.parts:
+            if TEST_REGEX.match(x):
+                self.metadata["flags"].add("test-code")
+                break
+
         if self.location.is_file():
+            with self.location.open("rb") as fd:
+                self.tlsh = tlsh.hash(fd.read())
+
+            self.size = self.location.stat().st_size
             self.metadata["mime"] = magic.from_file(self.str_location, mime=True)
 
             if self.metadata["mime"] in ("text/plain", "application/octet-stream", "text/none"):

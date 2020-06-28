@@ -8,8 +8,9 @@ from typing import List, Union, Mapping, Optional
 
 import pkg_resources
 
+from .table import Table
 from .. import exceptions
-from ..diff import Diff
+from ..diff import Diff, DiffAnalyzer
 
 OUTPUT_HANDLERS = None
 DIFF_OUTPUT_HANDLERS = None
@@ -142,27 +143,27 @@ class ScanOutputBase(metaclass=ABCMeta):
 @dataclass()
 class DiffOutputBase(metaclass=ABCMeta):
     detections: bool = True
-    all_detections: bool = False  # TODO: finish support for this
     output_same_renames: bool = False
     patch: bool = True
     output_location: str = "-"
 
     @classmethod
-    def from_uri(cls, uri: str) -> DiffOutputBase:
+    def from_uri(cls, uri: str, opts: Optional[dict] = None) -> DiffOutputBase:
         parsed = parse.urlparse(uri)
         parsed_qs = dict(parse.parse_qsl(parsed.query, keep_blank_values=True))
 
+        if opts is None:
+            opts = {}
+
         for fmt_name, fmt in cls.get_all_output_formats().items():
             if fmt_name == uri:
-                return fmt()
+                return fmt(**opts)
 
             if fmt.is_supported(parsed_uri=parsed):
                 fmt_class = fmt
                 break
         else:
-            raise exceptions.InvalidOutput("No such output format")
-
-        opts = {}
+            raise exceptions.InvalidOutput(f"No such output format: '{uri}'")
 
         if parsed.netloc and parsed.path:
             opts["output_location"] = os.path.join(parsed.netloc, parsed.path)
@@ -193,7 +194,7 @@ class DiffOutputBase(metaclass=ABCMeta):
         ...
 
     @abstractmethod
-    def output_diff(self, diffs: List[Diff]):
+    def output_diff(self, diff_analyzer: DiffAnalyzer):
         ...
 
     @classmethod
@@ -214,6 +215,9 @@ class DiffOutputBase(metaclass=ABCMeta):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         pass
+
+
+
 
 
 def qs_to_bool(qs: Union[str, bool]) -> bool:

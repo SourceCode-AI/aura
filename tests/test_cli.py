@@ -83,11 +83,11 @@ def test_custom_analyzer(fixtures):
 
 def test_scan_min_score_option(fixtures):
     output = fixtures.scan_test_file(
-        "obfuscated.py", args=["-f", "json://-?min_score=1000"], decode=False
+        "obfuscated.py", args=["--format", "json://-?min_score=1000"], decode=False
     )
     assert len(output.output.strip()) == 0, output.output
 
-    output = fixtures.scan_test_file("obfuscated.py", args=["-f", "json://-?min_score=10"])
+    output = fixtures.scan_test_file("obfuscated.py", args=["--format", "json://-?min_score=10"])
     assert type(output) == dict
     assert output["score"] > 0
 

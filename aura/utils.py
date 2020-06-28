@@ -8,6 +8,7 @@ import weakref
 import dataclasses
 from contextlib import contextmanager
 from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 from functools import partial, wraps, lru_cache
 from typing import Generator, Union, List, TypeVar, Generic, Mapping, cast, BinaryIO
@@ -67,6 +68,13 @@ def print_tty(msg: str, *args, **kwargs) -> None:
     """
     if sys.stdout.isatty():
         secho(msg, *args, **kwargs)
+
+
+def parse_iso_8601(date_string: str) -> datetime:
+    if date_string.endswith("Z"):
+        date_string = date_string[:-1] + "+00:00"
+
+    return datetime.fromisoformat(date_string)
 
 
 @lru_cache()

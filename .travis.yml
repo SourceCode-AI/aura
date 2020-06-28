@@ -2,11 +2,49 @@ language: minimal
 services:
   - docker
 
+
+
+
 before_install:
-  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
   - BRANCH=$(git branch| grep \* |cut -d ' ' -f2)
   - GIT_TAG=$(git describe --long --tags --dirty --always)
   - IMAGE_NAME="rootlug/aura-security:${GIT_TAG}"
-  - docker build -t $IMAGE_NAME .
-  - docker run -ti --rm $IMAGE_NAME run_tests
-  - docker push $IMAGE_NAME
+
+stages:
+  - login_docker
+  - build
+  - test
+  - deploy_prod
+  - deploy_dev
+
+jobs:
+  include:
+    - stage: login_docker
+      if: (branch = master) OR (branch = dev)
+      script:
+        - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+
+    - stage: build
+      script:
+        - docker build -t $IMAGE_NAME .
+
+    - stage: test
+      script:
+        - docker run -ti --rm $IMAGE_NAME run_tests
+
+    - stage: deploy_prod
+      if: branch = master
+      script:
+        - docker tag $IMAGE_NAME rootlug/aura-security:latest
+        - docker push rootlug/aura-security:latest
+
+    - stage: deploy_dev
+      if: branch = dev
+      script:
+        - docker tag $IMAGE_NAME rootlug/aura-security:dev
+        - docker push rootlug/aura-security:dev
+
+
+notifications:
+  email:
+    on_success: change

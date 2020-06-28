@@ -11,6 +11,7 @@ from .. import utils
 from .. import config
 from ..exceptions import MinimumScoreNotReached
 from .base import ScanOutputBase, DiffOutputBase
+from .table import Table
 
 
 # Reference for unicode box characters:
@@ -51,23 +52,7 @@ class PrettyReport:
         secho(f"{left}{infill*ljust} {text} {infill*rjust}{right}", file=self.fd)
 
     def align(self, line, pos=-1, left="\u2502 ", right=" \u2502"):
-        content_len = self.ansi_length(line)
-        remaining_len = self.width - len(left) - len(right)
-
-        if content_len > remaining_len:
-            parts = self.ANSI_RE.split(line)
-            longest = max(filter(lambda x: not x.startswith(r"\x1b"), parts), key=len)
-            for idx, p in enumerate(parts):
-                if p == longest:
-                    parts[idx] = p[:len(p)-len(left)-len(right)-6] + " [...]"  # TODO
-
-            line = "".join(parts)
-
-        if pos == -1:
-            line = line + " "*(remaining_len-content_len)
-        else:
-            line = " "*(remaining_len-content_len) + line
-
+        line = self._align_text(line, self.width - len(left) - len(right), pos=pos)
         secho(f"{left}{line}{right}", file=self.fd)
 
     def wrap(self, text, left="\u2502 ", right=" \u2502"):
@@ -79,6 +64,24 @@ class PrettyReport:
         remaining_len = self.width - len(left) - len(right)
         for line in pformat(obj, width=remaining_len).splitlines(False):
             self.align(line, left=left, right=right)
+
+    def _align_text(self, text, width, pos=-1):
+        content_len = self.ansi_length(text)
+        remaining_len = width
+
+        if content_len > remaining_len:
+            parts = self.ANSI_RE.split(text)
+            longest = max(filter(lambda x: not x.startswith(r"\x1b"), parts), key=len)
+            for idx, p in enumerate(parts):
+                if p == longest:
+                    parts[idx] = p[:len(p) - 6] + " [...]"  # TODO
+
+            text = "".join(parts)
+
+        if pos == -1:
+            return text + " " * (remaining_len - content_len)
+        else:
+            return " " * (remaining_len - content_len) + text
 
 
 @dataclass()
@@ -162,6 +165,22 @@ class TextBase:
 
         return root
 
+    def output_table(self, table):
+        out = PrettyReport(fd=self._fd)
+        out.print_top_separator()
+
+        if table.metadata.get("title"):
+            out.print_heading(table.metadata["title"])
+
+        for row in table:
+            cols = []
+            for idx, col in enumerate(row):
+                text = out._align_text(style(str(col), **col.style), width=table.col_len[idx])
+                cols.append(text)
+
+            out.align(" \u2502 ".join(cols))
+
+        out.print_bottom_separator()
 
 
 class TextScanOutput(ScanOutputBase, TextBase):
@@ -247,10 +266,13 @@ class TextDiffOutput(DiffOutputBase, TextBase):
     def is_supported(cls, parsed_uri) -> bool:
         return parsed_uri.scheme == "text"
 
-    def output_diff(self, diffs):
+    def output_diff(self, diff_analyzer):
         out = PrettyReport(fd=self._fd)
 
-        for diff in self.filtered(diffs):
+        for table in diff_analyzer.tables:
+            self.output_table(table)
+
+        for diff in self.filtered(diff_analyzer.diffs):
             out.print_separator(left="\u2552", sep="\u2550", right="\u2555")
 
             if diff.operation in ("M", "R"):

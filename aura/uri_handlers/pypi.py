@@ -4,8 +4,10 @@ import shutil
 import tempfile
 import pathlib
 import urllib.parse
+from typing import Generator, Tuple
 
 from .base import URIHandler, PackageProvider, ScanLocation
+from ..exceptions import UnsupportedDiffLocation
 from ..package import PypiPackage
 
 
@@ -68,6 +70,19 @@ class PyPiHandler(URIHandler, PackageProvider):
                     "depth": 0
                 }
             )
+
+    def get_diff_paths(
+            self,
+            other: URIHandler
+    )-> Generator[Tuple[ScanLocation, ScanLocation], None, None]:
+        if isinstance(other, PyPiHandler):
+            yield self.package._cmp_info(other.package)
+            yield self.package.score.get_score_table()
+            yield other.package.score.get_score_table()
+
+            yield from self.package._cmp_archives(other.package)
+        else:
+            raise UnsupportedDiffLocation()
 
     def cleanup(self):
         if self.opts.get("cleanup", False) and self.opts["download_dir"].exists():

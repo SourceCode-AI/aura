@@ -879,7 +879,7 @@ class Arguments(ASTNode):  # TODO: not used yet
         params = []  # TODO add defaults
         default_diff = len(self.args) - len(self.defaults)
         for idx, x in enumerate(self.args):
-            if isinstance(x, str):
+            if type(x) == str:
                 if idx >= default_diff:
                     default = self.defaults[idx - default_diff]
                 else:
@@ -1104,7 +1104,15 @@ class Print(ASTNode):
     dest: typing.Any
 
     def _visit_node(self, context: Context):
-        pass  # TODO
+        for idx, x in enumerate(self.values):
+            context.visit_child(
+                node=x,
+                replace=partial(self.__replace_value, idx=idx, visitor=context.visitor)
+            )
+
+    def __replace_value(self, value, idx, visitor):
+        self.values[idx] = value
+        visitor.modified = True
 
     @property
     def json(self):
@@ -1127,7 +1135,7 @@ class ReturnStmt(ASTNode):
             parent = parent.parent
 
         try:
-            if isinstance(self.value, str):
+            if type(self.value) == str:
                 target = context.stack[self.value]
                 self.value = target
                 context.visitor.modified = True

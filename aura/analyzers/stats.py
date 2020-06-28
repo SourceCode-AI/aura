@@ -11,14 +11,19 @@ def analyze(*, location: ScanLocation):
 
     loc = str(location)
 
+    info = {
+        "mime": location.metadata["mime"],
+        "size": location.location.stat().st_size
+    }
+
+    if location.tlsh:
+        info["tlsh"] = location.tlsh
+
     yield Rule(
         detection_type="FileStats",
         message = "Statistics about files scanned by aura",
         informational=True,
-        extra={
-            "mime": location.metadata["mime"],
-            "size": location.location.stat().st_size
-        },
+        extra=info,
         location=loc,
         signature=f"file_stats#{loc}"
     )
