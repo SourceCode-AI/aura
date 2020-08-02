@@ -1,45 +1,11 @@
-import time
-
-import requests
 import networkx
 from networkx.readwrite.gexf import write_gexf
-from lxml import html
 
 from . import config
+from . import package
+
 
 logger = config.get_logger(__name__)
-
-
-def get_pypi_author_packages(author):
-    resp = requests.get(f"https://pypi.org/user/{author}/")
-    tree = html.fromstring(resp.content)
-    packages = []
-
-    for pkg in tree.cssselect(".package-list .package-snippet .package-snippet__title"):
-        name = pkg.text
-        packages.append(name)
-
-    return packages
-
-
-def get_pypi_dependents(pkg):
-    token = config.get_token("librariesio")
-
-    if token is None:
-        raise EnvironmentError(
-            "You need to configure a token for the Libraries.io API access to use this functionality"
-        )
-
-    time.sleep(1)  # FIXME: avoid rate limits
-    dependents = []
-    resp = requests.get(
-        f"https://libraries.io/api/pypi/{pkg}/dependents?api_key={token}"
-    )
-
-    for x in resp.json():
-        dependents.append(x["name"])
-
-    return dependents
 
 
 class AttackVectorGraph:
@@ -58,7 +24,7 @@ class AttackVectorGraph:
     def user_compromised(self, user):
         a_label = self.user_label(user)
         self.g.add_node(a_label, compromised=True, type="user")
-        pkgs = get_pypi_author_packages(user)
+        pkgs = [x[1] for x in package.get_packages_for_author(user)]
         for x in pkgs:
             logger.info(f"Adding user '{user}' pkg compromise '{x}'")
             self.package_compromised(x)
@@ -69,8 +35,7 @@ class AttackVectorGraph:
         pkg_label = self.pkg_label(pkg)
         self.processed_cache.add(pkg_label)
         self.g.add_node(pkg_label, compromised=True, type="package")
-        dependents = get_pypi_dependents(pkg)
-        for x in dependents:
+        for x in package.get_reverse_dependencies(pkg):
             logger.info(f"Adding {pkg} dependent compromise '{x}'")
             x_label = self.pkg_label(x)
             if x_label not in self.processed_cache:

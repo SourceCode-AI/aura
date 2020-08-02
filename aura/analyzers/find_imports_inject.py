@@ -6,6 +6,7 @@ The reason is to be python 2 and 3 compatible regardless of Aura framework
 import sys
 import dis
 import json
+import modulefinder
 
 
 LOAD_CONST = dis.opmap["LOAD_CONST"]
@@ -15,13 +16,18 @@ STORE_GLOBAL = dis.opmap["STORE_GLOBAL"]
 STORE_OPS = STORE_NAME, STORE_GLOBAL
 EXTENDED_ARG = dis.EXTENDED_ARG
 
+if hasattr(dis, "_unpack_opargs"):
+    _unpack_opargs = dis._unpack_opargs
+else:  # Python 2.7 fallback
+    _unpack_opargs = modulefinder._unpack_opargs
+
 
 def find_imports(co):
     code = co.co_code
     names = co.co_names
     consts = co.co_consts
     opargs = [
-        (op, arg) for _, op, arg in dis._unpack_opargs(code)
+        (op, arg) for _, op, arg in _unpack_opargs(code)
         if op != EXTENDED_ARG
     ]
 

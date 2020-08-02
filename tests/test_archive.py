@@ -4,7 +4,7 @@ import zipfile
 import tarfile
 import tempfile
 
-from aura.analyzers.rules import Rule
+from aura.analyzers.detections import Detection
 from aura.analyzers import archive
 
 
@@ -24,7 +24,7 @@ def test_is_suspicious_file(file_path, is_suspicious, fuzzy_rule_match):
 
     if is_suspicious:
         assert ret is not None
-        assert isinstance(ret, Rule)
+        assert isinstance(ret, Detection)
         match = {
             "type": "SuspiciousArchiveEntry",
             "location": "something",

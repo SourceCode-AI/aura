@@ -11,6 +11,7 @@ from __future__ import unicode_literals
 import ast
 import sys
 import io
+import re
 import inspect
 import codecs
 import tokenize
@@ -28,6 +29,7 @@ except ImportError:
 BUILTIN_PURE = [int, float, bool]
 BUILTIN_BYTES = (bytearray, bytes)
 BUILTIN_STR = (str,)
+ENCODING_REGEX = re.compile(r"^[ \t\f]*#.*?coding[:=][ \t]*(?P<encoding>[-_.a-zA-Z0-9]+)")
 
 
 def hex_decode(value):
@@ -82,9 +84,7 @@ def get_value(attr):
 
     if attr is None:
         return attr
-    elif isinstance(
-        attr, tuple(BUILTIN_PURE)
-    ):  # We could also use isinstance but that is slow compared to array lookup
+    elif t in BUILTIN_PURE:  # We could also use isinstance but that is slow compared to array lookup
         return attr
     elif isinstance(attr, BUILTIN_BYTES):
         return decode_bytes(attr)
@@ -131,12 +131,21 @@ def get_comments(source_code):
             yield {"line": line.start, "string": line.string}
 
 
-def get_encoding(path):
-    if sys.version_info.major == 2:
+def find_encoding_py2(fd_readline):
+    m = ENCODING_REGEX.match(fd_readline())
+    if not m:
+        m = ENCODING_REGEX.match(fd_readline())
+    if not m:
         return "utf-8"
+    else:
+        return m.groupdict()["encoding"]
 
+
+def get_encoding(path):
     try:
         with open(path, "rb") as fd:
+            if sys.version_info.major == 2:
+                return find_encoding_py2(fd.readline)
             return tokenize.detect_encoding(fd.readline)[0]
     except SyntaxError:
         return "utf-8"

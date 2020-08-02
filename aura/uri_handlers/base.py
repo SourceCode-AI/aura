@@ -24,13 +24,13 @@ from .. import config
 from ..utils import KeepRefs
 from ..exceptions import PythonExecutorError, UnsupportedDiffLocation
 from ..analyzers import find_imports
-from ..analyzers.rules import DataProcessing, Rule
+from ..analyzers.detections import DataProcessing, Detection
 
 
 logger = config.get_logger(__name__)
 HANDLERS = {}
 CLEANUP_LOCATIONS = set()
-TEST_REGEX = re.compile(r"^test(_.+|s)?$")
+TEST_REGEX = re.compile(r"^test(_.+|s)?$")  # TODO: move this to config
 
 
 class URIHandler(ABC):
@@ -83,7 +83,7 @@ class URIHandler(ABC):
         return HANDLERS
 
     @property
-    def metadata(self):
+    def metadata(self) -> dict:
         return {}
 
     @property
@@ -91,7 +91,7 @@ class URIHandler(ABC):
         return True
 
     @abstractmethod
-    def get_paths(self) -> Generator[ScanLocation, None, None]:
+    def get_paths(self, metadata: Optional[dict]) -> Generator[ScanLocation, None, None]:
         ...
 
     def get_diff_paths(self, other: URIHandler) -> Generator[Tuple[ScanLocation, ScanLocation], None, None]:
@@ -129,7 +129,6 @@ class ScanLocation(KeepRefs):
             CLEANUP_LOCATIONS.add(self.location)
 
         self.__str_parent = None
-
         self.metadata["path"] = self.location
         self.metadata["normalized_path"] = str(self)
 
@@ -202,6 +201,8 @@ class ScanLocation(KeepRefs):
         for x in ("mime", "interpreter_path", "interpreter_name"):
             metadata.pop(x, None)
 
+        metadata["analyzers"] = self.metadata.get("analyzers")
+
         if type(new_location) == str:
             str_loc = new_location
             new_location = Path(new_location)
@@ -261,7 +262,7 @@ class ScanLocation(KeepRefs):
 
         return target
 
-    def should_continue(self) -> Union[bool, Rule]:
+    def should_continue(self) -> Union[bool, Detection]:
         """
         Determine if the processing of this scan location should continue
         Currently, the following reasons can halt the processing:

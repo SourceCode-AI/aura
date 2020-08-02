@@ -7,7 +7,7 @@ from typing import List, Any
 from abc import ABCMeta, abstractmethod
 
 from .base import ScanOutputBase, DiffOutputBase
-from ..analyzers.rules import Rule
+from ..analyzers.detections import Detection
 from ..utils import json_encoder
 from ..exceptions import InvalidOutput
 
@@ -41,8 +41,8 @@ class DiffBase(metaclass=ABCMeta):
         self._create_tables()
 
     @classmethod
-    def is_supported(cls, parsed_uri) -> bool:
-        return parsed_uri.scheme == "sqlite"
+    def protocol(cls) -> str:
+        return "sqlite"
 
 
 @dataclass()
@@ -94,7 +94,7 @@ class SQLiteScanOutput(DiffBase, ScanOutputBase):
             self._db.execute(DETECTION_SCHEMA)
             self._db.execute(FILES_SCHEMA)
 
-    def output(self, hits: List[Rule], scan_metadata: dict):
+    def output(self, hits: List[Detection], scan_metadata: dict):
         cur = self._db.cursor()
         try:
             location_ids = {}

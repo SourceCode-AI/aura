@@ -8,7 +8,7 @@ import pkg_resources
 from . import exceptions
 from .type_definitions import AnalyzerType, ScanLocation
 from .analyzers.base import NodeAnalyzerV2
-from .analyzers.rules import Rule
+from .analyzers.detections import Detection
 from .analyzers.python.visitor import Visitor
 from .analyzers.python.readonly import ReadOnlyAnalyzer
 
@@ -31,7 +31,7 @@ def initialize_analyzer(analyzer: AnalyzerType) -> AnalyzerType:
         raise ValueError(f"Could not initialize the '{analyzer}' analyzer")
 
 
-def load_entrypoint(name: str) -> dict:
+def load_entrypoint(name: str, names=None) -> dict:
     global PLUGIN_CACHE
     if PLUGIN_CACHE.get(name):
         return PLUGIN_CACHE[name]
@@ -41,6 +41,10 @@ def load_entrypoint(name: str) -> dict:
         "disabled": [],
     }
     for x in pkg_resources.iter_entry_points(name):
+        if names and x.name not in names:
+            # Prevent AST analyzers from being loaded if they are not specified in the names
+            continue
+
         try:
             plugin = x.load()
             data["entrypoints"][x.name] = initialize_analyzer(plugin)
@@ -68,8 +72,7 @@ def get_analyzers(names: Optional[List[str]]=None) -> List[AnalyzerType]:
     :return: List of initialized analyzers
     :rtype: List[Callable]
     """
-
-    data = load_entrypoint("aura.analyzers")
+    data = load_entrypoint("aura.analyzers", names=names)
     if not names:
         return list(data["entrypoints"].values())
 
@@ -129,14 +132,14 @@ def get_analyzer_group(names: Optional[List[str]]):
                 visitor = Visitor.run_stages(location=location)
                 yield from visitor()
             except exceptions.ASTParseError:
-                yield Rule(
+                yield Detection(
                     location=location.location,
                     detection_type="ASTParseError",
                     message="Unable to parse the source code",
                     signature=f"ast_parse_error#{str(location)}",
                 )
             except exceptions.PythonExecutorError as exc:
-                yield Rule(
+                yield Detection(
                     location=location.location,
                     detection_type="ASTParseError",
                     message="Unable to parse the source code",

@@ -9,7 +9,7 @@ from jinja2 import nodes as jnodes
 
 from .visitor import Visitor
 from .. import base
-from .. import rules
+from ..detections import Detection
 from .nodes import Context, Taints, ASTNode, String
 from ...utils import Analyzer
 from ... import config
@@ -18,7 +18,7 @@ from ... import config
 logger = config.get_logger(__name__)
 
 
-class JinjaVulnerability(rules.Rule):
+class JinjaVulnerability(Detection):
     pass
 
 

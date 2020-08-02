@@ -1,6 +1,8 @@
 import os
 import re
+import sys
 import json
+import pprint
 import inspect
 import tempfile
 import contextlib
@@ -35,7 +37,7 @@ REGEX_TYPE = type(re.compile(""))
 
 
 cli = None
-Rule = None
+Detection = None
 cfg_path = os.fspath(Path(__file__).parent / "files" / "test_config.ini")
 
 os.environ['AURA_CFG'] = cfg_path
@@ -68,7 +70,11 @@ class Fixtures(object):
 
         result = self.get_cli_output(cmd)
         if decode:
-            return json.loads(result.output)
+            try:
+                return json.loads(result.output)
+            except Exception:
+                print(result.output, file=sys.stdout)
+                raise
         else:
             return result
 
@@ -115,10 +121,21 @@ class Fixtures(object):
             visitor = Visitor.run_stages(location=loc)
             return visitor.tree["ast_tree"]
 
-    def scan_and_match(self, input_file, matches):
-        output = self.scan_test_file(input_file)
+    def scan_and_match(self, input_file, matches, excludes=None, **kwargs):
+        output = self.scan_test_file(input_file, **kwargs)
+
         for x in matches:
-            assert any(match_rule(h, x) for h in output["detections"]), (x, output["detections"])
+            try:
+                assert any(match_rule(h, x) for h in output["detections"]), (x, output["detections"])
+            except AssertionError:
+                for h in output["detections"]:
+                    pprint.pprint(h)
+                raise
+
+        if excludes:
+            for x in excludes:
+                for hit in output["detections"]:
+                    assert not match_rule(hit, x), hit
 
         for hit in output["detections"]:
             assert hit["type"] != "ASTParseError"
@@ -137,11 +154,11 @@ def match_rule(source, target) -> bool:
     """
     # We want to avoid importing the Rule in top level
     # as the tests can change the aura configuration which is influenced by import
-    global Rule
-    if Rule is None:
-        from aura.analyzers.rules import Rule
+    global Detection
+    if Detection is None:
+        from aura.analyzers.detections import Detection
 
-    if isinstance(source, Rule):
+    if isinstance(source, Detection):
         source = source._asdict()
 
     # Check if target is a regex and apply it to source string
@@ -305,3 +322,12 @@ def mock_pypi_rest_api(fixtures):
 
 
     return _activate_mock
+
+
+@pytest.fixture(scope="function", autouse=True)
+def reset_plugins():
+    from aura.analyzers.python.readonly import ReadOnlyAnalyzer
+    from aura import plugins
+
+    ReadOnlyAnalyzer.hooks = []
+    plugins.PLUGIN_CACHE = {}

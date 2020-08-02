@@ -5,7 +5,7 @@ import time
 
 
 from .base import AnalyzerDeactivated
-from .rules import Rule
+from .detections import Detection
 from ..uri_handlers.base import ScanLocation
 from ..utils import Analyzer
 from .. import config
@@ -47,7 +47,7 @@ def analyze(*, location: ScanLocation):
             else:
                 total_score = rule_score
 
-            yield Rule(
+            yield Detection(
                 detection_type = "YaraMatch",
                 message = f"Yara match '{m.rule}' signature",
                 signature = f"yara#{str(location)}#{m.rule}#{hash(strings)}",
@@ -61,7 +61,7 @@ def analyze(*, location: ScanLocation):
                 tags = set(m.tags)
             )
     except yara.Error as exc:
-        yield Rule(
+        yield Detection(
             detection_type="YaraError",
             message=exc.args[0],
             signature=f"yara_error#{str(location)}",

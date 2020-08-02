@@ -1,7 +1,7 @@
 import re
 
 from .. import base
-from .. import rules
+from ..detections import Detection
 from .nodes import *
 from ...utils import Analyzer
 
@@ -19,7 +19,7 @@ def is_sql(data):
     return bool(SQL_REGEX.match(data))
 
 
-class SQLInjection(rules.Rule):
+class SQLInjection(Detection):  # TODO: refactor to use the base class
     pass
 
 

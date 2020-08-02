@@ -37,7 +37,7 @@ class GitRepoHandler(URIHandler):
         }
         return m
 
-    def get_paths(self):
+    def get_paths(self, metadata: dict=None):
         if self.opts.get('download_dir') is None:
             p = tempfile.mkdtemp(prefix="aura_git_repo_clone_")
             self.opts["download_dir"] = p
@@ -50,9 +50,7 @@ class GitRepoHandler(URIHandler):
 
         yield ScanLocation(
             location=p,
-            metadata={
-                "depth": 0
-            }
+            metadata=metadata or {"depth": 0}
         )
 
     def cleanup(self):

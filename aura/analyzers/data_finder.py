@@ -8,7 +8,7 @@ import binascii
 import tempfile
 from typing import Union
 
-from . import rules
+from .detections import Detection
 from .base import NodeAnalyzerV2
 from .python.nodes import Context
 from ..utils import Analyzer
@@ -29,7 +29,7 @@ class DataFinder(NodeAnalyzerV2):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.__min_blob_size = config.get_int("aura.min-blob-size", 100)
+        self.__min_blob_size = int(config.get_settings("aura.min-blob-size", 100))
 
     def node_String(self, context: Context):
         val = context.node.value
@@ -40,7 +40,7 @@ class DataFinder(NodeAnalyzerV2):
                 result = base64.b64decode(val)
                 result = result.decode("utf-8")
 
-                yield rules.Rule(
+                yield Detection(
                     detection_type="Base64Blob",
                     message="Base64 data blob found",
                     node=context.node,
@@ -110,7 +110,7 @@ class StringFinder(NodeAnalyzerV2):
             yield self.__generate_hit(context, hit, value)
 
     def __generate_hit(self, context: Context, hit, value: str):
-        return rules.Rule(
+        return Detection(
                 detection_type="StringMatch",
                 message=hit.message,
                 extra={

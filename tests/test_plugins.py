@@ -1,4 +1,4 @@
-from aura.analyzers.rules import Rule
+from aura.analyzers.detections import Detection
 from aura import plugins
 
 
@@ -16,7 +16,7 @@ def test_get_analyzers_custom(fixtures):
         responses = set()
         for a in analyzers:
             for r in a():
-                assert isinstance(r, Rule), r
+                assert isinstance(r, Detection), r
                 responses.add(r.detection_type)
 
         assert len(expected_responses-responses) == 0, responses

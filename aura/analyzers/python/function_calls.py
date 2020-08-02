@@ -1,12 +1,8 @@
 from ..base import NodeAnalyzerV2
 from ...utils import Analyzer
-from ..rules import Rule
+from ..detections import Detection
 from ... import config
 from ... import pattern_matching
-
-
-class FunctionCall(Rule):
-    pass
 
 
 @Analyzer.ID("function_calls")
@@ -28,7 +24,8 @@ class FunctionCallAnalyzer(NodeAnalyzerV2):
 
             sig_id = sig.signature.get("_id") or sig.signature["name"]
 
-            hit = FunctionCall(
+            hit = Detection(
+                detection_type="FunctionCall",  # TODO: search for potential usages and fix to use generic detection
                 score = sig.signature.get("score", 0),
                 message = sig.signature["message"],
                 node=context.node,

@@ -103,7 +103,7 @@ def get_logger(name: str) -> logging.Logger:
     return _log
 
 
-def get_int(pth: str, fallback: Optional[int]=None) -> int:
+def get_settings(pth: str, fallback=None) -> Optional[str]:
     data = CFG
 
     for part in pth.split("."):
@@ -112,7 +112,7 @@ def get_int(pth: str, fallback: Optional[int]=None) -> int:
         else:
             return fallback
 
-    return int(data)
+    return data
 
 
 @lru_cache()

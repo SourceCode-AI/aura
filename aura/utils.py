@@ -1,5 +1,4 @@
 import os
-import re
 import sys
 import codecs
 import hashlib
@@ -22,7 +21,6 @@ from . import progressbar
 
 
 logger = config.get_logger(__name__)
-PKG_NORM_CHARS = re.compile(r"[-_.]+")
 T = TypeVar("T")
 
 
@@ -220,6 +218,34 @@ def normalize_path(
         return os.fspath(pth)
     else:
         return Path(pth)
+
+
+def slotted_dataclass(dataclass_arguments=None, **kwargs):
+    """
+    Decorator to make dataclasses works with slots
+    Built-in dataclasses do not support __slots__ if a default value is specified for a field, this can be fixed using a decorator or a metaclass
+    https://stackoverflow.com/questions/50180735/how-can-dataclasses-be-made-to-work-better-with-slots
+
+    :param dataclass_arguments: dict specifying arguments to a dataclass such as {"frozen": True}
+    :param kwargs: default values for a fields
+    """
+    if dataclass_arguments is None:
+        dataclass_arguments = {}
+
+    def decorator(cls):
+        old_attrs = {}
+
+        for k, v in kwargs.items():
+            old_attrs[k] = getattr(cls, k)
+            setattr(cls, k, v)
+
+        cls = dataclasses.dataclass(cls, **dataclass_arguments)
+        for k, v in old_attrs.items():
+            setattr(cls, k, v)
+
+        return cls
+
+    return decorator
 
 
 class Analyzer:

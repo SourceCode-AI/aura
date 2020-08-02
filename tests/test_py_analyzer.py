@@ -25,7 +25,7 @@ def test_interpreters():
 
     py3 = config.CFG.get('interpreters', 'python3')
     py3_version = subprocess.check_output([py3] + args).decode().strip().split()[0]
-    assert re.match(r'^3\.(6|7)\.\d+$', py3_version)
+    assert re.match(r'^3\.(6|7|8)\.\d+$', py3_version)
 
 
 def test_py2k(fixtures):

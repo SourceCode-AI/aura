@@ -11,7 +11,7 @@ from defusedxml import (
     NotSupportedError
 )
 
-from .rules import Rule
+from .detections import Detection
 from ..utils import Analyzer
 from ..uri_handlers.base import ScanLocation
 from ..config import get_score_or_default
@@ -25,7 +25,7 @@ ALLOWED_MIMES = (
 )
 
 
-def scan(location: ScanLocation, **mode) -> Generator[Rule, None, None]:
+def scan(location: ScanLocation, **mode) -> Generator[Detection, None, None]:
     """
     Attempt to parse the XML using defused XML and the mode options to turn protections on/off
     When an exception is raised for supported XML problems a detection is yielded back to the analyzer
@@ -33,7 +33,7 @@ def scan(location: ScanLocation, **mode) -> Generator[Rule, None, None]:
     try:
         cElementTree.parse(location.str_location, **mode)
     except EntitiesForbidden:
-        yield Rule(
+        yield Detection(
             detection_type = "MalformedXML",
             message = "Malformed or malicious XML",
             score = get_score_or_default("malformed-xml-entities", 100),
@@ -45,7 +45,7 @@ def scan(location: ScanLocation, **mode) -> Generator[Rule, None, None]:
             tags = {"malformed_xml", "xml_entities"}
         )
     except DTDForbidden:
-        yield Rule(
+        yield Detection(
             detection_type = "MalformedXML",
             message = "Malformed or malicious XML",
             score = get_score_or_default("malformed-xml-dtd", 20),
@@ -57,7 +57,7 @@ def scan(location: ScanLocation, **mode) -> Generator[Rule, None, None]:
             tags = {"malformed_xml", "xml_dtd"}
         )
     except ExternalReferenceForbidden:
-        yield Rule(
+        yield Detection(
             detection_type = "MalformedXML",
             message = "Malformed or malicious XML",
             score = get_score_or_default("malformed-xml-external-reference", 100),

@@ -2,7 +2,7 @@ import math
 
 from .. import base
 from .. import detect_redos
-from ..rules import Rule
+from ..detections import Detection
 from ...utils import Analyzer
 from ... import config
 
@@ -19,7 +19,7 @@ class MiscAnalyzer(base.NodeAnalyzerV2):
         entropy = calculate_entropy(val)
 
         if ENTROPY_THRESHOLD > 0 and entropy >= ENTROPY_THRESHOLD:
-            hit = Rule(
+            hit = Detection(
                 message="A string with high shanon entropy was found",
                 extra={
                     "type": "high_entropy_string",
@@ -40,7 +40,7 @@ class MiscAnalyzer(base.NodeAnalyzerV2):
 
         try:
             if detect_redos.catastrophic(val):
-                hit = Rule(
+                hit = Detection(
                     message = "Possible catastrophic ReDoS",
                     extra = {
                         "type": "redos",
@@ -52,7 +52,7 @@ class MiscAnalyzer(base.NodeAnalyzerV2):
                 )
                 yield hit
         except RecursionError:
-            yield Rule(
+            yield Detection(
                 detection_type="Misc",
                 message="Recursion limit exceeded when scanning regex pattern for ReDoS",
                 extra={
@@ -70,7 +70,7 @@ class MiscAnalyzer(base.NodeAnalyzerV2):
 
         # TODO look maybe for a suspicious function calls inside the reduce method
 
-        hit = Rule(
+        hit = Detection(
             message = f"Usage of {context.node.name} in an object indicates a possible pickle exploit",
             signature = f"pickleploit#{context.visitor.normalized_path}#{context.node.line_no}",
             line_no = context.node.line_no,

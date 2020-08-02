@@ -3,21 +3,22 @@
 import fnmatch
 from typing import Generator
 
-from .rules import Rule
+from .detections import Detection
 from ..utils import Analyzer
 from ..uri_handlers.base import ScanLocation
+from ..type_definitions import AnalyzerReturnType
 from .. import config
 
 
 @Analyzer.ID("sensitive_files")
-def analyze_sensitive(*, location: ScanLocation) -> Generator[Rule, None, None]:
+def analyze_sensitive(*, location: ScanLocation) -> AnalyzerReturnType:
     """Find files not intended to be published such as .pypirc leaking user password"""
     if location.location.stat().st_size == 0:
         return
 
     for pattern in config.SEMANTIC_RULES["sensitive_filenames"]:
         if fnmatch.fnmatch(location.str_location, pattern) or location.str_location.endswith(pattern):
-            yield Rule(
+            yield Detection(
                 detection_type="SensitiveFile",
                 message = "A potentially sensitive file has been found",
                 score=config.get_score_or_default("contain-sensitive-file", 0),
@@ -32,7 +33,7 @@ def analyze_sensitive(*, location: ScanLocation) -> Generator[Rule, None, None]:
 
 
 @Analyzer.ID("suspicious_files")
-def analyze_suspicious(*, location: ScanLocation) -> Generator[Rule, None, None]:
+def analyze_suspicious(*, location: ScanLocation) -> AnalyzerReturnType:
     """Find non-standard files such as *.exe, compiled python code (*.pyc) or hidden files"""
     if location.location.stat().st_size == 0:
         return
@@ -50,7 +51,7 @@ def analyze_suspicious(*, location: ScanLocation) -> Generator[Rule, None, None]
         return
 
     if f_type:
-        yield Rule(
+        yield Detection(
             detection_type="SuspiciousFile",
             message="A potentially suspicious file has been found",
             score=config.get_score_or_default("contain-suspicious-file", 0),
@@ -62,3 +63,8 @@ def analyze_suspicious(*, location: ScanLocation) -> Generator[Rule, None, None]
             location=location.location,
             tags={f_type}
         )
+
+
+@Analyzer.ID("file_filter")
+def file_filter(*, location: ScanLocation) -> AnalyzerReturnType:
+    yield from []

@@ -1,7 +1,7 @@
 from ..uri_handlers.base import ScanLocation
 
-from .rules import Rule
-from ..utils import Analyzer
+from .detections import Detection
+from ..utils import Analyzer, md5
 
 
 
@@ -13,13 +13,14 @@ def analyze(*, location: ScanLocation):
 
     info = {
         "mime": location.metadata["mime"],
-        "size": location.location.stat().st_size
+        "size": location.location.stat().st_size,
+        "md5": md5(location.location)
     }
 
     if location.tlsh:
         info["tlsh"] = location.tlsh
 
-    yield Rule(
+    yield Detection(
         detection_type="FileStats",
         message = "Statistics about files scanned by aura",
         informational=True,

@@ -5,7 +5,7 @@ import pprint
 
 from packaging.utils import canonicalize_name
 
-from . import rules
+from .detections import Detection
 from .python.nodes import String, Call, Dictionary
 from .base import NodeAnalyzerV2
 from ..utils import Analyzer
@@ -46,6 +46,7 @@ class SetupPy(NodeAnalyzerV2):
             parsed.update(self.__parse_cmdclass(context))
 
         pkgs = []
+        # TODO: refactor these `isinstance` into `type`
         if isinstance(context.node.kwargs.get("packages"), list):
             pkgs = [self.__as_str(x) for x in context.node.kwargs["packages"]]
         elif isinstance(context.node.kwargs.get("packages"), str):
@@ -57,7 +58,7 @@ class SetupPy(NodeAnalyzerV2):
             if isinstance(parsed.get("name"), str) and not self.__check_name(
                 parsed["name"], pkg
             ):
-                sig = rules.Rule(
+                sig = Detection(
                     detection_type="SetupScript",
                     score=100,
                     message=f"Package '{parsed['name']}' is installed under different name: '{pkg}'",
@@ -65,7 +66,7 @@ class SetupPy(NodeAnalyzerV2):
                 )
                 self.hits.append(sig)
 
-        main_sig = rules.Rule(
+        main_sig = Detection(
             detection_type="SetupScript",
             score=0,
             message="Setup script found", extra={"parsed": parsed},
@@ -87,8 +88,11 @@ class SetupPy(NodeAnalyzerV2):
             return
 
         for x in analyzer.hits:
-            if x.__class__.__name__ == "FunctionCall" and "code_execution" in x.tags:
-                sig = rules.Rule(
+            if not isinstance(x, Detection):
+                continue
+
+            if x.name == "FunctionCall" and "code_execution" in x.tags:
+                sig = Detection(
                     detection_type="SetupScript",
                     score=100,
                     message="Code execution capabilities found in a setup.py script",
@@ -99,10 +103,8 @@ class SetupPy(NodeAnalyzerV2):
                 )
 
                 analyzer.hits.append(sig)
-            elif isinstance(x, rules.Rule) and (
-                "network" in x.extra.get("categories", []) or "network" in x.tags
-            ):  # TODO: refactor this elif condition for categories
-                sig = rules.Rule(
+            elif "network" in x.extra.get("categories", []) or "network" in x.tags: # TODO: refactor this elif condition for categories
+                sig = Detection(
                     detection_type="SetupScript",
                     score=100,
                     message="Imported module with network communication capabilities in a setup.py script",
@@ -121,7 +123,7 @@ class SetupPy(NodeAnalyzerV2):
             ]
 
             if "install" in parsed["install_hooks"]:
-                sig = rules.Rule(
+                sig = Detection(
                     detection_type="SetupScript",
                     score=500,
                     message="Setup script hooks to the `setup.py install` command.",

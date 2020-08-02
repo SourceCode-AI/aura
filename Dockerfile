@@ -1,4 +1,4 @@
-FROM python:3.7-alpine3.11
+FROM python:3.8.3-alpine3.12
 
 # This is a specific order of installing the dependencies first so we can use caching mechanism to quickly rebuild the image in case only aura source code changed
 RUN addgroup analysis && adduser -S -G analysis analysis

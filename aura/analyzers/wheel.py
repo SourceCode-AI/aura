@@ -8,7 +8,7 @@ from typing import Generator
 
 import chardet
 
-from . import rules
+from .detections import Detection
 from ..utils import Analyzer, normalize_path
 from ..uri_handlers.base import ScanLocation
 from ..config import get_score_or_default
@@ -23,7 +23,7 @@ def get_checksum(alg: str, path: Path) -> str:
 
 
 @Analyzer.ID("wheel")
-def analyze_wheel(*, location: ScanLocation) -> Generator[rules.Rule, None, None]:
+def analyze_wheel(*, location: ScanLocation) -> Generator[Detection, None, None]:
     """Find anomalies in the Wheel packages that could be caused by manipulation or using a non-standard tools"""
     parts = location.location.parts
 
@@ -44,7 +44,7 @@ def analyze_wheel(*, location: ScanLocation) -> Generator[rules.Rule, None, None
     record_path = dist_info / "RECORD"
 
     if not record_path.exists():
-        yield rules.Rule(
+        yield Detection(
             detection_type="Wheel",
             location=location.location,
             score = get_score_or_default("wheel-records-missing", 100),
@@ -64,7 +64,7 @@ def analyze_wheel(*, location: ScanLocation) -> Generator[rules.Rule, None, None
                 records_encoding = chardet.detect(records_raw)["encoding"]
                 records_content = records_raw.decode(records_encoding)
             except (TypeError, UnicodeDecodeError):
-                yield rules.Rule(
+                yield Detection(
                     detection_type="Wheel",
                     location=location.location,
                     message="Unable to decode the wheel RECORDs file",
@@ -79,7 +79,7 @@ def analyze_wheel(*, location: ScanLocation) -> Generator[rules.Rule, None, None
         full_pth = wheel_root.joinpath(record[0])
 
         if not full_pth.exists():
-            yield rules.Rule(
+            yield Detection(
                 location=location.location,
                 detection_type="Wheel",
                 score=get_score_or_default("wheel-missing-file", 100),
@@ -101,7 +101,7 @@ def analyze_wheel(*, location: ScanLocation) -> Generator[rules.Rule, None, None
         except ValueError:  # not enough values to unpack
             continue
         except IndexError:  # Record does not have the `=` sign
-            yield rules.Rule(
+            yield Detection(
                 detection_type="Wheel",
                 location=location.location,
                 message="Malformed record entry",
@@ -115,7 +115,7 @@ def analyze_wheel(*, location: ScanLocation) -> Generator[rules.Rule, None, None
         try:
             target_checksum = get_checksum(alg, full_pth)
         except ValueError as exc:
-            yield rules.Rule(
+            yield Detection(
                 detection_type="Wheel",
                 location=location.location,
                 score=get_score_or_default("wheel-invalid-record-checksum", 100),
@@ -129,7 +129,7 @@ def analyze_wheel(*, location: ScanLocation) -> Generator[rules.Rule, None, None
             )
         else:
             if target_checksum != checksum:
-                yield rules.Rule(
+                yield Detection(
                     detection_type="Wheel",
                     location=location.location,
                     score=get_score_or_default("wheel-invalid-record-checksum", 100),
@@ -145,7 +145,7 @@ def analyze_wheel(*, location: ScanLocation) -> Generator[rules.Rule, None, None
 
     for x in wheel_root.glob("*/setup.py"):
         hit_path = normalize_path(wheel_root / x)
-        hit = rules.Rule(
+        hit = Detection(
             detection_type="Wheel",
             location=location.location,
             score=get_score_or_default("wheel-contain-setup-py", 100),
@@ -161,7 +161,7 @@ def analyze_wheel(*, location: ScanLocation) -> Generator[rules.Rule, None, None
             continue
 
         if x not in record_entries:
-            hit = rules.Rule(
+            hit = Detection(
                 detection_type="Wheel",
                 location=location.location,
                 score=get_score_or_default("wheel-file-not-listed-in-records", 10),

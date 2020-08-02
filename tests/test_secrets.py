@@ -35,7 +35,7 @@ def test_secret_finder(fixtures, fuzzy_rule_match):
                 'name': 'password',
                 'secret': 'cmp_toor'
             },
-            # FIXME: line_no missing?
+            "line": 'if password == "cmp_toor":'
         }
     ]
 

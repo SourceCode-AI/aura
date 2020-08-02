@@ -145,13 +145,17 @@ def scan_mirror(output_dir):
 @click.option("--patch/--no-patch", "patch", is_flag=True, default=True)
 @click.option("--output-same-renames", "same_renames", flag_value=True)
 @click.option("--no-same-renames", "same_renames", flag_value=False)
-def diff(pth1, pth2, *, format=None, detections=True, patch=None, same_renames=None):
+@click.option("-a", "--analyzer", multiple=True, help="Specify analyzers to run")
+def diff(pth1, pth2, *, format=None, detections=True, patch=None, same_renames=None, analyzer=None):
     if not format:
         format = ("text",)
 
     output_opts = {
-        "detections": detections
+        "detections": detections,
     }
+
+    if analyzer and detections:
+        output_opts["detections"] = analyzer
 
     if patch is not None:
         output_opts["patch"] = patch
@@ -179,31 +183,13 @@ def parse_ast(path, stages=None):
 
 @cli.command(name="info")
 def info():
-    commands.info()
+    commands.show_info()
 
 
-@cli.command()
-@click.option(
-    "-o",
-    "--out",
-    default=os.fspath(config.get_relative_path("pypi_stats")),
-    type=click.Path(
-        file_okay=True,
-        dir_okay=True,
-        writable=True,
-        allow_dash=True
-    ),
-)
-def fetch_pypi_stats(out):
-    """
-    Download the latest PyPI download stats from the public BigQuery dataset
-    """
-    if out !="-" and os.path.exists(out):
-        LOGGER.info(f"File '{out}' exists, creating backup")
-        shutil.copyfile(out, f"{out}.bak")
-
-    with open(out, "wb") as fd:
-        commands.fetch_pypi_stats(fd)
+@cli.command(name="update")
+def update_aura():
+    from . import update
+    update.update_all()
 
 
 @cli.command()

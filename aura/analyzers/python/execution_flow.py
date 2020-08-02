@@ -8,7 +8,7 @@ from fnmatch import fnmatch
 from ..base import NodeAnalyzerV2
 from ...utils import Analyzer
 from .nodes import *
-from ..rules import Rule
+from ..detections import Detection
 from ... import config
 
 
@@ -19,7 +19,7 @@ class ExecutionFlow(NodeAnalyzerV2):
         node = context.node
 
         for norm in node.get_modules():
-            hit = Rule(
+            hit = Detection(
                 detection_type="ModuleImport",
                 message = f"Module '{norm}' import in a source code",
                 extra = {

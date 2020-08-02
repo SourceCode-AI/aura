@@ -62,7 +62,7 @@ def find_imports(py_src: Path, metadata=None):
         return
 
     for level, pkg, name in imports:
-        if level == 0:
+        if level == 0 or pkg is None:
             # TODO: add support for absolute imports
             continue
 

@@ -1,38 +1,44 @@
 from unittest import mock
 
-import responses
+from pytest import fixture
 
 from aura import config
 from aura import graph
+from aura import package
 
 
-def test_author_packages():
-    packages = graph.get_pypi_author_packages("intense.feel")
-    print(packages)
-    assert len(packages) >= 2
-    assert "Sweepatic-urlnorm" in packages
-    assert "Sweepatic-PyExifTool" in packages
+GRAPH_DATA = {
+    "dependencies": {
+        "abc": ["abc1", "abc2"],
+        "abc2": ["abc3"]
+    },
+    "authors": {
+        "john1": ["abc"]
+    }
+}
 
 
-@responses.activate
-def test_pypi_package_dependencies():
-    responses.add(
-        responses.GET,
-        "https://libraries.io/api/pypi/wheel/dependents",
-        json=[{"name": "dep1"}, {"name": "dep2"}]
-    )
-
-    with mock.patch.object(config, "get_token", return_value="blah"):
-        dependencies = graph.get_pypi_dependents("wheel")
-
-    assert dependencies == ["dep1", "dep2"]
+def mock_authors(name):
+    return [["Owner", x] for x in GRAPH_DATA["authors"].get(name, [])]
 
 
-@responses.activate
-def test_attack_vector_graph():
-    responses.add(
-        responses.GET,
-        "https://libraries.io/api/pypi/wheel/dependents",
-        json=[{"name": "dep1"}, {"name": "dep2"}]
-    )
-    pass # TODO
+def mock_reverse_dependencies(pkg):
+    return GRAPH_DATA["dependencies"].get(pkg, [])
+
+
+@fixture()
+def mock_graph():
+    package.get_packages_for_author = mock_authors
+    package.get_reverse_dependencies = mock_reverse_dependencies
+
+
+def test_attack_vector_graph(mock_graph):
+    g = graph.AttackVectorGraph()
+    g.user_compromised("john1")
+    nodes = dict(g.g.nodes(data=True))
+
+    assert "User john1" in nodes
+    assert "abc" in nodes
+    assert "abc1" in nodes
+    assert "abc2" in nodes
+    assert "abc3" in nodes

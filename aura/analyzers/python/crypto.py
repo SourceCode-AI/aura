@@ -5,7 +5,7 @@ It looks up common RSA/DSA key generation functions and key sizes
 
 from .nodes import *
 from .. import base
-from .. import rules
+from ..detections import Detection
 from ...utils import Analyzer
 
 # Key generation functions to lookup
@@ -36,7 +36,7 @@ CRYPTO_GEN_KEYS = {
 MIN_KEY_SIZES = {"rsa": 2048, "dsa": 2048}
 
 
-class CryptoKeyGeneration(rules.Rule):
+class CryptoKeyGeneration(Detection):  # TODO: refactor to use the base Detection class
     """
     Detection hit to throw when crypto key generation is detected
     """

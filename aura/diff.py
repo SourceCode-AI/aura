@@ -22,7 +22,7 @@ from . import utils
 from . import plugins
 from .output.table import Table
 from .exceptions import UnsupportedDiffLocation
-from .analyzers.rules import Rule
+from .analyzers.detections import Detection
 from .package_analyzer import Analyzer
 from .uri_handlers.base import ScanLocation, URIHandler
 
@@ -46,8 +46,8 @@ class Diff:
     diff: str = ''
     similarity: float = 0.0
 
-    new_detections: Optional[List[Rule]] = None
-    removed_detections: Optional[List[Rule]] = None
+    new_detections: Optional[List[Detection]] = None
+    removed_detections: Optional[List[Detection]] = None
 
     def __post_init__(self):
         assert self.operation in ("A", "D", "M", "R")
@@ -137,7 +137,7 @@ class Diff:
 
         return cls(**data)
 
-    def add_detections(self, a_detections: List[Rule], b_detections: List[Rule]):
+    def add_detections(self, a_detections: List[Detection], b_detections: List[Detection]):
         duplicates = set(x.diff_hash for x in a_detections) & set(x.diff_hash for x in b_detections)
         self.new_detections = [x for x in b_detections if x.diff_hash not in duplicates]
         self.removed_detections = [x for x in a_detections if x.diff_hash not in duplicates]
@@ -205,6 +205,10 @@ class DiffAnalyzer:
                     loc1, loc2 = item
                     self.compare(loc1, loc2, detections=detections)
                     if detections:
+                        if type(detections) in (list, tuple):
+                            loc1.metadata["analyzers"] = detections
+                            loc2.metadata["analyzers"] = detections
+
                         DiffDetections(self.diffs, loc1, loc2)
 
             except UnsupportedDiffLocation:
@@ -216,6 +220,10 @@ class DiffAnalyzer:
                     loc2, loc1 = item
                     self.compare(loc1, loc2, detections=detections)
                     if detections:
+                        if type(detections) in (list, tuple):
+                            loc1.metadata["analyzers"] = detections
+                            loc2.metadata["analyzers"] = detections
+
                         DiffDetections(self.diffs, loc1, loc2)
 
             return

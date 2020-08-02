@@ -28,7 +28,7 @@ except NameError:
     text_input = input
 
 
-SUPPORTED_PIP_VERSIONS = ("19.*", "10.*", "20.*")
+SUPPORTED_PIP_VERSIONS = ("19.*", "10.*", "20.*", "18.*")
 logger = logging.getLogger("apip")
 
 
@@ -53,22 +53,6 @@ def get_dependency_chain(
     return chain[::-1]
 
 
-def ask_user(label):
-    """
-    Helper function that asks user for a confirmation
-    This is used for interactively aborting installation
-    """
-    if not sys.stdin.isatty():
-        return True
-
-    answer = text_input("{} [y/N]:".format(label)).strip().lower()
-
-    if answer in ("y", "yes"):
-        return True
-    else:
-        return False
-
-
 def check_package(pkg):
     """
     Check a given package by calling aura security framework
@@ -84,17 +68,17 @@ def check_package(pkg):
 
     payload = json.dumps(pkg)
 
-    p = subprocess.run(
+    p = subprocess.Popen(
         shlex.split(os.environ["AURA_PATH"]) + ["check_requirement"],
-        # check=True,
-        input=payload,
-        text=True,
+        universal_newlines=True,
+        stdin=subprocess.PIPE
     )
+    p.communicate(payload)
+    p.stdin.close()
+    p.wait()
 
-    if (p.returncode > 0) or not ask_user(
-        "Would you like to proceed with installation?"
-    ):
-        raise EnvironmentError("Installation aborted by user")
+    if p.returncode > 0:
+        raise EnvironmentError("Installation aborted")
 
 
 def mp_install_requirement(
@@ -107,15 +91,6 @@ def mp_install_requirement(
     It collects the package information and sends it to aura for security audit
     User then has a choice to proceed or abort the installation process based on audit results
     """
-    # subprocess.call(['tree', self.setup_py_dir])
-    # import pprint
-    # pprint.pprint(kwargs)
-    # pprint.pprint(self.__dict__)
-    #
-    # print(f'Home: {kwargs["home"]}')
-    # print(f'root: {kwargs["root"]}')
-    # raise EnvironmentError(pth)
-
     data = {
         "format": "0.1",
         "cmd": sys.argv,
@@ -124,8 +99,10 @@ def mp_install_requirement(
         "wheel": self.is_wheel,
         "is_pinned": self.is_pinned,
         "editable": self.editable,
-        "update": self.update,
-        "url": self.req.url,
+        "update": getattr(self, "update", False),
+        "hash": self.link.hash,
+        "filename": self.link.filename,
+        "url": self.link.url,
         "dependency_chain": get_dependency_chain(self),
     }
     check_package(data)
@@ -139,15 +116,12 @@ def monkey_patch():
 
 def main():
     if not check_version():
-        logger.error("Unsupported pip version: '{}'".format(pip.__version__))
-        logger.error(
+        logger.warning("Unsupported pip version: '{}'".format(pip.__version__))
+        logger.warning(
             "Use one of the supported versions: {}".format(
                 ", ".join(SUPPORTED_PIP_VERSIONS)
             )
         )
-
-        if not ask_user("Do you really want to continue?"):
-            sys.exit(1)
 
     if not os.environ.get("AURA_PATH"):
         logger.error(

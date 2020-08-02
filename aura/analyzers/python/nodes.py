@@ -18,7 +18,7 @@ from functools import partial, total_ordering, wraps
 import chardet
 
 from ...stack import Stack
-from ...utils import KeepRefs
+from ...utils import KeepRefs, slotted_dataclass
 from ... import exceptions
 
 
@@ -62,22 +62,29 @@ class Taints(Enum):
         return max(self, other)
 
 
-@dataclass
+@slotted_dataclass(
+    taint_level = None,
+    line_no = None,
+    message = None,
+    extra = field(default_factory=dict),
+    node = None
+)
 class TaintLog:
     """
     Log entry to track the propagation of taints in the AST
     """
+    __slots__ = ("path", "taint_level", "line_no", "message", "extra", "node")
     path: Path  # Path to the affected source code
-    taint_level: Taints = None
-    line_no: int = None
-    message: str = None
-    extra: dict = field(default_factory=dict)
-    node: NodeType = None
+    taint_level: typing.Optional[Taints]
+    line_no: typing.Optional[int]
+    message: typing.Optional[str]
+    extra: dict
+    node: typing.Optional[NodeType]
 
     def __post_init__(self):
         self.path = Path(self.path).absolute()
 
-    def json(self):
+    def json(self) -> dict:
         d = {
             'line_no': self.line_no,
             'message': self.message
@@ -134,6 +141,27 @@ class ASTNode(KeepRefs, metaclass=ABCMeta):
         self._taint_class: Taints = Taints.UNKNOWN
         self._taint_locked: bool = False
         self._taint_log: typing.List[TaintLog] = []
+
+    def enrich_from_previous(self, node: typing.Union[dict, ASTNode]):
+        """
+        Enrich the current node using the information from the previous node
+        This is used when AST tree is rewritten/replace with a new node so we copy all the information from the previous one
+
+        :param node: previous node that was replaced that we want to copy information from
+        :type node: typing.Union[dict, ASTNode]
+        """
+        if type(node) == dict:
+            if not self.line_no and "lineno" in node:
+                self.line_no = node["lineno"]
+            if not self.col and "col_offset" in node:
+                self.col = node["col_offset"]
+            if not self._docs:
+                self._docs = node.get("_doc_string")
+        elif isinstance(node, ASTNode):
+            if not self.line_no:
+                self.line_no = node.line_no
+            if not self.col:
+                self.col = node.col
 
     @property
     def full_name(self):
@@ -322,6 +350,7 @@ class String(ASTNode):
         d["value"] = self.value
         return d
 
+
 @dataclass
 class Bytes(ASTNode):
     value: bytes
@@ -351,6 +380,7 @@ class Bytes(ASTNode):
         d = super().json
         d["value"] = self.value
         return d
+
 
 @dataclass
 class List(ASTNode):
@@ -1245,17 +1275,26 @@ class ExceptHandler(ASTNode):
         visitor.modified = True
 
 
-@dataclass
+@slotted_dataclass(
+    replace=field(default=lambda x: None),
+    visitor=field(default=None),
+    stack=field(default_factory=Stack),
+    depth=field(default=0),
+    modified=field(default=False),
+    shared_state=field(default_factory=dict)
+)
 class Context:
+    __slots__ = ("node", "parent", "replace", "visitor", "stack", "depth", "modified", "shared_state")
+
     node: NodeType
     parent: typing.Union[Context, None]
     # can_replace: bool = True
-    replace: typing.Callable[[NodeType], None] = lambda x: None
-    visitor: typing.Any = None  # FIXME typing
-    stack: Stack = field(default_factory=Stack)
-    depth: int = 0
-    modified: bool = False
-    shared_state: dict = field(default_factory=dict)
+    replace: typing.Callable[[NodeType], None]
+    visitor: typing.Any # FIXME typing
+    stack: Stack
+    depth: int
+    modified: bool
+    shared_state: dict
 
     @property
     def call_graph(self):

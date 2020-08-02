@@ -53,7 +53,7 @@ class PyPiHandler(URIHandler, PackageProvider):
         }
         return m
 
-    def get_paths(self):
+    def get_paths(self, metadata: dict=None):
         if self.opts.get("download_dir") is None:
             self.opts["download_dir"] = pathlib.Path(
                 tempfile.mkdtemp(prefix="aura_pypi_download_")
@@ -66,9 +66,7 @@ class PyPiHandler(URIHandler, PackageProvider):
             yield ScanLocation(
                 location=loc,
                 strip_path=os.fspath(self.opts["download_dir"]),
-                metadata={
-                    "depth": 0
-                }
+                metadata=metadata or {"depth": 0}
             )
 
     def get_diff_paths(

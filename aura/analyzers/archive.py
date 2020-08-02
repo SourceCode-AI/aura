@@ -5,11 +5,11 @@ import zipfile
 from pathlib import Path
 from typing import Generator, Union
 
-
-from .rules import Rule
+from .detections import Detection
 from ..uri_handlers.base import ScanLocation
 from .. import config
 from .. import utils
+from ..type_definitions import AnalyzerReturnType
 
 
 SUPPORTED_MIME = (
@@ -23,7 +23,7 @@ logger = config.get_logger(__name__)
 
 
 
-class ArchiveAnomaly(Rule):
+class ArchiveAnomaly(Detection):
     @classmethod
     def from_generic_exception(cls, location: ScanLocation, exc: Exception):
         return cls(
@@ -45,7 +45,7 @@ def is_suspicious(pth, location):
     norm = utils.normalize_path(pth)
 
     if pth.startswith("/"):
-        return Rule(
+        return Detection(
             message = "Archive contains an absolute path item",
             detection_type="SuspiciousArchiveEntry",
             location=utils.normalize_path(location),
@@ -55,7 +55,7 @@ def is_suspicious(pth, location):
         )
 
     elif any(x == ".." for x in Path(pth).parts):
-        return Rule(
+        return Detection(
             message = "Archive contains an item with parent reference",
             detection_type="SuspiciousArchiveEntry",
             location=utils.normalize_path(location),
@@ -69,7 +69,7 @@ def is_suspicious(pth, location):
 
 def filter_zip(
     arch: zipfile.ZipFile, path, max_size=None
-) -> Generator[Union[zipfile.ZipInfo, Rule], None, None]:
+) -> Generator[Union[zipfile.ZipInfo, Detection], None, None]:
     if max_size is None:
         max_size = config.get_maximum_archive_size()
 
@@ -99,7 +99,7 @@ def filter_zip(
 
 def filter_tar(
     arch: tarfile.TarFile, path, max_size=None
-) -> Generator[Union[tarfile.TarInfo, Rule], None, None]:
+) -> Generator[Union[tarfile.TarInfo, Detection], None, None]:
     if max_size is None:
         config.get_maximum_archive_size()
 
@@ -113,7 +113,7 @@ def filter_tar(
             yield member
         elif member.issym() or member.islnk():
             # https://en.wikipedia.org/wiki/Tar_(computing)#Tarbomb
-            yield Rule(
+            yield Detection(
                 detection_type="ArchiveAnomaly",
                 message="Archive contain a member that is a link.",
                 signature=f"archive_anomaly#link#{path}#{pth}",
@@ -126,7 +126,8 @@ def filter_tar(
             continue
         elif member.isfile():
             if max_size is not None and member.size > max_size:
-                hit = ArchiveAnomaly(
+                hit = Detection(
+                    detection_type="ArchiveAnomaly",
                     location=path,
                     message="Archive contain a file that exceed the configured maximum size",
                     score = config.get_score_or_default("archive-file-size-exceeded", 100),
@@ -146,7 +147,7 @@ def filter_tar(
             continue
 
 
-def process_zipfile(path, tmp_dir) -> Generator[Rule, None, None]:
+def process_zipfile(path, tmp_dir) -> AnalyzerReturnType:
     with zipfile.ZipFile(file=path, mode="r") as fd:
         for x in filter_zip(arch=fd, path=path):
             if isinstance(x, zipfile.ZipInfo):
@@ -155,7 +156,7 @@ def process_zipfile(path, tmp_dir) -> Generator[Rule, None, None]:
                 yield x
 
 
-def process_tarfile(path, tmp_dir) -> Generator[Rule, None, None]:
+def process_tarfile(path, tmp_dir) -> AnalyzerReturnType:
     with tarfile.open(name=path, mode="r:*") as fd:
         for x in filter_tar(arch=fd, path=path):
             if isinstance(x, tarfile.TarInfo):
@@ -164,7 +165,7 @@ def process_tarfile(path, tmp_dir) -> Generator[Rule, None, None]:
                 yield x
 
 
-def archive_analyzer(*, location: ScanLocation):
+def archive_analyzer(*, location: ScanLocation) -> AnalyzerReturnType:
     """
     Archive analyzer that looks for suspicious entries and unpacks the archive for recursive analysis
     """
@@ -195,7 +196,7 @@ def archive_analyzer(*, location: ScanLocation):
         yield ArchiveAnomaly.from_generic_exception(location, exc)
 
 
-def diff_archive(diff):
+def diff_archive(diff) -> AnalyzerReturnType:
     if diff.operation not in "RM":
         return
     elif diff.a_md5 == diff.b_md5:

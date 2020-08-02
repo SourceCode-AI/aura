@@ -2,11 +2,11 @@ from itertools import groupby
 
 from ..nodes import Taints, ASTNode, TaintLog
 from ...base import NodeAnalyzerV2
-from ...rules import Rule
+from ...detections import Detection
 from ....utils import Analyzer
 
 
-class TaintAnomaly(Rule):
+class TaintAnomaly(Detection):  # TODO: refactor to use base Detection class
     pass
 
 

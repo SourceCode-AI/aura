@@ -20,16 +20,11 @@ from . import plugins
 from . import worker_executor
 from . import progressbar
 from .uri_handlers import base
-from .analyzers import rules
+from .analyzers.detections import Detection
 from .analyzers.find_imports import TopologySort
 
 
 logger = config.get_logger(__name__)
-
-
-@dataclasses.dataclass
-class ArchiveAnomaly(rules.Rule):
-    __hash__ = rules.Rule.__hash__
 
 
 class Analyzer(object):
@@ -63,7 +58,7 @@ class Analyzer(object):
                         executor.wait()
                         continue
 
-                    should_continue: Union[bool, rules.Rule] = item.should_continue()
+                    should_continue: Union[bool, Detection] = item.should_continue()
                     # Equals True if it's ok to process this item
                     # Otherwise returns `Rule` indicating why processing of this location should be halted
                     if should_continue is not True:

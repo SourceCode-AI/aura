@@ -20,7 +20,7 @@ def threshold_or_default(threshold: Optional[int]) -> int:
     Return default threshold if none is set otherwise proxy the value
     """
     if threshold is None:
-        return config.get_int("aura.pypi_download_threshold", fallback=10000)
+        return int(config.get_settings("aura.pypi_download_threshold", fallback=10000))
     else:
         return threshold
 

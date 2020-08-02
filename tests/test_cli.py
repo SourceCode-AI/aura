@@ -5,11 +5,43 @@ import tempfile
 from pathlib import Path
 
 import pytest
-import responses
 from click.testing import CliRunner
 
 from aura import cli
-from aura.analyzers.python.readonly import ReadOnlyAnalyzer
+
+
+OBFUSCATED_DEFAULT_MATCHES = [
+    {
+        "type": "StringMatch",
+        "extra": {
+            "signature_id": "url",
+            "string": "https://example.com/index.html",
+        },
+        "tags": ["url"]
+    },
+    {
+        "type": "StringMatch",
+        "extra": {
+            "signature_id": "url",
+            "string": "http://malware.com/CnC"
+        },
+        "tags": ["url"]
+    },
+    {
+        "type": "YaraMatch",
+        "location": re.compile(r".*obfuscated\.py$"),
+        "extra": {
+            "rule": "eicar_substring_test"
+        }
+    },
+    {
+        "type": "YaraMatch",
+        "location": re.compile(r".*obfuscated\.py:\d+\$blob$"),
+        "extra": {
+            "rule": "eicar_substring_test"
+        }
+    }
+]
 
 
 @pytest.mark.timeout(5)
@@ -24,61 +56,32 @@ def test_simple_cli_analysis(exec_mode, fixtures):
 
 @pytest.mark.extended
 def test_complex_cli_analysis(fixtures):
-    matches = [
-        {
-            "type": "StringMatch",
-            "extra": {
-                "signature_id": "url",
-                "string": "https://example.com/index.html",
-            },
-            "tags": ["url"]
-        },
-        {
-            "type": "StringMatch",
-            "extra": {
-                "signature_id": "url",
-                "string": "http://malware.com/CnC"
-            },
-            "tags": ["url"]
-        },
-        {
-            "type": "YaraMatch",
-            "location": re.compile(r".*obfuscated\.py$"),
-            "extra": {
-                "rule": "eicar_substring_test"
-            }
-        },
-        {
-            "type": "YaraMatch",
-            "location": re.compile(r".*obfuscated\.py:\d+\$blob$"),
-            "extra": {
-                "rule": "eicar_substring_test"
-            }
-        }
-    ]
-
-    fixtures.scan_and_match("obfuscated.py", matches)
+    fixtures.scan_and_match("obfuscated.py", OBFUSCATED_DEFAULT_MATCHES)
 
 
 @pytest.mark.extended
 def test_custom_analyzer(fixtures):
-    runner = CliRunner()
-    pth = fixtures.path('obfuscated.py')
-    # The import system will mess up custom analyzer
-    # Backup currently imported analyzers and restore them after the test
-    hooks = ReadOnlyAnalyzer.hooks[:]
-    try:
-        result = runner.invoke(
-            cli.cli, ['scan', os.fspath(pth), '-a', 'custom_analyzer:CustomAnalyzer']
-        )
-
-        if result.exception:
-            raise result.exception
-
-        assert result.exit_code == 0
-        # TODO: add tests to test specific functionality of the custom analyzer
-    finally:
-        ReadOnlyAnalyzer.hooks = hooks
+    fixtures.scan_and_match(
+        "obfuscated.py",
+        matches=[
+            {
+                "type": "CustomAnalyzer",
+                "tags": ["test-code", "custom_tag"],
+                "extra": {
+                    "string_content": "Hello world"
+                }
+            },
+            {
+                "type": "CustomAnalyzer",
+                "tags": ["test-code", "custom_tag"],
+                "extra": {
+                    "string_content": "~/.profile"
+                }
+            }
+        ],
+        excludes=OBFUSCATED_DEFAULT_MATCHES,
+        args=["-a", "custom_analyzer:CustomAnalyzer"]
+    )
 
 
 def test_scan_min_score_option(fixtures):
@@ -156,48 +159,6 @@ def test_r2c_integration():
     assert 'errors' in data
 
 
-@responses.activate
-def test_fetching_pypi_stats():
-    url = "https://cdn.sourcecode.ai/datasets/typosquatting/pypi_stats.json"
-
-    stats_content = json.dumps([
-        {"package": "pkg1", "downloads": 6},
-        {"package": "pkg2", "downloads": 4}
-    ])
-
-    responses.add(
-        responses.GET,
-        url=url,
-        body=stats_content,
-        status = 200,
-        adding_headers={
-            "Content-length": str(len(stats_content)),
-            "Content-type": "application/json"
-        }
-    )
-
-    f_name = "my_stats.json"
-    runner = CliRunner()
-    with runner.isolated_filesystem():
-        assert not os.path.exists(f_name)
-        assert not os.path.exists(f"{f_name}.bak")
-
-        with open(f_name, "w") as fd:
-            fd.write("hello_world")
-
-        result = runner.invoke(cli.cli, ["fetch-pypi-stats", "-o", f_name])
-        assert result.exit_code == 0, result.stdout
-        assert os.path.exists(f_name)
-
-        with open(f_name, "r") as fd:
-            for line in fd:
-                assert json.loads(line)["package"] in ("pkg1", "pkg2"), line
-
-        assert os.path.exists(f"{f_name}.bak")
-        with open(f"{f_name}.bak", "r") as fd:
-            assert fd.read() == "hello_world"
-
-
 def test_async_cleanup(fixtures):
     from aura.uri_handlers import base
 
@@ -206,7 +167,7 @@ def test_async_cleanup(fixtures):
     leftovers = list(tmp_dir.glob("aura_pkg__sandbox*"))
     assert len(leftovers) == 0, leftovers
 
-    output = fixtures.scan_test_file("mirror/wheel-0.34.2.tar.gz", args=["--async"])
+    output = fixtures.scan_test_file("mirror/wheel-0.34.2.tar.gz", args=["--async", "-a", "archive"])
 
     # Make sure that the temp dir is properly cleaned up also when using async mode
     leftovers = list(tmp_dir.glob("aura_pkg__sandbox*"))

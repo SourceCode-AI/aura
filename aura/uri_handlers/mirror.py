@@ -29,7 +29,7 @@ class MirrorHandler(URIHandler):
     def metadata(self):
         return {"package": self.package_name, "package_opts": self.opts}
 
-    def get_paths(self, package=None) -> typing.Generator[ScanLocation, None, None]:
+    def get_paths(self, metadata: dict=None, package=None) -> typing.Generator[ScanLocation, None, None]:
         if package is None:
             package = self.package
 
@@ -43,7 +43,5 @@ class MirrorHandler(URIHandler):
             if pkg_path.exists():
                 yield ScanLocation(
                     location=pkg_path,
-                    metadata={
-                        "depth": 0
-                    }
+                    metadata=metadata or {"depth": 0}
                 )

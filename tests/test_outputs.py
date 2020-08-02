@@ -167,7 +167,7 @@ def test_output_not_created_when_below_minimum_score(output_type, fixtures, tmp_
         "djamgo-0.0.1-py3-none-any.whl",
         "evil.tar.gz",
         "misc.py",
-        "r.tar.gz",
+        "obfuscated.py",
         "malformed_xmls/bomb.xml"
     )
 )
@@ -281,7 +281,7 @@ def test_diff_output_comprehensive(fixtures, fuzzy_rule_match):
         }
     ]
 
-    raw_output = fixtures.get_cli_output(["diff", arch1, arch2, "-f", "json"])
+    raw_output = fixtures.get_cli_output(["diff", arch1, arch2, "-f", "json", "-a", "execution_flow"])
     output = json.loads(raw_output.stdout)
     diffs = output["diffs"]
 

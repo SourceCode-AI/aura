@@ -12,7 +12,7 @@ from .python.nodes import NodeType, ASTNode
 
 @dataclass
 @total_ordering
-class Rule:
+class Detection:
     """
     Base for analyzers to produce detections from audit scans that are reported back to the Aura framework
     Subclass this to have different hits on semantic level
@@ -98,9 +98,9 @@ class Rule:
         return data
 
     def __le__(self, other):
-        if not isinstance(other, Rule):
+        if not isinstance(other, Detection):
             return True
-        elif not (isinstance(self.line_no, int) and isinstance(other.line_no, int)):
+        elif not (type(self.line_no) == int and type(other.line_no) == int):
             return True
         return self.line_no <= other.line_no
 
@@ -127,7 +127,7 @@ class Rule:
             return False
 
     @classmethod
-    def lookup_lines(cls, rules: List[Rule], location):
+    def lookup_lines(cls, rules: List[Detection], location):
         """
         For each rule in the list, look-up a content of the line based on
         location and line number of the hit
@@ -163,5 +163,5 @@ class Rule:
         return self._diff_hash
 
 
-class DataProcessing(Rule):
+class DataProcessing(Detection):
     pass

@@ -9,8 +9,14 @@ from ..exceptions import MinimumScoreNotReached
 from ..utils import json_encoder
 
 
+class JSONOutputBase:
+    @classmethod
+    def protocol(cls) -> str:
+        return "json"
+
+
 @dataclass()
-class JSONScanOutput(ScanOutputBase):
+class JSONScanOutput(JSONOutputBase, ScanOutputBase):
     _fd: Any = None
 
     def __enter__(self):
@@ -22,10 +28,6 @@ class JSONScanOutput(ScanOutputBase):
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self._fd:
             self._fd.close()
-
-    @classmethod
-    def is_supported(cls, parsed_uri) -> bool:
-        return parsed_uri.scheme == "json"
 
     def output(self, hits, scan_metadata: dict):
         score = 0
@@ -50,7 +52,7 @@ class JSONScanOutput(ScanOutputBase):
 
 
 @dataclass()
-class JSONDiffOutput(DiffOutputBase):
+class JSONDiffOutput(JSONOutputBase, DiffOutputBase):
     _fd: Any = None
 
     def __enter__(self):
@@ -62,10 +64,6 @@ class JSONDiffOutput(DiffOutputBase):
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self._fd:
             self._fd.close()
-
-    @classmethod
-    def is_supported(cls, parsed_uri) -> bool:
-        return parsed_uri.scheme == "json"
 
     def output_diff(self, diff_analyzer):
         payload = {

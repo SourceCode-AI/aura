@@ -12,12 +12,55 @@ from .table import Table
 from .. import exceptions
 from ..diff import Diff, DiffAnalyzer
 
-OUTPUT_HANDLERS = None
-DIFF_OUTPUT_HANDLERS = None
+
+OUTPUT_HANDLER_CACHE = {}
+
+
+class OutputBase(metaclass=ABCMeta):
+    def __init__(self, *args, **kwargs):
+        pass
+
+    @classmethod
+    @abstractmethod
+    def protocol(cls) -> str:
+        ...
+
+    @classmethod
+    @abstractmethod
+    def entrypoint(cls) -> str:
+        ...
+
+    @classmethod
+    def is_supported(cls, parsed_uri) -> bool:
+        return parsed_uri.scheme == cls.protocol()
+
+    @classmethod
+    def get_all_output_formats(cls) -> Mapping[str, OutputBase]:
+        handlers = OUTPUT_HANDLER_CACHE.setdefault(cls.entrypoint(), {})
+
+        if not handlers:
+            for x in pkg_resources.iter_entry_points(cls.entrypoint()):
+                handler = x.load()
+                handlers[x.name] = handler
+
+        return handlers
+
+    @classmethod
+    def get_format(cls, uri: str, parsed=None) -> OutputBase:
+        if not parsed:
+            parsed = parse.urlparse(uri)
+
+        for fmt_name, fmt in cls.get_all_output_formats().items():
+            if fmt_name == uri:  # This will match also "protocol" so we don't need to specify "protocol://"
+                return fmt
+            elif fmt.is_supported(parsed_uri=parsed):
+                return fmt
+
+        raise exceptions.InvalidOutput("No such output format")
 
 
 @dataclass()
-class ScanOutputBase(metaclass=ABCMeta):
+class ScanOutputBase(OutputBase, metaclass=ABCMeta):
     min_score: int = 0
     output_location: str = "-"
     tag_filters: list = field(default_factory=list)
@@ -31,6 +74,10 @@ class ScanOutputBase(metaclass=ABCMeta):
         pass
 
     @classmethod
+    def entrypoint(cls) -> str:
+        return "aura.output_handlers"
+
+    @classmethod
     def from_uri(cls, uri: str, opts: Optional[dict] = None) -> ScanOutputBase:
         if opts is None:
             opts = {}
@@ -41,21 +88,13 @@ class ScanOutputBase(metaclass=ABCMeta):
         if set(opts.keys()) & set(parsed_qs.keys()):
             raise exceptions.InvalidOutput("You can't specify the same options both via uri and command line options at the same time")
 
-        for fmt_name, fmt in cls.get_all_output_formats().items():
-            if fmt_name == uri:   # This will match "text" so we don't need to specify "text://<something>"
-                return fmt(**opts)
-
-            if fmt.is_supported(parsed_uri=parsed):
-                fmt_class = fmt
-                break
-        else:
-            raise exceptions.InvalidOutput("No such output format")
+        fmt_class = cls.get_format(uri, parsed)
 
         # TODO: add support for tags from uri
 
         if parsed.netloc and parsed.path:
             opts["output_location"] = os.path.join(parsed.netloc, parsed.path)
-        else:
+        elif uri != fmt_class.protocol():
             opts["output_location"] = parsed.netloc or parsed.path
 
         for opt in ():  # TODO
@@ -83,11 +122,6 @@ class ScanOutputBase(metaclass=ABCMeta):
                 self.tag_filters.append(lambda x: t[1:] not in x)
             else:
                 self.tag_filters.append(lambda x: t in x)
-
-    @classmethod
-    @abstractmethod
-    def is_supported(cls, parsed_uri) -> bool:
-        ...
 
     @abstractmethod
     def output(self, hits, scan_metadata: dict):
@@ -127,25 +161,17 @@ class ScanOutputBase(metaclass=ABCMeta):
 
         return processed
 
-    @classmethod
-    def get_all_output_formats(cls) -> Mapping[str, ScanOutputBase]:
-        global OUTPUT_HANDLERS
-
-        if not OUTPUT_HANDLERS:
-            OUTPUT_HANDLERS = {}
-            for x in pkg_resources.iter_entry_points("aura.output_handlers"):
-                handler = x.load()
-                OUTPUT_HANDLERS[x.name] = handler
-
-        return OUTPUT_HANDLERS
-
 
 @dataclass()
-class DiffOutputBase(metaclass=ABCMeta):
+class DiffOutputBase(OutputBase, metaclass=ABCMeta):
     detections: bool = True
     output_same_renames: bool = False
     patch: bool = True
     output_location: str = "-"
+
+    @classmethod
+    def entrypoint(cls) -> str:
+        return "aura.diff_output_handlers"
 
     @classmethod
     def from_uri(cls, uri: str, opts: Optional[dict] = None) -> DiffOutputBase:
@@ -155,19 +181,11 @@ class DiffOutputBase(metaclass=ABCMeta):
         if opts is None:
             opts = {}
 
-        for fmt_name, fmt in cls.get_all_output_formats().items():
-            if fmt_name == uri:
-                return fmt(**opts)
-
-            if fmt.is_supported(parsed_uri=parsed):
-                fmt_class = fmt
-                break
-        else:
-            raise exceptions.InvalidOutput(f"No such output format: '{uri}'")
+        fmt_class = cls.get_format(uri, parsed)
 
         if parsed.netloc and parsed.path:
             opts["output_location"] = os.path.join(parsed.netloc, parsed.path)
-        else:
+        elif uri != fmt_class.protocol():
             opts["output_location"] = parsed.netloc or parsed.path
 
         for opt in ("detections", "all_detections", "output_same_renames", "patch"):
@@ -188,26 +206,9 @@ class DiffOutputBase(metaclass=ABCMeta):
 
         return out
 
-    @classmethod
-    @abstractmethod
-    def is_supported(cls, parsed_uri) -> bool:
-        ...
-
     @abstractmethod
     def output_diff(self, diff_analyzer: DiffAnalyzer):
         ...
-
-    @classmethod
-    def get_all_output_formats(cls) -> Mapping[str, DiffOutputBase]:
-        global DIFF_OUTPUT_HANDLERS
-
-        if not DIFF_OUTPUT_HANDLERS:
-            DIFF_OUTPUT_HANDLERS = {}
-            for x in pkg_resources.iter_entry_points("aura.diff_output_handlers"):
-                handler = x.load()
-                DIFF_OUTPUT_HANDLERS[x.name] = handler
-
-        return DIFF_OUTPUT_HANDLERS
 
     @abstractmethod
     def __enter__(self):
@@ -217,7 +218,19 @@ class DiffOutputBase(metaclass=ABCMeta):
         pass
 
 
+@dataclass()
+class InfoOutputBase(OutputBase, metaclass=ABCMeta):
+    @classmethod
+    def entrypoint(cls) -> str:
+        return "aura.info_output_handlers"
 
+    @classmethod
+    def from_uri(cls, uri: str) -> InfoOutputBase:
+        return cls.get_format(uri)()
+
+    @abstractmethod
+    def output_info_data(self, data):
+        ...
 
 
 def qs_to_bool(qs: Union[str, bool]) -> bool:

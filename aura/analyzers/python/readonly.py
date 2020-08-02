@@ -1,6 +1,6 @@
 import typing
 
-from .. import rules
+from ..detections import Detection
 from ...uri_handlers.base import ScanLocation
 from .visitor import Visitor
 from .nodes import Context
@@ -10,7 +10,7 @@ class ReadOnlyAnalyzer(Visitor):
     stage_name = "read_only"
     hooks = []
 
-    def __call__(self) -> typing.Generator[rules.Rule, None, None]:
+    def __call__(self) -> typing.Generator[Detection, None, None]:
         if not self.hooks:
             return
         elif self.location.metadata["mime"] != "text/x-python":
@@ -32,7 +32,7 @@ class ReadOnlyAnalyzer(Visitor):
                 if x.location is None:
                     x.location = self.location.location
 
-            rules.Rule.lookup_lines(hits, location=self.location)
+            Detection.lookup_lines(hits, location=self.location)
             yield from hits
             yield from locations
 
@@ -49,3 +49,4 @@ class ReadOnlyAnalyzer(Visitor):
                 self.hits.extend(handler(context=context))
             elif hasattr(hook, "_visit_node"):
                 self.hits.extend(hook._visit_node(context=context))
+

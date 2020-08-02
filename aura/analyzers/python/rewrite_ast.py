@@ -1,7 +1,4 @@
-import base64
 import codecs
-
-import chardet
 
 from .visitor import Visitor
 from .nodes import *
@@ -142,7 +139,7 @@ class ASTRewrite(Visitor):
         else:
             new_node = Bytes(decoded)
 
-        new_node.line_no = node.line_no
+        new_node.enrich_from_previous(node)
         context.replace(new_node)
 
     def rewrite_function_call(self, context):

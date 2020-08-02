@@ -1,5 +1,6 @@
 import re
 import sys
+from shutil import get_terminal_size
 from dataclasses import dataclass
 from textwrap import shorten, wrap
 from prettyprinter import pformat
@@ -10,12 +11,36 @@ from click import echo, secho, style
 from .. import utils
 from .. import config
 from ..exceptions import MinimumScoreNotReached
-from .base import ScanOutputBase, DiffOutputBase
+from .base import ScanOutputBase, DiffOutputBase, InfoOutputBase
 from .table import Table
 
 
 # Reference for unicode box characters:
 # https://jrgraphix.net/r/Unicode/2500-257F
+
+# ASCII Logo generated from png using https://asciiart.club/  & tweaked for better visual appearance
+LOGO = """
+                 ▄▄▄▄▄▄▄▄                
+           ▁▄████████████████▄▁          
+        ▄██████▀▀▀▀    ▀▀▀▀██████▄       
+      ▄████▀▀      ▄▄▄▄      ▀▀████▌     
+    ▄████▀    ▄████████████▄    ▀████▄   
+   ████▀   ▄█████▀▀    ▀▀█████▄   ▀████  
+  ▟███▀   ████▀            ▀████   ▀███▙ 
+ ▗███▌   ███▀     ▄████▄     ▀███   ▐███▖      ___                   
+ ▟██▌   ████     ██▋  ▐██     ████   ▐██▙     /   | __  ___________ _
+ ███▏  ▐████████▌▀██▌▐██▀▐████████▌  ▕███    / /| |/ / / / ___/ __ `/
+ ▜██▌   ████▀▀▀▀▀▀▄█▌▐█▄▀▀▀▀▀▀████   ▐██▛   / ___ / /_/ / /  / /_/ / 
+ ▝███   ▝███▄    ▄█▙▄▄▟█▄    ▄███▘   ███▘  /_/  |_\__,_/_/   \__,_/  
+  ▜███   ▝███▄   ▀▀▀▀▀▀▀▀   ▄███▘   ███▛ 
+   ████▖   ▀██▌            ▐██▀   ▗████    {version}
+    ▀███▖    ▀              ▀    ▄████           
+     ▝█████▄                  ▄█████▀          by SourceCode.AI
+       ▝▀█████▄▄▁        ▁▄▄██████▘      
+          ▝▀██████████████████▀▘         
+               ▝▀▀▀▀▀▀▀▀▀▀▘                                              
+"""
+
 
 class PrettyReport:
     ANSI_RE = re.compile(r"""
@@ -26,7 +51,12 @@ class PrettyReport:
     """, re.VERBOSE)
 
     def __init__(self, fd=None):
-        self.width = config.get_int("aura.text-output-width", 120)
+        width = config.get_settings("aura.text-output-width", "auto")
+        if width == "auto":
+            self.width = get_terminal_size(fallback=(120, 24))[0]
+        else:
+            self.width = int(width or 120)
+
         self.fd = fd
 
     @classmethod
@@ -87,6 +117,10 @@ class PrettyReport:
 @dataclass()
 class TextBase:
     _formatter: Optional[PrettyReport] = None
+
+    @classmethod
+    def protocol(cls) -> str:
+        return "text"
 
     def _format_detection(
             self,
@@ -183,7 +217,8 @@ class TextBase:
         out.print_bottom_separator()
 
 
-class TextScanOutput(ScanOutputBase, TextBase):
+@dataclass()
+class TextScanOutput(TextBase, ScanOutputBase):
     _fd: Any = None
 
     def __enter__(self):
@@ -197,10 +232,6 @@ class TextScanOutput(ScanOutputBase, TextBase):
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self._fd:
             self._fd.close()
-
-    @classmethod
-    def is_supported(cls, parsed_uri) -> bool:
-        return parsed_uri.scheme == "text"
 
     def output(self, hits, scan_metadata: dict):
         hits = set(hits)
@@ -246,8 +277,72 @@ class TextScanOutput(ScanOutputBase, TextBase):
         self._formatter.print_bottom_separator()
 
 
+class TextInfoOutput(InfoOutputBase):
+    @classmethod
+    def protocol(cls) -> str:
+        return "text"
+
+    def output_info_data(self, data):
+        OK = '\u2713'
+        NOK = '\u2717'
+
+        out = PrettyReport()
+
+        # Left hand side of the table contains logo and basic project information
+        logo = LOGO.format(version=f'Version {data["aura_version"]}'.center(26))
+
+        lhs_lines = logo.split("\n")
+        lhs_size = max(len(x) for x in lhs_lines) + 1
+
+        #print(logo)
+        out.print_top_separator()
+
+        # Right hand side lists environment information (installed plugins, URI handlers etc.)
+        rhs_lines = [
+            "Installed analyzers:"
+        ]
+
+        rhs_size = max(len(x) for x in rhs_lines)
+
+        #out.align("Installed analyzers: ")
+        for name, i in data["analyzers"].items():
+            if i["enabled"]:
+                mark = OK
+                s = {"fg": "bright_green"}
+            else:
+                mark = NOK
+                s = {"fg": "bright_red"}
+
+            rhs_lines.append(style(f" {mark} {name}: {i['description']}", **s))
+            #out.align(style(f" {mark} {name}: {i['description']}", **s))
+
+        rhs_lines.append("Installed URI handlers:")
+        #out.align("Installed URI handlers: ")
+        for name, i in data["uri_handlers"].items():
+            mark = OK
+            s = {"fg": "bright_green"}
+
+            rhs_lines.append(style(f" {mark} {name}://", **s))
+            #out.align(style(f" {mark} {name}://", **s))
+
+        for idx in range(max(len(rhs_lines), len(lhs_lines))):
+            if idx < len(lhs_lines):
+                lhs = out._align_text(lhs_lines[idx], lhs_size)
+            else:
+                lhs = " "*lhs_size
+
+            if idx < len(rhs_lines):
+                rhs = rhs_lines[idx]
+            else:
+                rhs = " "
+
+            out.align(f"{lhs} \u2502 {rhs}")
+
+        out.print_bottom_separator()
+
+
 @dataclass()
-class TextDiffOutput(DiffOutputBase, TextBase):
+class TextDiffOutput(TextBase, DiffOutputBase):
     _fd: Any = None
 
     def __enter__(self):
@@ -261,10 +356,6 @@ class TextDiffOutput(DiffOutputBase, TextBase):
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self._fd:
             self._fd.close()
-
-    @classmethod
-    def is_supported(cls, parsed_uri) -> bool:
-        return parsed_uri.scheme == "text"
 
     def output_diff(self, diff_analyzer):
         out = PrettyReport(fd=self._fd)

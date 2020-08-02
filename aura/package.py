@@ -10,14 +10,14 @@ from urllib.parse import urlparse, ParseResult
 from pathlib import Path
 from itertools import product, chain
 from contextlib import contextmanager
-from typing import Optional, Generator, Tuple
+from typing import Optional, Generator, Tuple, List
 
 import pytz
 import requests
-import requirements
 import rapidjson as json
 from packaging.version import Version
 from packaging.utils import canonicalize_name
+from packaging.requirements import Requirement
 from textdistance import jaccard
 
 from . import config
@@ -39,8 +39,6 @@ class PypiPackage:
         self.name = name
         self.info = info
         self.source = source
-        self.requirements = []
-        self._parse_requirements()
         self.release = "all"
         self.packagetype = None
         self.filename = None
@@ -84,17 +82,14 @@ class PypiPackage:
     def __getitem__(self, item):
         return self.info[item]
 
-    def _parse_requirements(self):
-        if not self["info"].get("requires_dist"):
-            return
-
-        for req_line in self["info"]["requires_dist"]:
-            for req in requirements.parse(req_line):
-                # FIXME: reference lost # req = utils.filter_empty_dict(dict(req))
-                self.requirements.append(req)
-
     def get_latest_release(self) -> str:
         return self.info["info"]["version"]
+
+    def get_dependencies(self) -> Generator[Requirement, None, None]:
+        deps = self.info["info"].get("requires_dist", [])
+        if deps:
+            for req_line in deps:
+                yield Requirement(req_line)
 
     def download_release(
         self,
@@ -314,6 +309,13 @@ class PackageScore:
 
         return 0
 
+    def score_reverse_dependencies(self) -> int:
+        dependencies = get_reverse_dependencies(self.package_name)
+        if not dependencies:
+            return 0
+
+        return math.ceil(math.log(len(dependencies), 10))
+
     def score_github_stars(self) -> int:
         if self.github is None:
             return 0
@@ -393,6 +395,7 @@ class PackageScore:
     def get_score_matrix(self) -> dict:
         score_matrix = {
             "pypi_downloads": self.score_pypi_downloads(),
+            "reverse_dependencies": self.score_reverse_dependencies(),
             "github_stars": self.score_github_stars(),
             "forks": self.score_github_forks(),
             "contributors": self.score_github_contributors(),
@@ -445,3 +448,22 @@ def md5_filter(release, md5=None) -> bool:
         return True
 
     return (md5 == release["md5_digest"])
+
+
+def get_reverse_dependencies(pkg_name: str) -> List[str]:
+    pkg_name = canonicalize_name(pkg_name)
+    dataset_path = Path("reverse_dependencies.json")
+    with dataset_path.open("r") as fd:
+        dataset = json.loads(fd.read())
+
+    if pkg_name in dataset:
+        return dataset[pkg_name]
+    else:
+        return []
+
+
+def get_packages_for_author(author: str) -> List[Tuple[str, str]]:
+    repo = xmlrpc.client.ServerProxy(
+        "https://pypi.org/pypi", use_builtin_types=True
+    )
+    return list(repo.user_packages(author))

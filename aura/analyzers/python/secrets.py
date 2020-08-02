@@ -3,11 +3,11 @@ from urllib.parse import urlparse, parse_qs
 
 from .nodes import *
 from .. import base
-from .. import rules
+from ..detections import Detection
 from ...utils import Analyzer
 
 
-class LeakingSecret(rules.Rule):
+class LeakingSecret(Detection):  # TODO: refactor to use the base class
     pass
 
 

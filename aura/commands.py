@@ -4,6 +4,7 @@ import sys
 import os
 import json
 import time
+import copy
 import inspect
 from pathlib import Path
 from functools import partial
@@ -16,23 +17,18 @@ from prettyprinter import pprint
 from .package_analyzer import Analyzer
 from .uri_handlers.base import URIHandler, ScanLocation
 
-from . import __version__ as version
 from . import config
 from . import exceptions
 from . import utils
 from . import mirror
-from . import plugins
 from . import typos
 from . import diff
 from . import worker_executor
 from .package import PypiPackage
-from .output.base import ScanOutputBase, DiffOutputBase
+from .output.base import ScanOutputBase, DiffOutputBase, InfoOutputBase
 
 
 logger = config.get_logger(__name__)
-
-OK = '\u2713'
-NOK = '\u2717'
 
 
 def check_requirement(pkg):
@@ -67,6 +63,7 @@ def check_requirement(pkg):
     finally:
         handler.cleanup()
     sys.exit(1)
+
 
 @contextmanager
 def scan_worker(item: ScanLocation) -> list:
@@ -108,7 +105,8 @@ def scan_uri(uri, metadata: Union[list, dict]=None) -> list:
             })
 
             with ExitStack() as stack:
-                for x in handler.get_paths():  # type: ScanLocation
+                # FIXME: metadata=metadata
+                for x in handler.get_paths(metadata={"analyzers": metadata["analyzers"]}):  # type: ScanLocation
                     all_hits.extend(
                         stack.enter_context(scan_worker(x))
                     )
@@ -199,57 +197,14 @@ def parse_ast(path: Union[str, Path], stages: Optional[Tuple[str,...]]=None):
     pprint(v.tree["ast_tree"], indent=2)
 
 
-def info():
+def show_info():
     """
     Collect and print information about the framework environment and plugins
     """
-    click.secho(f"---[ Aura framework version {version} ]---", fg="blue", bold=True)
-    analyzers = plugins.load_entrypoint("aura.analyzers")
-    if not analyzers["entrypoints"]:
-        click.secho("No analyzers available", color="red", blink=True, bold=True)
-    else:
-        click.echo("Available analyzers:")
-
-    for k, v in analyzers["entrypoints"].items():
-        doc = getattr(v, 'analyzer_description', None)
-        if not doc:
-            doc = inspect.getdoc(v) or "Description N/A"
-        click.echo(f" {OK} {k} - {doc}")
-
-    if analyzers["disabled"]:
-        click.secho("Disabled analyzers:", color="red", bold=True)
-        for (k, v) in analyzers["disabled"]:
-            click.echo(f" {NOK} {k.name} - {v}")
-
-    click.secho(f"\nAvailable URI handlers:")
-    for k, v in URIHandler.load_handlers().items():
-        click.secho(f" {OK} '{k}://'")
-
-    click.echo("\nExternal integrations:")
-    tokens = {"librariesio": "Libraries.io API"}
-    for k, v in tokens.items():
-        t = (config.get_token(k) is not None)
-        fg = "green" if t else "red"
-        status = "enabled" if t else "Disabled - Token not found"
-        click.secho(f" {OK if t else NOK} {v}: {status}", fg=fg)
-
-
-    if config.get_relative_path("pypi_stats").is_file():
-        click.secho(
-            f"\n {OK} PyPI download stats present. Typosquatting protection enabled",
-            fg="green",
-        )
-    else:
-        click.secho(
-            f"\n {NOK} PyPI download stats not found, run `aura fetch-pypi-stats`. Typosquatting protection disabled",
-            fg="red",
-        )
-
-
-def fetch_pypi_stats(out):
-    STATS_CDN_URL = "https://cdn.sourcecode.ai/datasets/typosquatting/pypi_stats.json"
-
-    utils.download_file(STATS_CDN_URL, out)
+    from . import info
+    info_data = info.gather_aura_information()
+    formatter = InfoOutputBase.from_uri("text")
+    formatter.output_info_data(info_data)
 
 
 def generate_typosquatting(out, distance=2, limit=None):

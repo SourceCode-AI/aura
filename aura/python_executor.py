@@ -9,10 +9,11 @@ IMPORTANT NOTE:
 """
 
 import os
-import json
 import subprocess
 from shutil import which
 from typing import List
+
+import rapidjson as json
 
 from . import config
 from .exceptions import PythonExecutorError
@@ -49,7 +50,7 @@ def run_with_interpreters(*, metadata=None, **kwargs):
 
         try:
             output = execute_interpreter(interpreter=interpreter, **kwargs)
-            if output:
+            if output is not None:
                 if metadata is not None:
                     metadata["interpreter_name"] = name
                     metadata["interpreter_path"] = interpreter

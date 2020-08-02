@@ -10,7 +10,7 @@ import requirements
 from packaging.specifiers import SpecifierSet
 from pkg_resources import RequirementParseError
 
-from .rules import Rule
+from .detections import Detection
 from ..utils import Analyzer
 from ..uri_handlers.base import ScanLocation
 from ..config import get_score_or_default
@@ -57,9 +57,9 @@ def auto_decode(data: bytes) -> str:
         return data.decode(encoding)
 
 
-def check_unpinned(requirement, location) -> Optional[Rule]:
+def check_unpinned(requirement, location) -> Optional[Detection]:
     if not requirement.specs:
-        return Rule(
+        return Detection(
             detection_type="UnpinnedRequirement",
             message=f"Package {requirement.name} is unpinned",
             signature=f"req_unpinned#{str(location)}#{requirement.name}",
@@ -72,7 +72,7 @@ def check_unpinned(requirement, location) -> Optional[Rule]:
         )
 
 
-def check_outdated(requirement, location) -> Optional[Rule]:
+def check_outdated(requirement, location) -> Optional[Detection]:
     pypi = package.PypiPackage.from_pypi(requirement.name)
     latest = pypi.get_latest_release()
 
@@ -80,7 +80,7 @@ def check_outdated(requirement, location) -> Optional[Rule]:
     spec_set = SpecifierSet(specs)
 
     if latest not in spec_set:
-        return Rule(
+        return Detection(
             detection_type="OutdatedRequirement",
             message=f"Package {requirement.name}{specs} is outdated, newest version is {latest}",
             signature=f"req_outdated#{str(location)}#{requirement.name}#{requirement.specs}#{latest}",
@@ -96,7 +96,7 @@ def check_outdated(requirement, location) -> Optional[Rule]:
 
 
 @Analyzer.ID("requirements_file_analyzer")
-def analyze_requirements_file(*, location: ScanLocation) -> Generator[Rule, None, None]:
+def analyze_requirements_file(*, location: ScanLocation) -> Generator[Detection, None, None]:
     """
     Analyzer the requirements.txt file and lookup for outdated packages
     """
@@ -109,7 +109,7 @@ def analyze_requirements_file(*, location: ScanLocation) -> Generator[Rule, None
         with location.location.open("rb") as fd:
             decoded = auto_decode(fd.read())
     except (UnicodeDecodeError, TypeError):
-        yield Rule(
+        yield Detection(
             detection_type="InvalidRequirement",
             message=f"Unable to decode the requirements file into unicode",
             signature = f"req_invalid#unicode_decode#{norm_pth}",
@@ -128,7 +128,7 @@ def analyze_requirements_file(*, location: ScanLocation) -> Generator[Rule, None
             continue
 
         if URL.match(req_line):
-            yield Rule(
+            yield Detection(
                 detection_type="InvalidRequirement",
                 message = f"Can't process requirement with a remote URL",
                 signature = f"req_invalid#remote_url#{norm_pth}/{idx}",
@@ -155,7 +155,7 @@ def analyze_requirements_file(*, location: ScanLocation) -> Generator[Rule, None
                     yield hit
                     continue
         except (RequirementParseError, ValueError, FileNotFoundError, NoSuchPackage) as exc:
-            yield Rule(
+            yield Detection(
                 detection_type="InvalidRequirement",
                 message = f"Could not parse the requirement for analysis",
                 signature = f"req_invalid#{norm_pth}/{idx}",

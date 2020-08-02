@@ -66,8 +66,8 @@ class Visitor:
         self.hits = []
         self.path = location.location
         self.normalized_path: str = str(location)
-        self.max_iterations = config.get_int("aura.max-ast-iterations", 500)
-        self.max_queue_size = config.get_int("aura.max-ast-queue-size", 10000)
+        self.max_iterations = int(config.get_settings("aura.max-ast-iterations", 500))
+        self.max_queue_size = int(config.get_settings("aura.max-ast-queue-size", 10000))
 
     @classmethod
     def from_visitor(cls, visitor: Visitor):
