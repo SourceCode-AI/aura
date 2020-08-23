@@ -1,0 +1,613 @@
+patterns:
+  - id: flask_run_debug
+    pattern: "flask.Flask.run(..., debug=True)"
+    detection:
+      message: Debug mode enabled in Flask
+      score: 10
+    tags:
+      - flask_debug
+
+  - id: ctypes_memory_allocation
+    pattern: "ctypes.windll.kernel32.VirtualAlloc"
+    detection:
+      message: Memory allocation using ctypes
+
+  - id: ctypes_create_thread
+    pattern: "ctypes.windll.kernel32.CreateThread"
+    detection:
+      message: Creating thread using ctypes
+
+  - id: ctypes_create_remote_thread
+    pattern: "ctypes.windll.kernel32.CreateRemoteThread"
+    detection:
+      message: Creating remote thread using ctypes
+
+  - id: ctypes_write_process_memory
+    pattern: "ctypes.windll.kernel32.WriteProcessMemory"
+    detection:
+      message: Ctypes writing directly into the process memory
+      score: 100
+
+  - id: ctypes_window_hook
+    pattern: "ctypes.windll.user32.SetWindowsHookExA"
+    detection:
+      message: Ctypes creating a hook for the window. Possible sign of keylogger
+      score: 100
+
+  - id: ctypes_lock_screen
+    pattern: "ctypes.windll.user32.LockWorkStation"
+    detection:
+      message: Ctypes locks windows screen
+      score: 50
+
+  - id: ctypes_is_admin
+    pattern: "ctypes.windll.shell32.IsUserAnAdmin"
+    detection:
+      message: Ctypes determining if user is an admin
+      score: 100
+
+  - id: ctypes_enum_windows
+    pattern: "ctypes.windll.user32.EnumWindows"
+    detection:
+      message: "Ctypes is enumerating over windows"
+      score: 10
+
+  - id: ctypes_page_execute_read_write
+    pattern: "ctypes.c_int(64)"
+    detection:
+      message: Flag PAGE_EXECUTE_READ_WRITE for allocated memory page
+
+  - id: ctypes_kernel32_rtlmovememory
+    pattern: "ctypes.windll.kernel32.RtlMoveMemory(...)"
+    detection:
+      message: "Copying memory between allocated pages"
+
+  - id: ctypes_kernel32_waitforsingleobject
+    pattern: "ctypes.windll.kernel32.WaitForSingleObject"
+    detection:
+      message: Wait until the object is in signaled state or timed-out
+
+  - id: ctypes_kernel32_getvolumeinformationw
+    pattern: "ctypes.windll.kernel32.GetVolumeInformationW"
+    detection:
+      message: Get volume information via ctypes
+
+  - id: ctypes_cfunc_type
+    pattern: "ctypes.CFUNCTYPE"
+    detection:
+      message: CFUNCTYPE allows creating a pointer to memory location containing executable code
+      score: 100
+    tags:
+      - ctypes_cfunc_type
+      - possible_malware
+
+  - id: mktemp_racecond
+    pattern: "tempfile.mktemp(...)"
+    detection:
+      score: 20
+      message: "Usage of tempfile.mktemp is susceptible to race conditions!"
+
+  - id: open_file
+    pattern: "open(...)"
+    detection:
+      message: Code is accessing files via open
+    tags:
+      - file_access
+    taint: sink
+
+  - id: md5_deprecated
+    pattern: "hashlib.md5"
+    detection:
+      message: Usage of MD5 for cryptographic purposes is very dangerous and no longer recommended
+      score: 20
+    tags:
+      - deprecated
+
+  - id: requests_unverified
+    pattern:
+      - "requests.get(..., verify=False)"
+      - "requests.post(..., verify=False)"
+      - "requests.put(..., verify=False)"
+      - "requests.delete(..., verify=False)"
+      - "requests.patch(..., verify=False)"
+      - "requests.head(..., verify=False)"
+      - "requests.options(..., verify=False)"
+    detection:
+      message: SSL/TLS verification disabled when doing a request
+      score: 10
+
+  - id: shell_injection
+    pattern:
+      - "subprocess.run(..., shell=True)"
+      - "subprocess.Popen(..., shell=True)"
+      - "subprocess.call(..., shell=True)"
+      - "subprocess.check_call(..., shell=True)"
+      - "subprocess.check_output(..., shell=True)"
+    detection:
+      score: 20
+      message: "Setting shell=True is dangerous and allows a shell injection attack"
+    tags:
+      - shell_injection
+    taint: sink
+
+  - id: dangerous_pickle
+    pattern:
+      - "pickle.load(...)"
+      - "pickle.loads(...)"
+      - "cPickle.load(...)"
+      - "cPickle.loads(...)"
+    detection:
+      message: Usage of pickle is very dangerous and easily exploitable
+      score: 50
+    tags:
+      - pickle_usage
+    taint: sink
+
+  - id: os_system_execution
+    pattern:
+      - "os.system(...)"
+      - "os.popen(...)"
+      - "os.popen2(...)"
+      - "os.popen3(...)"
+      - "os.popen4(...)"
+      - "os.startfile(...)"
+      - "os.execl(...)"
+      - "os.execle(...)"
+      - "os.execlp(...)"
+      - "os.execv(...)"
+      - "os.execve(...)"
+      - "os.execvp(...)"
+      - "os.execvpe(...)"
+      - "os.spawnl(...)"
+      - "os.spawnle(...)"
+      - "os.spawnlp(...)"
+      - "os.spawnlpe(...)"
+      - "os.spawnv(...)"
+      - "os.spawnve(...)"
+      - "os.spawnvp(...)"
+      - "os.spawnvpe(...)"
+    detection:
+      score: 50
+      message: Code is performing system command execution
+    tags:
+      - system_execution
+    taint: sink
+
+  - id: yaml_load_unsafe
+    pattern: "yaml.load(...)"
+    detection:
+      message: yaml.load is considered unsafe as it can execute python commands via directive. Use yaml.safe_load instead
+      score: 100
+    tags:
+      - yaml_load
+    taint: sink
+
+  - id: python_code_execution
+    pattern:
+      - "eval(...)"
+      - "exec(...)"
+    detection:
+      score: 100
+      message: eval/exec usage found in a source code
+    tags:
+      - obfuscation
+      - code_execution
+    taint: sink
+
+  - id: inline_import
+    pattern:
+      - "__import__(...)"
+      - "importlib.import_module(...)"
+      - "importlib.__import__(...)"
+    detection:
+      message: Inline import
+      score: 50
+    tags:
+      - import
+      - obfuscation
+    taint: sink
+
+  - pattern: "getpass.getuser"
+    detection:
+      message: Local username lookup, could be used for exploit to determine if running under the root/admin
+      score: 10
+    tags:
+      - information_gathering
+
+  # Taint cleaners
+  - pattern: "int(...)"
+    taint: safe
+
+  - pattern: "float(...)"
+    taint: safe
+
+  - pattern: "flask.Markup.escape(...)"
+    taint: safe
+
+  - pattern: "shlex.escape(...)"
+    taint: safe
+
+  # Taint sources
+  - pattern: "input(...)"
+    taint: tainted
+
+  - pattern: "raw_input(...)"
+    taint: tainted
+
+  - id: flask_request_args
+    pattern: "flask.request.args"
+    taint: tainted
+
+  - id: flask_request_form
+    pattern: "flask.request.form"
+    taint: tainted
+
+  - pattern: "flask.request.path"
+    taint: tainted
+
+  - id: flask_request_headers
+    pattern: "flask.request.headers"
+    taint: tainted
+
+  - id: flask_request_files
+    pattern: "flask.request.files"
+    taint: tainted
+
+  - id: flask_request_cookies
+    pattern: "flask.request.cookies"
+    taint: tainted
+
+  - pattern: "flask.request.get_json(...)"
+    taint: tainted
+
+  # Taint sinks
+  - pattern: "flask.make_response(...)"
+    taint: sink
+
+  - pattern: "flask.jsonify(...)"
+    taint: sink
+
+  - pattern: "flask.send_file(...)"
+    taint: sink
+
+  - pattern: "flask.db.execute(...)"
+    taint: sink
+
+  - pattern: "flask.make_response.set_cookie(...)"
+    taint: sink
+
+  - id: subprocess_sink
+    pattern:
+      - "subprocess.Popen(...)"
+      - "subprocess.call(...)"
+      - "subprocess.run(...)"
+    taint: sink
+
+  - pattern: "MySQLdb.connect.cursor.execute(...)"
+    taint: sink
+
+  - pattern: "mysql.connector.connect.cursor.execute(...)"
+    taint: sink
+
+  - pattern: "pymysql.connect.cursor.execute(...)"
+    taint: sink
+
+  - pattern: "sqlalchemy.orm.scoped_session.execute(...)"
+    taint: sink
+
+  - pattern: "psycopg2.connect.cursor.execute"
+    taint: sink
+
+  - pattern: "django.shortcuts.render(...)"
+    tags:
+      - django_view
+    taint:
+      level: sink
+      log_message: "AST node has been marked as Django view"
+      args:
+        request: tainted
+
+  - pattern: "django.http.HttpResponse(...)"
+    taint: sink
+
+  - pattern: "django.http.HttpResponseNotFound(...)"
+    taint: sink
+
+  - pattern: "sqlite3.connect.execute(...)"
+    taint: sink
+
+  - id: shutil_module_sinks
+    pattern:
+      - "shutil.copyfileobj(...)"
+      - "shutil.copyfile(...)"
+      - "shutil.copymode(...)"
+      - "shutil.copystat(...)"
+      - "shutil.copy(...)"
+      - "shutil.copy2(...)"
+      - "shutil.copytree(...)"
+      - "shutil.rmtree(...)"
+      - "shutil.move(...)"
+      - "shutil.chown(...)"
+      - "shutil.make_archive(...)"
+      - "shutil.unpack_archive(...)"
+    taint: sink
+
+  # Module imports
+  - id: network_modules
+    pattern:
+      - "import socket"
+      - "import requests"
+      - "import urllib"
+      - "import urllib2"
+      - "import urllib3"
+      - "import httplib"
+      - "import ftplib"
+    tags:
+      - network
+
+  - id: code_execution_modules
+    pattern:
+      - "import importlib"
+      - "import pickle"
+      - "import cPickle"
+      - "import marshal"
+      - "import imp"
+      - "import imputil"
+      - "import zipimport"
+      - "import runpy"
+      - "import subprocess"
+      - "import popen2"
+      - "import commands"
+    tags:
+      - "code_execution"
+
+  - id: obfuscation_modules
+    pattern: "import base64"
+    tags:
+      - obfuscation
+
+  - id: windows_modules
+    pattern:
+      - "import winreg"
+      - "import _winreg"
+    tags:
+      - "windows"
+
+  - id: django_modules
+    pattern: "import django.shortcuts.render"
+    tags:
+      - "django"
+
+
+files:
+  - id: tag_test_code
+    type: regex
+    pattern: "^test(_.+|s)?$"
+    target: part
+    tags:
+      - "test-code"
+
+  - type: exact
+    pattern: ".pypirc"
+    target: filename
+    tags:
+      - sensitive_file
+      - pypirc
+
+  - type: regex
+    pattern: "^id_[rd]sa$"
+    target: filename
+    tags:
+      - sensitive_file
+      - private_key
+
+  - type: exact
+    pattern: ".bash_history"
+    target: filename
+    tags:
+      - sensitive_file
+      - bash_history
+
+  - type: exact
+    pattern: ".htpasswd"
+    target: filename
+    tags:
+      - sensitive_file
+
+  - type: contains
+    pattern: ".ssh/known_keys"
+    target: full
+    tags:
+      - sensitive_file
+
+  - type: contains
+    pattern: ".ssh/authorized_keys"
+    target: full
+    tags:
+      - sensitive_file
+
+  - type: exact
+    pattern: "wallet.dat"
+    target: filename
+    tags:
+      - senstivive_file
+      - crypto_wallet
+
+  - type: contains
+    pattern: "etc/shadow"
+    target: full
+    tags:
+      - sensitive_file
+
+  - type: contains
+    pattern: "etc/sudoers"
+    target: full
+    tags:
+      - sensitive_file
+
+  - type: contains
+    pattern: "Local/Google/Chrome/"
+    target: full
+    tags:
+      - sensitive_file
+
+  - type: exact
+    pattern: "secret_token.rb"
+    target: filename
+    tags:
+      - sensitive_file
+
+  - type: exact
+    pattern: kwallet
+    target: filename
+    tags:
+      - sensitive_file
+
+  - type: contains
+    pattern: ".docker/config.json"
+    target: full
+    tags:
+      - sensitive_file
+
+  - type: contains
+    pattern: ".kube/config"
+    target: full
+    tags:
+      - sensitive_file
+
+  - type: exact
+    pattern: ".bash_login"
+    target: filename
+    tags:
+      - sensitive_file
+
+  - type: exact
+    pattern: ".bash_history"
+    target: filename
+    tags:
+      - sensitive_file
+
+  - type: exact
+    pattern: ".sh_history"
+    target: filename
+    tags:
+      - sensitive_file
+
+  - type: exact
+    pattern: ".mysql_history"
+    target: filename
+    tags:
+      - sensitive_file
+
+  - type: exact
+    pattern: ".dbshell"
+    target: filename
+    tags:
+      - sensitive_file
+
+  - type: exact
+    pattern: ".rediscli_history"
+    target: filename
+    tags:
+      - sensitive_file
+
+  - type: contains
+    pattern: ".aws/credentials"
+    target: full
+    tags:
+      - sensitive_file
+
+  - type: exact
+    pattern: ".viminfo"
+    target: filename
+    tags:
+      - sensitive_file
+
+  - type: exact
+    pattern: ".fetchmailrc"
+    target: filename
+    tags:
+      - sensitive_file
+
+  - type: exact
+    pattern: "database.yml"
+    target: filename
+    tags:
+      - sensitive_file
+
+  - type: exact
+    pattern: ".gitignore"
+    target: filename
+    tags:
+      - ignore
+
+  - type: exact
+    pattern: ".travis.yml"
+    target: filename
+    tags:
+      - ignore
+
+
+string:
+  - id: all_interfaces
+    type: regex
+    pattern: "^0\\.0\\.0\\.0(:\\d{2,6})?$"
+    message: "Binding to all interfaces may unwillingly expose non-protected interface"
+    score: 10
+
+  - id: tmp_folder
+    type: regex
+    pattern: "^(/tmp|/var/tmp|/dev/shm|C:\\\\{1,2}Windows\\\\Temp\\\\).*$"
+    message: "Hardcoded tmp folder in the source code"
+    score: 10
+
+  - id: url
+    type: regex
+    pattern: "^(http|ftp)s?://.+"
+    message: "A possible URL has been found"
+    score: 0
+    tags:
+      - url
+
+  - id: netsh_firewall
+    type: regex
+    pattern: "netsh (adv)?firewall"
+    message: "Windows netsh firewall command"
+    score: 10
+    tags:
+      - windows
+
+  - id: mac_firewall
+    type: regex
+    pattern: "^(pfctl|/usr/libexec/ApplicationFirewall/socketfilterfw).*"
+    message: "Mac os firewall command (packet filtering)"
+    tags:
+      - macos
+
+  - id: windows_service
+    type: contains
+    pattern: "SysWOW64"
+    message: "Windows system folder for services"
+    score: 10
+    tags:
+      - windows
+
+  - id: windows_task_scheduler
+    type: contains
+    pattern: "schtasks"
+    message: "Windows task scheduler"
+    score: 10
+    tags:
+      - windows
+
+  - id: hosts_file
+    type: regex
+    pattern: "^(C:\\\\{1,2}Windows\\\\System32\\\\drivers\\\\etc\\\\hosts|/etc/hosts)$"
+    message: "Location of hosts file"
+    score: 5
+
+  - id: sudo_command
+    type: regex
+    pattern: "^sudo .*$"
+    message: "Executing sudo command"
+    score: 20

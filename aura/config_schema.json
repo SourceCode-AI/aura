@@ -13,7 +13,7 @@
         "type": "object",
         "properties": {
           "name": {"$ref": "#/definitions/pattern_matching"},
-          "_id": {"type":  "string"},
+          "id": {"type":  "string"},
           "message": {"type": "string"},
           "tags": {
             "type": "array",
@@ -72,6 +72,10 @@
         }
       ]}
     },
+    "files": {
+      "type":  "array",
+      "items": {"$ref": "#/definitions/file_pattern"}
+    },
     "modules": {},
     "django_modules": {},
     "function_calls": {},
@@ -95,6 +99,17 @@
             "flags": {"type": "string"}
           },
           "required": ["type", "pattern"]
+        }
+      ]
+    },
+    "file_pattern": {
+      "allOf": [
+        {"$ref": "#/definitions/pattern_matching"},
+        {
+          "type": "object",
+          "properties": {
+            "target": {"enum": ["full", "part", "filename"]}
+          }
         }
       ]
     }

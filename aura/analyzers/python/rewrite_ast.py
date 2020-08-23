@@ -39,15 +39,15 @@ class ASTRewrite(Visitor):
             if type(node.left) == String and type(node.right) == String:
                 new_str = str(node.right) + str(node.left)
                 new_node = String(value=new_str)
-                new_node.line_no = node.line_no
+                new_node.enrich_from_previous(node)
                 context.replace(new_node)
                 return True
             if type(node.left) == Number and type(node.right) == Number:
                 new_node = Number(node.left.value + node.right.value)
-                new_node.line_no = node.line_no
+                new_node.enrich_from_previous(node)
                 context.replace(new_node)
                 return True
-        #  TODO cover other cases
+        # TODO cover other cases
 
     def string_slice(self, context):
         if not type(context.node) == Subscript:
@@ -83,6 +83,7 @@ class ASTRewrite(Visitor):
 
         sliced_str = value[lower:upper:step]
         new_node = String(sliced_str)
+        new_node.enrich_from_previous(context.node)
         context.replace(new_node)
 
     def resolve_variable(self, context: Context):
@@ -91,9 +92,8 @@ class ASTRewrite(Visitor):
         """
         if (
             type(context.node) == Attribute
-        ):  #  TODO: transition inside the visit_node of Attr
+        ):  # TODO: transition inside the visit_node of Attr
             # Replace attributes such as x.decode("base64") to "test".decode("base64")
-
             source = context.node.source
 
             try:
@@ -110,6 +110,11 @@ class ASTRewrite(Visitor):
                     context.node.source = target.value
                 else:
                     context.node.source = target
+        elif type(context.node) == Var and context.parent is not None and type(context.parent.node) == Call:
+            # Replace the following:
+            # c = 10; x(c) *~> c = 10; x(c=10) -> x(10)
+            context.replace(context.node.value)
+
 
     def inline_decode(self, context):
         node = context.node
@@ -192,7 +197,7 @@ class ASTRewrite(Visitor):
         node = context.node
         if not isinstance(node, Attribute):
             return
-        elif not (isinstance(node.func, str) and node.func == "self"):
+        elif not (type(node.func) == str and node.func == "self"):
             # TODO
             return
 
@@ -235,7 +240,9 @@ class ASTRewrite(Visitor):
         # Rewrite the node by applying the replace operation
         # TODO: check docs if replace takes additional (kw)arguments
         data = str(replace_source).replace(str(context.node.args[0]), str(context.node.args[1]))
-        context.replace(String(value=data))
+        new_node = String(value=data)
+        new_node.enrich_from_previous(context.node)
+        context.replace(new_node)
 
     def unary_op(self, context):
         if not type(context.node) == dict:
@@ -258,6 +265,5 @@ class ASTRewrite(Visitor):
             return
 
         new_node = Number(value= op(value))
-        new_node.line_no = context.node["lineno"]
-        new_node.col = context.node["col_offset"]
+        new_node.enrich_from_previous(context.node)
         context.replace(new_node)

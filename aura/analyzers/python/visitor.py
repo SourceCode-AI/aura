@@ -7,10 +7,10 @@ import os
 import copy
 import time
 from functools import partial, wraps
-from collections import deque
+from collections import deque, OrderedDict
 from pathlib import Path
 from warnings import warn
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import pkg_resources
 
@@ -44,6 +44,35 @@ def ignore_error(func):
     return wrapper
 
 
+def get_ast_tree(location: Union[ScanLocation, bytes], metadata=None):
+    if type(location) == bytes:
+        kwargs = {
+            "command": [INSPECTOR_PATH, "-"],
+            "stdin": location
+        }
+    else:
+        kwargs = {
+            "command": [INSPECTOR_PATH, location.str_location]
+        }
+
+    if metadata is None:
+        if isinstance(location, ScanLocation):
+            metadata = location.metadata
+        else:
+            metadata = {}
+
+    tree = python_executor.run_with_interpreters(metadata=metadata, **kwargs)
+
+    if tree is None:
+        raise ASTParseError("Unable to parse the source code")
+
+    if "encoding" not in metadata and tree and tree.get("encoding"):
+        metadata["encoding"] = tree["encoding"]
+
+    return tree
+
+
+
 class Visitor:
     """
     Main class for traversing the parsed AST tree with support for hooks to call functions
@@ -51,7 +80,6 @@ class Visitor:
     """
 
     stage_name = None
-    _lru_cache = {}
 
     def __init__(self, *, location: ScanLocation):
         self.location: ScanLocation = location
@@ -73,17 +101,21 @@ class Visitor:
     def from_visitor(cls, visitor: Visitor):
         obj = cls(location=visitor.location)
         obj.tree = visitor.tree
+        obj.hits = visitor.hits
         obj.traverse()
 
         return obj
 
     @classmethod
-    def run_stages(cls, *, location: ScanLocation, stages: Optional[Tuple[str, ...]]=None) -> Visitor:
+    def run_stages(cls, *, location: ScanLocation, stages: Optional[Tuple[str, ...]]=None, ast_tree=None) -> Visitor:
         if not stages:
             stages = config.get_ast_stages()
 
         v = previous = Visitor(location=location)
-        previous.load_tree()
+        if ast_tree is None:
+            previous.load_tree()
+        else:
+            previous.tree = ast_tree
         previous.traverse()
 
         visitors = cls.get_visitors()
@@ -112,16 +144,7 @@ class Visitor:
         return VISITORS
 
     def load_tree(self):
-        source = self.location.str_location
-
-        cmd = [INSPECTOR_PATH, source]
-        self.tree = python_executor.run_with_interpreters(command=cmd, metadata=self.location.metadata)
-
-        if self.tree is None:
-            raise ASTParseError("Unable to parse the source code")
-
-        if "encoding" not in self.location.metadata and self.tree and self.tree.get("encoding"):
-            self.location.metadata["encoding"] = self.tree["encoding"]
+        self.tree = get_ast_tree(self.location)
 
     def push(self, context):
         if len(self.queue) >= self.max_queue_size:
@@ -167,13 +190,17 @@ class Visitor:
                 if (not self.modified) and self.convergence > 0:
                     self.convergence -= 1
                 else:
-                    #  Reset convergence if the tree was modified
+                    # Reset convergence if the tree was modified
                     self.convergence = 1
 
             self.modified = False
 
+            root = self.tree
+            if type(root) == dict and "ast_tree" in root:
+                root = root["ast_tree"]["body"]
+
             new_ctx = Context(
-                node=self.tree, parent=None, replace=self._replace_root, visitor=self
+                node=root, parent=None, replace=self._replace_root, visitor=self
             )
             self.queue.append(new_ctx)
             self._init_visit(new_ctx)
@@ -191,6 +218,7 @@ class Visitor:
                 self.__process_context(ctx)
                 processed_nodes.add(_id(ctx.node))
 
+            self._post_iteration()
             self.iteration += 1
             if self.iteration >= self.max_iterations:  # TODO: report this as a result so we can collect this data
                 break
@@ -209,10 +237,6 @@ class Visitor:
                 f"[{self.__class__.__name__}] Convergence of {str(self.location)} took {end}s in {self.iteration} iterations"
             )
 
-        if self.path:
-            cache_id = f"{self.__class__.__name__}#{os.fspath(self.path)}"
-            self._lru_cache[cache_id] = self
-
         return self.tree
 
     @ignore_error
@@ -230,19 +254,26 @@ class Visitor:
             return
 
         # Using map is much faster then for-loop
-        if _type(context.node) == _dict:
+        if _type(context.node) in (_dict, OrderedDict):
             if context.node.get("lineno") in config.DEBUG_LINES:
                 breakpoint()
-            keys = _list(context.node.keys())
+            keys = _list(k for k, v in context.node.items() if type(v) not in (str, int))
             _list(map(lambda k: self.__visit_dict(k, context), keys))
         elif _type(context.node) == _list:
             _list(map(lambda x: self.__visit_list(x[0], x[1], context), enumerate(context.node)))
         elif _isinstance(context.node, ASTNode):
             if context.node.line_no in config.DEBUG_LINES:
                 breakpoint()
-            context.node._visit_node(context)
+
+            if not context.node.converged:
+                context.node._visit_node(context)
 
     def __visit_dict(self, key: str, context: Context):
+        value = context.node[key]
+
+        if type(value) == dict and len(value) == 1 and value.get("_type") == "Load":
+            return
+
         context.visit_child(
             node=context.node[key],
             replace=partial(self._replace_generic, key=key, context=context),
@@ -257,8 +288,12 @@ class Visitor:
     def _init_visit(self, context: Context):
         pass
 
+    def _post_iteration(self):
+        ...
+
     def _post_analysis(self):
-        pass
+        for node in ASTNode.get_instances():
+            node.converged = False
 
     def _visit_node(self, context: Context):
         pass

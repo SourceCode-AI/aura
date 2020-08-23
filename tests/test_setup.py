@@ -8,7 +8,7 @@ def test_setup(fixtures):
         },
         {
             'type': 'SetupScript',
-            'message': 'Imported module with network communication capabilities in a setup.py script',
+            'message': 'Found code with network communication capabilities in a setup.py script',
             'line_no': 2
         }
     ]

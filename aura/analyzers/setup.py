@@ -90,8 +90,10 @@ class SetupPy(NodeAnalyzerV2):
         for x in analyzer.hits:
             if not isinstance(x, Detection):
                 continue
+            elif x.name == "SetupScript":
+                continue
 
-            if x.name == "FunctionCall" and "code_execution" in x.tags:
+            if "code_execution" in x.tags:
                 sig = Detection(
                     detection_type="SetupScript",
                     score=100,
@@ -103,11 +105,11 @@ class SetupPy(NodeAnalyzerV2):
                 )
 
                 analyzer.hits.append(sig)
-            elif "network" in x.extra.get("categories", []) or "network" in x.tags: # TODO: refactor this elif condition for categories
+            if "network" in x.tags:
                 sig = Detection(
                     detection_type="SetupScript",
                     score=100,
-                    message="Imported module with network communication capabilities in a setup.py script",
+                    message="Found code with network communication capabilities in a setup.py script",
                     tags=x.tags,
                     line=x.line,
                     line_no=x.line_no,

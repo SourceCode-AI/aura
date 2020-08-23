@@ -67,7 +67,7 @@ class CryptoGenKey(base.NodeAnalyzerV2):
         key_size = signature.args[0]
         if isinstance(key_size, Number):
             key_size = key_size.value
-        elif not isinstance(key_size, int):
+        elif not type(key_size) == int:
             return
 
         yield self._gen_hit(context, info, key_size)
@@ -81,7 +81,7 @@ class CryptoGenKey(base.NodeAnalyzerV2):
         key_size = signature.args[0]
         if isinstance(key_size, Number):
             key_size = key_size.value
-        elif not isinstance(key_size, int):
+        elif not type(key_size) == int:
             return
 
         yield self._gen_hit(context, info, key_size)

@@ -1,3 +1,6 @@
+from typing import Optional
+from collections import OrderedDict
+
 from .visitor import Visitor
 from .nodes import *
 
@@ -7,12 +10,14 @@ def visit_List(context):
     new_node.line_no = context.node["lineno"]
     new_node.col = context.node["col_offset"]
     context.replace(new_node)
+    return new_node
 
 
 def visit_Str(context):
     node = String(context.node["s"])
     node.enrich_from_previous(context.node)
     context.replace(node)
+    return node
 
 
 def visit_Bytes(context):
@@ -20,12 +25,14 @@ def visit_Bytes(context):
     node.line_no = context.node["lineno"]
     node.col = context.node["col_offset"]
     context.replace(node)
+    return node
 
 
 def visit_Num(context):
     node = Number(context.node["n"])
     node.enrich_from_previous(context.node)
     context.replace(node)
+    return node
 
 
 def visit_Complex(context):
@@ -39,20 +46,23 @@ def visit_Constant(context):
     elif context.node["kind"] is None and type(context.node["value"]) == int:
         node = Number(context.node["value"])
     else:
-        return
+        node = Constant(context.node["value"])
 
     node.enrich_from_previous(context.node)
     context.replace(node)
+    return node
 
 
 def visit_Dict(context):
     new_node = Dictionary(context.node["keys"], context.node["values"])
     new_node.enrich_from_previous(context.node)
     context.replace(new_node)
+    return new_node
 
 
 def visit_Expr(context):
-    context.replace(context.node["value"])
+    new_node = context.node["value"]
+    context.replace(new_node)
 
 
 def visit_Call(context):
@@ -63,6 +73,7 @@ def visit_Call(context):
     new_node = Call(context.node["func"], context.node["args"], keyword)
     new_node.enrich_from_previous(context.node)
     context.replace(new_node)
+    return new_node
 
 
 def visit_Assign(context):
@@ -75,6 +86,7 @@ def visit_Assign(context):
     new_node = Var(target, context.node["value"])
     new_node.enrich_from_previous(context.node)
     context.replace(new_node)
+    return new_node
 
 
 def visit_BinOp(context):
@@ -83,6 +95,7 @@ def visit_BinOp(context):
     new_node = BinOp(left=left, right=right, op=context.node["op"]["_type"].lower())
     new_node.enrich_from_previous(context.node)
     context.replace(new_node)
+    return new_node
 
 
 def visit_Name(context):
@@ -101,6 +114,7 @@ def visit_Attribute(context):
     new_node._original = context.node
 
     context.replace(new_node)
+    return new_node
 
 
 def visit_ImportFrom(context):
@@ -114,6 +128,7 @@ def visit_ImportFrom(context):
 
     new_node.enrich_from_previous(context.node)
     context.replace(new_node)
+    return new_node
 
 
 def visit_Import(context):
@@ -127,12 +142,14 @@ def visit_Import(context):
         new_node.names[alias] = x["name"]
 
     context.replace(new_node)
+    return new_node
 
 
 def visit_Print(context):
     new_node = Print(context.node["values"], context.node["dest"])
     new_node.enrich_from_previous(context.node)
     context.replace(new_node)
+    return new_node
 
 
 def visit_Compare(context):
@@ -150,6 +167,7 @@ def visit_Compare(context):
 
     new_node.enrich_from_previous(context.node)
     context.replace(new_node)
+    return new_node
 
 
 def visit_FunctionDef(context):
@@ -162,6 +180,7 @@ def visit_FunctionDef(context):
     )
     new_node.enrich_from_previous(context.node)
     context.replace(new_node)
+    return new_node
 
 
 def visit_arguments(context):
@@ -192,6 +211,7 @@ def visit_arguments(context):
 
     new_node.enrich_from_previous(context.node)
     context.replace(new_node)
+    return new_node
 
 
 def visit_ClassDef(context):
@@ -202,24 +222,28 @@ def visit_ClassDef(context):
     )
     new_node.enrich_from_previous(context.node)
     context.replace(new_node)
+    return new_node
 
 
 def visit_Return(context):
     new_node = ReturnStmt(value=context.node["value"])
     new_node.enrich_from_previous(context.node)
     context.replace(new_node)
+    return new_node
 
 
 def visit_Yield(context):
     new_node = Yield(value=context.node["value"])
     new_node.enrich_from_previous(context.node)
     context.replace(new_node)
+    return new_node
 
 
 def visit_YieldFrom(context):
     new_node = YieldFrom(value=context.node["value"])
     new_node.enrich_from_previous(context.node)
     context.replace(new_node)
+    return new_node
 
 
 def visit_Subscript(context):
@@ -230,18 +254,21 @@ def visit_Subscript(context):
     )
     new_node.enrich_from_previous(context.node)
     context.replace(new_node)
+    return new_node
 
 
 def visit_Continue(context):
     new_node = Continue()
     new_node.enrich_from_previous(context.node)
     context.replace(new_node)
+    return new_node
 
 
 def visit_Pass(context):
     new_node = Pass()
     new_node.enrich_from_previous(context.node)
     context.replace(new_node)
+    return new_node
 
 
 def visit_ExceptHandler(context):
@@ -252,6 +279,11 @@ def visit_ExceptHandler(context):
     )
     new_node.enrich_from_previous(context.node)
     context.replace(new_node)
+    return new_node
+
+
+def visit_Ellipsis(context):
+    context.replace(...)
 
 
 VISITORS = {
@@ -284,6 +316,7 @@ VISITORS = {
     "Pass": visit_Pass,
     "ExceptHandler": visit_ExceptHandler,
     "complex": visit_Complex,
+    "Ellipsis": visit_Ellipsis,
 }
 
 
@@ -292,11 +325,21 @@ class ASTVisitor(Visitor):
     This class converts JSON serialized AST tree to appropriate dataclasses if possible
     """
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.convergence = None
+
     def _visit_node(self, context):
-        if type(context.node) != dict:
+        #print(context.node)
+        if type(context.node) not in (dict, OrderedDict):
             return
 
         otype = context.node.get("_type")
 
         if otype in VISITORS:
-            VISITORS[otype](context)
+            new_node: Optional[ASTNode] = VISITORS[otype](context)
+
+            # if new_node is not None and context.parent:
+            #     context.visitor.queue.clear()
+            #     context.visitor.push(context.parent)
+            #     new_node._visit_node(context)

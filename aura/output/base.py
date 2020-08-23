@@ -4,7 +4,7 @@ import os.path
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass, field
 from urllib import parse
-from typing import List, Union, Mapping, Optional
+from typing import List, Union, Mapping, Optional, Iterable
 
 import pkg_resources
 
@@ -97,6 +97,8 @@ class ScanOutputBase(OutputBase, metaclass=ABCMeta):
         elif uri != fmt_class.protocol():
             opts["output_location"] = parsed.netloc or parsed.path
 
+        tags = opts.pop("tags", [])
+
         for opt in ():  # TODO
             if opt in parsed_qs:
                 opts[opt] = qs_to_bool(parsed_qs[opt])
@@ -105,9 +107,11 @@ class ScanOutputBase(OutputBase, metaclass=ABCMeta):
             if opt in parsed_qs:
                 opts[opt] = int(parsed_qs[opt])
 
-        return fmt_class(**opts)
+        obj: ScanOutputBase = fmt_class(**opts)
+        obj.compile_filter_tags(tags)
+        return obj
 
-    def compile_filter_tags(self, tags: Optional[List[str]]):
+    def compile_filter_tags(self, tags: Iterable[str]):
         """
         compile input filter tags into an easy to use list of lambda's so the output hits can be filtered using map
         """

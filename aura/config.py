@@ -2,10 +2,12 @@
 import os
 import sys
 import typing
+import time
 import resource
 import logging
 import warnings
 import configparser
+import concurrent.futures
 from pathlib import Path
 from functools import lru_cache
 from logging.handlers import RotatingFileHandler
@@ -14,6 +16,7 @@ from typing import Optional
 import tqdm
 import pkg_resources
 import jsonschema
+from ruamel.yaml import YAML
 
 
 try:
@@ -24,12 +27,14 @@ except ImportError:
 
 CFG = configparser.ConfigParser(default_section="default", allow_no_value=True)
 CFG_PATH = None
-SEMANTIC_RULES = None
+SEMANTIC_RULES: Optional[dict] = None
 LOG_FMT = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 LOG_ERR = None
 # This is used to trigger breakpoint during AST traversing of specific lines
 DEBUG_LINES = set()
-DEFAULT_AST_STAGES = ("convert", "rewrite", "taint_analysis", "readonly")
+DEFAULT_AST_STAGES = ("convert", "rewrite", "ast_pattern_matching", "taint_analysis", "readonly")
+AST_PATTERNS_CACHE = None
+
 
 if "AURA_DEBUG_LINES" in os.environ:
     DEBUG_LINES = set(int(x.strip()) for x in os.environ["AURA_DEBUG_LINES"].split(","))
@@ -158,23 +163,24 @@ def load_config():
     CFG_PATH = os.fspath(pth)
     CFG.read(pth)
 
-    json_sig_pth = (
-        pth.parent / CFG.get("aura", "semantic-rules", fallback="signatures.json")
+    semantic_sig_pth = (
+        pth.parent / CFG.get("aura", "semantic-rules", fallback="signatures.yaml")
     ).absolute()
 
-    if not json_sig_pth.is_file():
-        logger.fatal(f"Invalid path to the signatures file: {json_sig_pth}")
+    if not semantic_sig_pth.is_file():
+        logger.fatal(f"Invalid path to the signatures file: {semantic_sig_pth}")
         sys.exit(1)
 
     # this environment variable is needed by python AST parser to pick up location of signatures
     if not os.environ.get("AURA_SIGNATURES"):
-        os.putenv("AURA_SIGNATURES", os.fspath(json_sig_pth))
+        os.putenv("AURA_SIGNATURES", os.fspath(semantic_sig_pth))
 
-    SEMANTIC_RULES = json.loads(json_sig_pth.read_text())
+    yaml = YAML(typ="safe")
+    SEMANTIC_RULES = yaml.load(semantic_sig_pth.read_text())
 
     with (Path(__file__).parent / "config_schema.json").open("r") as fd:
         schema = json.loads(fd.read())
-        jsonschema.validate(instance=SEMANTIC_RULES, schema=schema)
+        # FIXME: jsonschema.validate(instance=SEMANTIC_RULES, schema=schema)
 
     if "AURA_LOG_LEVEL" in os.environ:
         log_level = logging.getLevelName(os.getenv("AURA_LOG_LEVEL").upper())
@@ -245,5 +251,17 @@ def get_ast_stages() -> typing.Tuple[str,...]:
 
     return tuple(stages)
 
+
+def get_ast_patterns():
+    global AST_PATTERNS_CACHE
+    from .pattern_matching import ASTPattern
+
+    if AST_PATTERNS_CACHE is None:
+        start = time.monotonic()
+        with concurrent.futures.ThreadPoolExecutor() as e:
+            AST_PATTERNS_CACHE = tuple(e.map(ASTPattern, SEMANTIC_RULES.get("patterns", [])))
+        elapsed = round(time.monotonic() - start, 5)
+        logger.debug(f"AST Pattern compilation took {elapsed}s")
+    return AST_PATTERNS_CACHE
 
 load_config()

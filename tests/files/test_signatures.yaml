@@ -1,0 +1,120 @@
+patterns:
+  - id: python_code_execution
+    pattern:
+      - "eval(...)"
+      - "exec(...)"
+    detection:
+      score: 100
+      message: eval/exec usage found in a source code
+    tags:
+      - obfuscation
+      - code_execution
+    taint: sink
+
+  - pattern: "int(...)"
+    taint: safe
+
+  - pattern: "input(...)"
+    taint: tainted
+
+  - pattern: "flask.request.get_json(...)"
+    taint: tainted
+
+  - pattern: "flask.request.form"
+    taint: tainted
+
+  - id: flask_request_args
+    pattern: "flask.request.args"
+    taint: tainted
+
+  - id: flask_request_headers
+    pattern: "flask.request.headers"
+    taint: tainted
+
+  - pattern: "flask.make_response(...)"
+    taint: sink
+
+  - pattern: "flask.make_response.set_cookie(...)"
+    taint: sink
+
+  - pattern: "flask.send_file(...)"
+    taint: sink
+
+  - id: subprocess_sink
+    pattern:
+      - "subprocess.Popen(...)"
+      - "subprocess.call(...)"
+      - "subprocess.run(...)"
+    taint: sink
+
+  - id: os_system_execution
+    pattern:
+      - "os.system(...)"
+      - "os.popen(...)"
+    detection:
+      score: 50
+      message: Code is performing system command execution
+    tags:
+      - system_execution
+    taint: sink
+
+  - pattern: "flask.Markup.escape(...)"
+    taint: safe
+
+  - pattern: "django.shortcuts.render(...)"
+    tags:
+      - django_view
+    taint:
+      level: sink
+      log_message: "AST node has been marked as Django view"
+      args:
+        request: tainted
+
+  - id: mktemp_racecond
+    pattern: "tempfile.mktemp(...)"
+    detection:
+      score: 20
+      message: "Usage of tempfile.mktemp is susceptible to race conditions!"
+
+  - id: dangerous_pickle
+    pattern:
+      - "pickle.load(...)"
+      - "pickle.loads(...)"
+      - "cPickle.load(...)"
+      - "cPickle.loads(...)"
+    detection:
+      message: Usage of pickle is very dangerous and easily exploitable
+      score: 50
+    tags:
+      - pickle_usage
+    taint: sink
+
+  - id: network_modules
+    pattern: "import requests"
+    tags:
+      - network
+
+
+files:
+  - id: tag_test_code
+    type: regex
+    pattern: "^test(_.+|s)?$"
+    target: part
+    tags:
+      - "test-code"
+
+  - type: exact
+    pattern: ".pypirc"
+    target: filename
+    tags:
+      - sensitive_file
+      - pypirc
+
+strings:
+  - id: url
+    type: regex
+    pattern: "^(http|ftp)s?://.+"
+    message: "A possible URL has been found"
+    score: 0
+    tags:
+      - url

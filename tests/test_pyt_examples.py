@@ -1,3 +1,5 @@
+import pytest
+
 
 def render_lines(line_numbers):
     return [
@@ -117,20 +119,10 @@ def test_XSS_form(fixtures):
     fixtures.scan_and_match('pyt_examples/XSS_form.py', matches)
 
 
-def test_XSS_no_vuln(fixtures):
-    output = fixtures.scan_test_file('pyt_examples/XSS_no_vuln.py')
-    assert len(output['detections']) == 0, output['detections']
-
-
 def test_xss_reassign(fixtures):
     lines = [11, 12]
     matches = render_lines(lines)
     fixtures.scan_and_match('pyt_examples/XSS_reassign.py', matches)
-
-
-def test_XSS_sanitized(fixtures):
-    output = fixtures.scan_test_file('pyt_examples/XSS_sanitised.py')
-    assert len(output['detections']) == 0, output['detections']
 
 
 def test_XSS_url(fixtures):
@@ -145,11 +137,6 @@ def test_XSS_param(fixtures):
     fixtures.scan_and_match('pyt_examples/XSS_variable_assign.py', matches)
 
 
-def test_XSS_variable_assign_no_vuln(fixtures):
-    output = fixtures.scan_test_file('pyt_examples/XSS_variable_assign_no_vuln.py')
-    assert len(output['detections']) == 0, output['detections']
-
-
 def test_XSS_variable_multiple_assign(fixtures):
     lines = [15, 17]
     matches = render_lines(lines)
@@ -160,3 +147,15 @@ def test_yield(fixtures):
     lines = [16]
     matches = render_lines(lines)
     fixtures.scan_and_match('pyt_examples/yield.py', matches)
+
+
+@pytest.mark.parametrize("fpath", (
+    "pyt_examples/XSS_variable_assign_no_vuln.py",
+    "pyt_examples/XSS_sanitised.py",
+    "pyt_examples/XSS_no_vuln.py"
+))
+def test_no_vuln(fpath, fixtures):
+    excludes = [{
+        "type": "TaintAnomaly"
+    }]
+    assert not fixtures.scan_and_match(fpath, matches=[], excludes=excludes)

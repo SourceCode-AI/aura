@@ -110,7 +110,7 @@ class PackageProvider(ABC):
 
 @dataclass
 class ScanLocation(KeepRefs):
-    location: Path
+    location: Union[Path, str]
     metadata: dict = field(default_factory=dict)
     cleanup: bool = False
     parent: Optional[str] = None
@@ -131,6 +131,7 @@ class ScanLocation(KeepRefs):
         self.__str_parent = None
         self.metadata["path"] = self.location
         self.metadata["normalized_path"] = str(self)
+        self.metadata["tags"] = set()
 
         if not self.metadata.get("flags"):
             self.metadata["flags"] = set()
@@ -140,7 +141,7 @@ class ScanLocation(KeepRefs):
             warn("Depth is not set for the scan location", stacklevel=2)
 
         for x in self.location.parts:
-            if TEST_REGEX.match(x):
+            if TEST_REGEX.match(x):  # TODO: refactor
                 self.metadata["flags"].add("test-code")
                 break
 

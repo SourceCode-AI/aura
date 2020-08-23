@@ -281,7 +281,7 @@ def test_diff_output_comprehensive(fixtures, fuzzy_rule_match):
         }
     ]
 
-    raw_output = fixtures.get_cli_output(["diff", arch1, arch2, "-f", "json", "-a", "execution_flow"])
+    raw_output = fixtures.get_cli_output(["diff", arch1, arch2, "-f", "json", "-a", "ast"])
     output = json.loads(raw_output.stdout)
     diffs = output["diffs"]
 

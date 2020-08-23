@@ -5,9 +5,9 @@ Main CLI entry point for the Aura framework
 import json
 import sys
 import os
-import shutil
 import textwrap
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 import click
 from prettyprinter import install_extras
@@ -80,7 +80,9 @@ def scan(
     filter_tags=None,
     fork_mode=False
 ):
-    output_opts = {}
+    output_opts = {
+        "tags": filter_tags
+    }
     if min_score is not None:
         output_opts["min_score"] = min_score
 
@@ -94,7 +96,6 @@ def scan(
         "format": out_type,
         "analyzers": analyzer,
         "source": "cli",
-        "filter_tags": filter_tags,
         "fork": fork_mode,
         "output_opts": output_opts
     }
@@ -177,8 +178,28 @@ def diff(pth1, pth2, *, format=None, detections=True, patch=None, same_renames=N
     multiple=True,
     type=click.Choice(["raw"] + list(config.get_installed_stages()), case_sensitive=False)
 )
-def parse_ast(path, stages=None):
-    commands.parse_ast(path, stages=stages)
+@click.option(
+    "--format", "-f",
+    type=click.Choice(["text", "json"]),
+    default = "text"
+)
+def parse_ast(path, stages=None, format="text"):
+    if path == "-":
+        ctx = NamedTemporaryFile(mode="w", prefix="aura_parse_ast_")
+        ctx.write(sys.stdin.read())
+        ctx.flush()
+        path = ctx.name
+    else:
+        ctx = None
+
+    try:
+        commands.parse_ast(path, stages=stages, format=format)
+    except exceptions.PythonExecutorError as exc:
+        print(exc.stderr.decode(), file=sys.stderr)
+    finally:
+        if ctx:
+            ctx.close()
+
 
 
 @cli.command(name="info")

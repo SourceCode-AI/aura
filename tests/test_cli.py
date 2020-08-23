@@ -100,11 +100,11 @@ def test_scan_min_score_option(fixtures):
     (
         ("!test_code",),
         ("shell_injection",),
-        ("test_code", "shell_injection"),
-        ("test_code",),
+        ("test-code", "shell_injection"),
+        ("test-code",),
         ("!shell_injection",),
-        ("ratata_does_not_exists"),
-        ("!ratata_does_not_exists"),
+        ("ratata_does_not_exists",),
+        ("!ratata_does_not_exists",),
     ),
 )
 def test_tag_filtering(tag_filter, fixtures):

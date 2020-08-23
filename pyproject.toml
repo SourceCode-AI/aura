@@ -48,6 +48,7 @@ textdistance = "~4.2.0"
 python-tlsh = "~3.17.0"
 defusedxml = "~0.6.0"
 python-rapidjson = "~0.9.1"
+"ruamel.yaml" = "~0.15"
 # TODO: Extras, autodetect their presence in aura
 yara-python = {version = "~4.0.1", optional = true}
 networkx = {version = "~2.4", optional = true}
@@ -83,6 +84,7 @@ local = "aura.uri_handlers.local:LocalFileHandler"
 [tool.poetry.plugins."aura.ast_visitors"]
 convert = "aura.analyzers.python.convert_ast:ASTVisitor"
 rewrite = "aura.analyzers.python.rewrite_ast:ASTRewrite"
+ast_pattern_matching = "aura.analyzers.python.pattern_matching_visitor:ASTPatternMatcherVisitor"
 taint_analysis = "aura.analyzers.python.taint.visitor:TaintAnalysis"
 readonly = "aura.analyzers.python.readonly:ReadOnlyAnalyzer"
 
@@ -103,15 +105,11 @@ text = "aura.output.text:TextInfoOutput"
 diff_archive = "aura.analyzers.archive:diff_archive"
 
 [tool.poetry.plugins."aura.analyzers"]
-file_filter = "aura.analyzers.fs_struct:file_filter"
-sensitive_files = "aura.analyzers.fs_struct:analyze_sensitive"
-suspicious_files = "aura.analyzers.fs_struct:analyze_suspicious"
+file_analyzer = "aura.analyzers.fs_struct:analyze"
 archive = "aura.analyzers.archive:archive_analyzer"
 req_analyzer = "aura.analyzers.requirements_analyzer:analyze_requirements_file"
 yara = "aura.analyzers.yara_scan:analyze"
 xml = "aura.analyzers.xml:analyze"
-function_calls = "aura.analyzers.python.function_calls:FunctionCallAnalyzer"
-execution_flow = "aura.analyzers.python.execution_flow:ExecutionFlow"
 setup_py = "aura.analyzers.setup:SetupPy"
 data_finder = "aura.analyzers.data_finder:DataFinder"
 string_finder = "aura.analyzers.data_finder:StringFinder"

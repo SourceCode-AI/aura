@@ -94,6 +94,8 @@ def get_value(attr):
         return list(map(get_value, attr))  # map is faster then list comprehension
     elif isinstance(attr, ast.AST):
         return ast2json(attr)
+    elif type(attr) == type(Ellipsis):
+        return {"_type": "Ellipsis"}
     elif t == complex:
         return {"_type": "complex", "real": attr.real, "imag": attr.imag}
     else:
@@ -122,7 +124,7 @@ def get_builtins():
 
 
 def get_comments(source_code):
-    if isinstance(source_code, str):
+    if type(source_code) == str:
         source_code = source_code.encode()
 
     wrap = io.StringIO(source_code)
@@ -151,6 +153,26 @@ def get_encoding(path):
         return "utf-8"
 
 
+def collect(source_code, encoding="utf-8", minimal=False):
+    src = ast.parse(source_code)
+    src_dump = {
+        "ast_tree": ast2json(src),
+        "encoding": encoding,
+    }
+
+    if not minimal:
+        src_dump.update({
+            "version": list(platform.python_version_tuple()),
+            "implementation": platform.python_implementation(),
+            "compiler": platform.python_compiler(),
+            "build": platform.python_build(),
+            "builtins": get_builtins(),
+            # TODO: 'comments': list(get_comments(source_code=source_code))
+        })
+
+    return src_dump
+
+
 def main(pth=None, out=sys.stdout):
     if pth is None:
         pth = sys.argv[1]
@@ -165,27 +187,11 @@ def main(pth=None, out=sys.stdout):
         source_code = sys.stdin.read()
 
     try:
-        src = ast.parse(source_code)
+        src_dump = collect(source_code=source_code, encoding=encoding)
+        print(json.dumps(src_dump), file=out)
     except SyntaxError:
         traceback.print_exc(file=sys.stderr)
         sys.exit(1)
-    except Exception:
-        print("Error parsing source code for file: " + pth, file=sys.stderr)
-        raise
-
-    src_dump = {
-        "ast_tree": ast2json(src),
-        "version": list(platform.python_version_tuple()),
-        "implementation": platform.python_implementation(),
-        "compiler": platform.python_compiler(),
-        "build": platform.python_build(),
-        "builtins": get_builtins(),
-        "encoding": encoding,
-        # TODO: 'comments': list(get_comments(source_code=source_code))
-    }
-
-    try:
-        print(json.dumps(src_dump), file=out)
     except Exception:
         print("Error parsing source code for file: " + pth, file=sys.stderr)
         raise

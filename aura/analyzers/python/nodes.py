@@ -61,6 +61,15 @@ class Taints(Enum):
 
         return max(self, other)
 
+    @classmethod
+    def from_string(cls, name: str) -> Taints:
+        if name.lower() == "safe":
+            return Taints.SAFE
+        elif name.lower() == "tainted":
+            return Taints.TAINTED
+        else:
+            return Taints.UNKNOWN
+
 
 @slotted_dataclass(
     taint_level = None,
@@ -125,16 +134,12 @@ class ASTNode(KeepRefs, metaclass=ABCMeta):
         self._full_name = None
         self._original = None
         self._docs = None
+        self._converged: bool = False
+        self.line_no = None
+        self.col = None
 
-        if isinstance(previous_node, ASTNode):
-            self.line_no = previous_node.line_no
-            self.col = previous_node.col
-        elif type(previous_node) == dict:
-            self.line_no = previous_node.get("lineno")
-            self.col = previous_node.get("col_offset")
-        else:
-            self.line_no = None
-            self.col = None
+        if previous_node is not None:
+            self.enrich_from_previous(previous_node)
 
         self.tags = set()
         self._hash = None
@@ -198,6 +203,14 @@ class ASTNode(KeepRefs, metaclass=ABCMeta):
 
         return data
 
+    @property
+    def converged(self) -> bool:
+        return self._converged
+
+    @converged.setter
+    def converged(self, value: bool):
+        self._converged = value
+
     @abstractmethod
     def _visit_node(self, context: Context):
         return NotImplemented
@@ -243,6 +256,18 @@ class ASTNode(KeepRefs, metaclass=ABCMeta):
         else:
             return False
 
+    def mark_as_sink(self, context: Context):
+        log = TaintLog(
+            path=context.visitor.path,
+            line_no=context.node.line_no,
+            message="AST node marked as sink using semantic rules"
+        )
+        self.tags.add("taint_sink")
+        self._taint_log.append(log)
+
+    def match(self, other, ctx) -> bool:
+        return False
+
 
 NodeType = typing.NewType(
     "NodeType", typing.Union[ASTNode, typing.Dict, typing.List, int, str]
@@ -250,7 +275,47 @@ NodeType = typing.NewType(
 
 
 @dataclass
-class Dictionary(ASTNode):  #  TODO: implement methods from ASTNode
+class Constant(ASTNode):
+    value: NodeType
+
+    def _visit_node(self, context: Context):
+        context.visit_child(
+            node = self.value,
+            replace = partial(self.__replace_value, visitor=context.visitor)
+        )
+
+    def __replace_value(self, value, visitor):
+        self.value = value
+        visitor.modified = True
+
+    def __post_init__(self):
+        super().__post_init__()
+        self._taint_class = Taints.SAFE
+
+    def __str__(self):
+        if type(self.value) in (str, String, bool, Dictionary, dict):
+            return str(self.value)
+        elif self.value == ...:
+            return "..."
+        else:
+            raise ValueError(f"Incompatible value type: {repr(type(self.value))}")
+
+    def __int__(self):
+        if type(self.value) in (int, Number):
+            return int(self.value)
+        else:
+            raise ValueError(f"Incompatible value type: {repr(type(self.value))}")
+
+    def match(self, other, ctx) -> bool:
+        if type(other) != Constant:
+            return False
+        if other.value != self.value:
+            return False
+        return True
+
+
+@dataclass
+class Dictionary(ASTNode):  # TODO: implement methods from ASTNode
     keys: list
     values: list
 
@@ -287,6 +352,9 @@ class Dictionary(ASTNode):  #  TODO: implement methods from ASTNode
 
     def to_dict(self):
         return dict(zip(self.keys, self.values))
+
+    def __str__(self):
+        return str(self.to_dict())
 
 
 @dataclass
@@ -341,6 +409,9 @@ class String(ASTNode):
     def __bytes__(self):
         return self.value.encode("utf-8")
 
+    def __hash__(self):
+        return hash(self.value)
+
     def _visit_node(self, context: Context):
         pass
 
@@ -349,6 +420,12 @@ class String(ASTNode):
         d = super().json
         d["value"] = self.value
         return d
+
+    def match(self, other, ctx) -> bool:
+        if type(other) not in (str, String):
+            return False
+
+        return str(self) == str(other)
 
 
 @dataclass
@@ -443,9 +520,12 @@ class Var(ASTNode):
         return d
 
     def _visit_node(self, context):
-        if isinstance(self.value, list) and self.value == []:
+        if isinstance(self.value, ASTNode) and self.value._taint_class != Taints.UNKNOWN:
+            self._taint_class = self.value._taint_class
+
+        if type(self.value) == list and self.value == []:
             self.typing = "list"
-        elif isinstance(self.value, str):
+        elif type(self.value) == str:
             try:
                 target = context.stack[self.value]
                 self._original = self.value
@@ -475,7 +555,7 @@ class Var(ASTNode):
             stack=context.stack.copy(),
         )
 
-        if self.var_type == "assign" and isinstance(self.var_name, str):
+        if self.var_type == "assign" and type(self.var_name) == str:
             context.stack[self.var_name] = self
 
     def __replace_value(self, value, visitor):
@@ -504,10 +584,10 @@ class Attribute(ASTNode):
     def full_name(self):
         if self._full_name is not None:
             return self._full_name
-        if isinstance(self.source, Import) and self.__original_source in self.source.names:
+        if isinstance(self.source, Import) and self.__original_source in self.source.names:  # TODO: remove this as it's replaced by `Container`
             self._full_name = f"{self.source.names[self.__original_source]}.{self.attr}"
             return self._full_name
-        elif isinstance(self.source, (Attribute, Call)):
+        elif isinstance(self.source, (Attribute, Call, Container, Var)):
             return f"{self.source.full_name}.{self.attr}"
         elif type(self.source) == str:
             return f"{self.source}.{self.attr}"
@@ -540,15 +620,22 @@ class Attribute(ASTNode):
                 # print(context.stack.frame.variables)
                 pass
 
-        context.visit_child(
-            node=self.source,
-            replace=partial(self.__replace_source, visitor=context.visitor),
-        )
+        if type(self.source) != str:
+            context.visit_child(
+                node=self.source,
+                replace=partial(self.__replace_source, visitor=context.visitor),
+            )
 
     def __replace_source(self, value, visitor):
         visitor.modified = True
         self._original = self.source
         self.source = value
+
+    def match(self, other, ctx) -> bool:
+        if type(other) != Attribute:
+            return False
+
+        return self.cached_full_name == other.cached_full_name
 
 
 @dataclass
@@ -796,6 +883,9 @@ class Call(ASTNode):
         if self._full_name is not None:
             return self._full_name
 
+        if type(self.func) == Container:
+            return self.func.full_name
+
         if type(self._original) == str and type(self.func) == Import:
             self._full_name = self.func.names[self._original]
             return self._full_name
@@ -872,6 +962,39 @@ class Call(ASTNode):
             kw = self.kwargs
 
         return signature.bind(*self.args, **kw)
+
+    def match(self, other: Call, ctx) -> bool:
+        if type(other) != Call:
+            return False
+        if self.cached_full_name != other.cached_full_name:
+            return False
+
+        for x in other.args:
+            if type(x) == Constant and type(x.value) == type(...):
+                is_wildcard = True
+                break
+        else:
+            is_wildcard = False
+
+        if (not is_wildcard) and len(self.args) != len(other.args):
+            return False
+        else:
+            for idx, arg in enumerate(other.args):
+                if len(self.args) < idx:
+                    if not ctx.match(arg, self.args[idx]):
+                        return False
+
+        for name, val in self.kwargs.items():
+            if name not in other.kwargs:
+                if is_wildcard:
+                    continue
+                else:
+                    return False
+
+            if not ctx.match(val, other.kwargs[name]):
+                return False
+
+        return True
 
 
 @dataclass
@@ -1033,10 +1156,10 @@ class Import(ASTNode):
                 imp_name = target.rstrip(".*")
                 context.shared_state.setdefault("wildcard_imports", set()).add(imp_name)
 
-            context.stack[name] = self
+            context.stack[name] = Container(name=name, pointer=self)
 
-    def get_modules(self) -> typing.List[str]:
-        m = list(self.names.values())
+    def get_modules(self) -> typing.Iterable[str]:
+        m = set(self.names.values())
         return m
 
     def get_files(self, base: Path) -> typing.Dict[str, Path]:
@@ -1058,18 +1181,29 @@ class Import(ASTNode):
 
         return imp_files
 
-
     @property
     def full_name(self):
         return None
 
     @property
-    def json(self):
-        d = super().json
+    def json(self) -> typing.Dict[str, typing.Any]:
+        d: typing.Dict[str, typing.Any] = super().json
         d["names"] = self.names
         if self.level is not None:
             d["level"] = self.level
         return d
+
+    def match(self, other, ctx) -> bool:
+        if type(other) == Import:
+            self_mods = self.get_modules()
+
+            for m in other.get_modules():
+                if m in self_mods:
+                    return True
+                elif any(x.startswith(m+".") for x in self_mods):
+                    return True
+
+        return False
 
 
 @dataclass
@@ -1275,6 +1409,30 @@ class ExceptHandler(ASTNode):
         visitor.modified = True
 
 
+@dataclass
+class Container(ASTNode):
+    name: str
+    pointer: ASTNode
+
+    def _visit_node(self, context):
+        self.pointer._visit_node(context)
+
+    @property
+    def json(self):
+        d = super().json
+        d["name"] = self.name
+        d["pointer"] = self.pointer
+        return d
+
+    @property
+    def full_name(self):
+        if type(self.pointer) == Import:
+            return self.pointer.names[self.name]
+        else:
+            return self.name
+
+
+
 @slotted_dataclass(
     replace=field(default=lambda x: None),
     visitor=field(default=None),
@@ -1311,8 +1469,11 @@ class Context:
             shared_state=self.shared_state
         )
 
-    def visit_child(self, stack=None, *args, **kwargs):
-        new_context = self.as_child(*args, **kwargs)
+    def visit_child(self, node, stack=None, replace=lambda x: None):
+        if type(node) in (str, int, type(...)) or node is None or node == ...:
+            return
+
+        new_context = self.as_child(node, replace=replace)
         if stack is not None:
             new_context.stack = stack
         new_context.visitor.push(new_context)
@@ -1323,9 +1484,9 @@ def to_json(element):
         return element
 
     output = element.json
-    if isinstance(output, dict):
+    if type(output) == dict:
         return {k: to_json(v) for k, v in output.items()}
-    elif isinstance(output, (list, tuple)):
+    elif type(output) in (list, tuple):
         return [to_json(x) for x in output]
     else:
         return output

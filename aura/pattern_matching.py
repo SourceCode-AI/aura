@@ -3,22 +3,19 @@ from __future__ import annotations
 import re
 import inspect
 import fnmatch
+import string
 from abc import ABCMeta, abstractmethod
-from typing import List, Union
+from typing import List, Mapping
 from functools import lru_cache
+from textwrap import dedent
 
-from .analyzers.python import nodes
+from .analyzers.python_src_inspector import collect
+from .analyzers.python import nodes, visitor
+from .analyzers.detections import Detection
+from .type_definitions import ScanLocation
 
 
-FUNCTION_PARAMS_KINDS = {
-    "POSITIONAL_ONLY": inspect.Parameter.POSITIONAL_ONLY,
-    "POSITIONAL_OR_KEYWORD": inspect.Parameter.POSITIONAL_OR_KEYWORD,
-    "VAR_POSITIONAL": inspect.Parameter.VAR_POSITIONAL,
-    "ARGS": inspect.Parameter.VAR_POSITIONAL,
-    "KEYWORD_ONLY": inspect.Parameter.KEYWORD_ONLY,
-    "VAR_KEYWORD": inspect.Parameter.VAR_KEYWORD,
-    "KWARGS": inspect.Parameter.VAR_KEYWORD,
-}
+PATTERN_CACHE = None
 
 
 class PatternMatcher(metaclass=ABCMeta):
@@ -51,16 +48,30 @@ class PatternMatcher(metaclass=ABCMeta):
         """
         return f"{self.pattern_type} match: {self._signature['message']}"
 
-    @classmethod
-    def get_patterns(cls) -> List[PatternMatcher]:
-        p = []
-        for x in cls.__subclasses__():  # type: PatternMatcher
-            if inspect.isabstract(x):
-                p.extend(x.get_patterns())
-            else:
-                p.append(x)
+    @property
+    def score(self) -> int:
+        return self._signature.get("score", 0)
 
-        return p
+    @property
+    def tags(self) -> set:
+        return set(self._signature.get("tags", []))
+
+    @classmethod
+    def get_patterns(cls, initialize=False) -> Mapping[str, PatternMatcher]:
+        global PATTERN_CACHE
+
+        if PATTERN_CACHE is None:
+            PATTERN_CACHE = {}
+            initialize = True
+
+        if initialize:
+            for x in cls.__subclasses__():  # type: PatternMatcher
+                if inspect.isabstract(x):
+                    x.get_patterns(initialize=initialize)
+                else:
+                    PATTERN_CACHE[x.pattern_type] = x
+
+        return PATTERN_CACHE
 
     @classmethod
     def compile_patterns(cls, signatures: List[dict]) -> List[PatternMatcher]:
@@ -68,7 +79,7 @@ class PatternMatcher(metaclass=ABCMeta):
         Compile all defined string pattern matchers into a dictionary indexed by type
         :signatures: a list of defined signatures (loaded from json file)
         """
-        types = {x.pattern_type: x for x in PatternMatcher.get_patterns()}
+        types = PatternMatcher.get_patterns()
 
         compiled = []
         for s in signatures:
@@ -110,6 +121,27 @@ class StringPatternMatcher(PatternMatcher, metaclass=ABCMeta):
     @abstractmethod
     def match_string(self, value: str):
         ...
+
+
+class FilePatternMatcher():
+    def __init__(self, signature):
+        self._signature = signature
+        self.__compiled = PatternMatcher.compile_patterns([signature])[0]
+
+    def __repr__(self):
+        return f"<FilePatternMatcher({repr(self._signature)})>"
+
+    def match(self, value: ScanLocation) -> bool:
+        if self._signature.get("target", "full") == "full":
+            targets = (str(value.location),)
+        elif self._signature["target"] == "part":
+            targets = value.location.parts
+        elif self._signature["target"] == "filename":
+            targets = (value.location.name,)
+        else:
+            raise ValueError(f"Unknown pattern target: '{self._signature['target']}'")
+
+        return any(self.__compiled.match(x) for x in targets)
 
 
 class RegexPattern(StringPatternMatcher):
@@ -168,179 +200,172 @@ class ContainsPattern(StringPatternMatcher):
         return self._signature["pattern"] in value
 
 
-class NumberPattern(PatternMatcher):
+class ASTPattern:
+    """
+    Match AST tree against a defined source code pattern (compiled into AST tree pattern)
+    """
+    # Nested class defined here on purpose to have a namespace as this `Context` is related to ASTPattern matching
+    # making it easier to distinguish from other classes also named `Context`, especially the one from ASTVisitor/ASTNodes
+    class Context:
+        def __init__(self, pattern: ASTPattern):
+            self.pattern = pattern
 
-    pattern_type = "number"
+        def match(
+                self,
+                node: nodes.NodeType,  # original AST node from the source code
+                other: nodes.NodeType  # AST node pattern to match against
+        ) -> bool:
+            if type(other) == ASTPattern.AnyOf:
+                return self._match_any_of(node, other)
+            elif node is None:
+                return other is None
+            elif type(node) == bool:
+                return self._match_bool(node, other)
+            elif type(node) == str:
+                return self._match_str(node, other)
+            elif type(node) == dict:
+                return self._match_dict(node, other)
+            elif type(node) in (list, tuple):
+                return self._match_list(node, other)
+            elif type(node) == int:
+                return self._match_int(node, other)
 
-    def match_node(self, node: nodes.NodeType) -> bool:
-        if type(node) not in (nodes.Number, int):
+            return node.match(other, self)
+
+        # Dispatch method for basic python types
+        def _match_bool(self, node: bool, other) -> bool:
+            if type(other) != bool:
+                return False
+            return node is other
+
+        def _match_str(self, node: str, other) -> bool:
+            if type(other) != str:
+                return False
+            return node == other
+
+        def _match_dict(self, node: dict, other) -> bool:
+            if type(other) != dict:
+                return False
+            if set(other.keys()) - set(node.keys()):
+                return False
+
+            for k, v in node.items():
+                if not self.match(v, other[k]):
+                    return False
+            return True
+
+        def _match_list(self, node: list, other) -> bool:
+            return False  # TODO
+
+        def _match_int(self, node: int, other) -> bool:
+            if type(other) != int:
+                return False
+            return node == int(other)
+
+        def _match_any_of(self, node, other: ASTPattern.AnyOf) -> bool:
+            for sub_pattern in other:
+                if self.match(node, sub_pattern):
+                    return True
             return False
 
-        value = int(node)
-        comparator = self._signature["comparator"]
-        constrain = self._signature["value"]
 
-        # TODO: eq, leq, range etc..
-        if comparator == "=":
-            return self.__check_eq(value, constrain)
-        else:
-            return False
+    class AnyOf(list):
+        pass
 
-    def __check_eq(self, value: int, constrain: int) -> bool:
-        return value == constrain
-
-
-
-class FunctionDefinitionPattern:
-    """
-    This pattern type allows to define a function signature, e.g. args & kwargs
-    including their default values and values passed when the function is called
-    Accepted arguments can be defined by applying constraints in the function signature
-    """
-
-    pattern_type = "function_definition"
 
     def __init__(self, signature: dict):
-        self.signature = signature
-        self.__args = {}
-        parameters = []
+        self._signature = signature
 
-        for s in signature.get("signature", []):
-            kind = s.get("kind", "POSITIONAL_OR_KEYWORD").upper()
-            p = inspect.Parameter(
-                name=s["name"],
-                kind=FUNCTION_PARAMS_KINDS[kind],
-                default=s.get("default", inspect.Parameter.empty),
-                annotation=s.get("annotation", inspect.Parameter.empty),
-            )
-            self.__args[s["name"]] = s
-            parameters.append(p)
-
-        if parameters:
-            self.compiled = inspect.Signature(parameters=parameters)
+        if type(self._signature["pattern"]) == str:
+            self._compiled = self._compile_src(self._signature["pattern"])
         else:
-            self.compiled = None
+            self._compiled = ASTPattern.AnyOf(self._compile_src(x) for x in self._signature["pattern"])
 
-    def match_node(self, context: nodes.Context) -> Union[bool, inspect.BoundArguments]:
-        """
-        Determine whenever the call to the function matches a defined signature
-        The following conditions are required:
-        - matching function name (could be another pattern such as regex)
-        - matching function args & kwargs as defined in the signature
-        - matching constraints for all args/kwargs
-        """
-        if type(context.node) != nodes.Call:
-            return False
+        self.ctx: ASTPattern.Context = ASTPattern.Context(self)
 
-        full_name = context.node.full_name
-        if type(full_name) != str:
-            return False
+    @classmethod
+    def _compile_src(cls, src: str) -> nodes.NodeType:
+        ast_tree = collect(dedent(src), minimal=True)
+        loc = ScanLocation(location="<unknown>")
+        v = visitor.Visitor.run_stages(location=loc, stages=("convert",), ast_tree=ast_tree)
+        return v.tree["ast_tree"]["body"][-1]  # TODO: assumption right now is it's a module with one body block
 
-        names = [full_name]
-        # Add all wildcards as name prefixes such as `from ctypes import *`
-        for wildcard_import in context.shared_state.get("wildcard_imports", []):
-            names.append(f"{wildcard_import}.{full_name}")
+    @property
+    def id(self) -> str:
+        if "id" in self._signature:
+            return self._signature["id"]
 
-        if not any(map(self.check_name, names)):
-            return False
+        chars = string.ascii_letters + string.digits + "._-"
+        return "".join(x for x in self._signature["pattern"] if x in chars)
 
-        if not self.compiled:
-            return True
+    def match(self, node: nodes.ASTNode) -> bool:
+        return self.ctx.match(node, self._compiled)
 
-        try:
-            sig = context.node.bind(self.compiled)
-            sig.apply_defaults()
-        except TypeError:
-            return False
+    def apply(self, context: nodes.Context):
+        if "tags" in self._signature:
+            context.node.tags |= set(self._signature["tags"])
 
-        for name, value in sig.arguments.items():
-            if not self.check_constrain(name, value):
-                return False
-        return sig
+        if "taint" in self._signature:
+            t = self._signature["taint"]
 
-    def match(self, node: nodes.NodeType) -> Union[None, bool, inspect.BoundArguments]:
-        """
-        Determine whenever the call to the function matches a defined signature
-        The following conditions are required:
-        - matching function name (could be another pattern such as regex)
-        - matching function args & kwargs as defined in the signature
-        - matching constraints for all args/kwargs
-        """
-        full_name = node.full_name
-        if type(full_name) != str:
-            return False
+            if type(t) == str:
+                t = {"level": t}
 
-        if not self.check_name(full_name):
-            return
+            msg = t.get("log_message")
+            level = t.get("level")
 
-        if not self.compiled:
-            return True
+            if level == "sink":
+                context.node.mark_as_sink(context=context)
+            elif level:
+                level = nodes.Taints.from_string(level)
 
-        try:
-            sig = node.bind(self.compiled)
-            sig.apply_defaults()
-        except TypeError:
-            return
+                if level == nodes.Taints.TAINTED and not msg:
+                    msg = "AST node marked as source using semantic rules"
+                elif level == nodes.Taints.SAFE and not msg:
+                    msg = "AST node has been cleaned of taint using semantic rules"
 
-        for name, value in sig.arguments.items():
-            if not self.check_constrain(name, value):
-                return
-        return sig
+                log = nodes.TaintLog(
+                    path = context.visitor.path,
+                    line_no = context.node.line_no,
+                    taint_level = level,
+                    message = msg
+                )
+                context.node.add_taint(level, context, taint_log=log, lock=t.get("lock", True))
+            elif msg:
+                log = nodes.TaintLog(
+                    path=context.visitor.path,
+                    line_no=context.node.line_no,
+                    message=msg
+                )
+                context.node._taint_log.append(log)
 
-    @lru_cache()
-    def check_name(self, name: str) -> bool:
-        """
-        Checks if the call function name is matching the pattern defined in signature
-        """
-        patterns = PatternMatcher.compile_patterns([self.signature["name"]])
-        matches = list(PatternMatcher.find_matches(name, patterns))
-        return bool(matches)
+            if type(context.node) == nodes.Call and "args" in t:
+                for arg_name, arg_level in t["args"].items():
+                    for arg in context.node.args:
+                        if type(arg) == nodes.Arguments and arg_name in arg.args:
+                            arg.taints[arg_name] = nodes.Taints.from_string(arg_level)
 
-    def check_constrain(self, name: str, value) -> bool:  # TODO!!!
-        """
-        Checks if the function argument value is matching all the constrains
-        :param name: function argument name
-        :param value: binded function argument value
-        """
-        annotation = self.__args[name].get("annotation", "").lower()
-        constrain = self.__args[name].get("constrain", [])
+        if "detection" in self._signature:
+            d = self._signature["detection"]
 
-        if type(constrain) == dict:
-            return False
+            hit = Detection(
+                detection_type=d.get("type", "ASTPattern"),
+                score=d.get("score", 0),
+                message=d["message"],
+                node=context.node,
+                tags=context.node.tags,
+                signature=f"ast_pattern#{self.id}/{context.node.line_no}#{context.visitor.normalized_path}"
+            )
+            if "informational" in d:
+                hit.informational = d["informational"]
+            else:
+                hit.informational = (hit.score == 0)
 
-        if not annotation:
-            return True
-        # TODO: check type by supported annotation
-        if constrain is None or constrain == []:
-            return True
+            if isinstance(context.node, nodes.Call):
+                if "type" not in d:  # Replace the default detection type name
+                    hit.detection_type = "FunctionCall"
+                # Enrich extra with the captured function name
+                hit.extra["function"] = context.node.cached_full_name
 
-        if not isinstance(constrain, (tuple, list)):
-            constrain = (constrain,)
-
-        for c in constrain:
-            if not CONSTRAINS[annotation](value, c):
-                return False
-
-        return True
-
-
-def boolean_constrain(value, constrain):
-    if value == 'False':
-        value = False
-    elif value == 'True':
-        value = True
-    return (value is constrain)
-
-
-def int_constrain(value, constrain):
-    if type(value) not in (int, nodes.Number):
-        return False
-
-    return int(value) == constrain
-
-
-# Possible constraint annotations for function arguments
-CONSTRAINS = {
-    "bool": boolean_constrain,
-    "int": int_constrain
-}
+            context.visitor.hits.append(hit)
+            return hit

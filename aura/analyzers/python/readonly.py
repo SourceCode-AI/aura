@@ -10,6 +10,10 @@ class ReadOnlyAnalyzer(Visitor):
     stage_name = "read_only"
     hooks = []
 
+    def __init__(self, *, location: ScanLocation):
+        super().__init__(location=location)
+        self.convergence = None
+
     def __call__(self) -> typing.Generator[Detection, None, None]:
         if not self.hooks:
             return
@@ -49,4 +53,3 @@ class ReadOnlyAnalyzer(Visitor):
                 self.hits.extend(handler(context=context))
             elif hasattr(hook, "_visit_node"):
                 self.hits.extend(hook._visit_node(context=context))
-

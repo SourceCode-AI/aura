@@ -1,42 +1,48 @@
 # -*- coding: utf-8 -*-
-#  Analyzer for FileSystem structure
+# Analyzer for FileSystem structure
 import fnmatch
-from typing import Generator
+from typing import Iterable
 
 from .detections import Detection
 from ..utils import Analyzer
 from ..uri_handlers.base import ScanLocation
 from ..type_definitions import AnalyzerReturnType
+from ..pattern_matching import FilePatternMatcher
 from .. import config
 
 
-@Analyzer.ID("sensitive_files")
-def analyze_sensitive(*, location: ScanLocation) -> AnalyzerReturnType:
-    """Find files not intended to be published such as .pypirc leaking user password"""
+FILE_PATTERNS = None
+
+
+def get_file_patterns() -> Iterable[FilePatternMatcher]:
+    global FILE_PATTERNS
+
+    if FILE_PATTERNS is None:
+        FILE_PATTERNS = tuple(FilePatternMatcher(x) for x in config.SEMANTIC_RULES.get("files", []))
+
+    return FILE_PATTERNS
+
+
+@Analyzer.ID("file_analyzer")
+def analyze(*, location: ScanLocation) -> AnalyzerReturnType:
+    for p in get_file_patterns():
+        if p.match(location):
+            location.metadata["tags"] |= set(p._signature.get("tags", []))
+
     if location.location.stat().st_size == 0:
         return
 
-    for pattern in config.SEMANTIC_RULES["sensitive_filenames"]:
-        if fnmatch.fnmatch(location.str_location, pattern) or location.str_location.endswith(pattern):
-            yield Detection(
-                detection_type="SensitiveFile",
-                message = "A potentially sensitive file has been found",
-                score=config.get_score_or_default("contain-sensitive-file", 0),
-                signature=f"sensitive_file#{str(location)}",
-                extra={
-                    "pattern": pattern,
-                    "file_name": location.location.name,
-                },
-                location=location.location,
-                tags = {"sensitive-file"}
-            )
-
-
-@Analyzer.ID("suspicious_files")
-def analyze_suspicious(*, location: ScanLocation) -> AnalyzerReturnType:
-    """Find non-standard files such as *.exe, compiled python code (*.pyc) or hidden files"""
-    if location.location.stat().st_size == 0:
-        return
+    if "sensitive_file" in location.metadata["tags"]:
+        yield Detection(
+            detection_type="SensitiveFile",
+            message="A potentially sensitive file has been found",
+            score=config.get_score_or_default("contain-sensitive-file", 0),
+            signature=f"sensitive_file#{str(location)}",
+            extra={
+                "file_name": location.location.name,
+            },
+            location=location.location
+        )
 
     name = location.location.name
     if name.startswith("."):
@@ -61,10 +67,5 @@ def analyze_suspicious(*, location: ScanLocation) -> AnalyzerReturnType:
                 "file_type": f_type
             },
             location=location.location,
-            tags={f_type}
+            tags={f_type} | location.metadata["tags"]
         )
-
-
-@Analyzer.ID("file_filter")
-def file_filter(*, location: ScanLocation) -> AnalyzerReturnType:
-    yield from []

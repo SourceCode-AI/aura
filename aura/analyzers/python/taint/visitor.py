@@ -1,33 +1,30 @@
 import re
 import pprint
-import fnmatch
 
 from ..nodes import *
 from ..visitor import Visitor
-from ..rewrite_ast import ASTRewrite
-from .... import config
 
 
 class TaintAnalysis(Visitor):
-    def _visit_node(self, context: Context, _isinstance=isinstance):
-        if not _isinstance(context.node, ASTNode):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.first_pass = True
+
+    def _post_iteration(self):
+        self.first_pass = False
+
+    def _visit_node(self, context: Context):
+        if not isinstance(context.node, ASTNode):
             return
         elif type(context.node) == Import:
             return
 
-        funcs = (
-            self.__mark_flask_route,
-            self.__mark_django_view,
-            self.__mark_sinks,
-            self.__mark_sources,
-            self.__mark_clean,
-            self.__propagate_taint,
-        )
+        if self.first_pass:
+            self.__mark_flask_route(context)
+            self.__mark_django_view(context)
 
-        for x in funcs:
-            x(context=context)
-            if context.visitor.modified:
-                return
+        self.__mark_sources(context)
+        self.__propagate_taint(context=context)
 
     def __mark_flask_route(self, context):
         """
@@ -78,85 +75,17 @@ class TaintAnalysis(Visitor):
         elif not isinstance(context.node, FunctionDef):
             return
 
-        for r in context.node.return_nodes.values():
+        for r in context.node.return_nodes.values():  # TODO: transition this to the apply_taint of FunctionDefPattern
             f_name = r.cached_full_name
             if type(f_name) != str:
                 continue
 
-            if f_name in config.SEMANTIC_RULES["django_modules"] and f_name.startswith(
-                "django."
-            ):
-                log = TaintLog(
-                    path = self.path,
-                    line_no = context.node.line_no,
-                    message = "AST node has been marked as Django view"
-                )
-                context.node._taint_log.append(log)
-                context.node.tags.add("django_view")
+            if "django_view" in context.node.tags:
                 context.node.args.taints["request"] = Taints.TAINTED
                 context.visitor.modified = True
                 return
 
-    def __mark_sinks(self, context):
-        f_name = context.node.cached_full_name
-        if f_name is None:
-            return
-        elif "taint_sink" in context.node.tags:
-            return
-        elif type(f_name) != str:
-            return
-
-        log = TaintLog(
-            path = self.path,
-            line_no = context.node.line_no,
-            message = "AST node marked as sink using semantic rules"
-        )
-
-        for sink in config.SEMANTIC_RULES.get("taint_sinks", []):
-            if sink.rstrip(".*") == f_name or fnmatch.fnmatch(f_name, sink):
-                context.node.tags.add("taint_sink")
-                context.node._taint_log.append(log)
-                context.visitor.modified = True
-                return
-
-    def __mark_clean(
-            self,
-            context: Context
-    ):
-        name = context.node.cached_full_name
-        if not type(name) == str or "taint_clean" in context.node.tags:
-            return
-
-        if name in config.SEMANTIC_RULES.get("taint_clean", []):
-            log = TaintLog(
-                path = self.path,
-                node=context.node,
-                taint_level=Taints.SAFE,
-                line_no=context.node.line_no,
-                message = "AST node has been cleaned of taint using semantic rules"
-            )
-            context.node.add_taint(Taints.SAFE, context, taint_log=log, lock=True)
-            context.node.tags.add("taint_clean")
-
     def __mark_sources(self, context):
-        f_name = context.node.cached_full_name
-
-        if not (type(f_name) == str and "taint_source" not in context.node.tags):
-            return
-
-        log = TaintLog(
-            path = self.path,
-            taint_level=Taints.TAINTED,
-            line_no = context.node.line_no,
-            message = "AST node marked as source using semantic rules"
-        )
-
-        for source in config.SEMANTIC_RULES.get("taint_sources", []):
-            if source.rstrip(".*") == f_name or fnmatch.fnmatch(f_name, source):
-                context.node.tags.add("taint_source")
-                context.node.add_taint(Taints.TAINTED, context, taint_log=log, lock=True)
-                return
-
         if isinstance(
             context.node, FunctionDef
         ):  # Mark arguments as sources for flask routes
@@ -184,25 +113,8 @@ class TaintAnalysis(Visitor):
         if isinstance(context.node, Attribute) and isinstance(
             context.node.source, ASTNode
         ):
-            t = context.node.source._taint_class
-
-            if (
-                "taint_source" in context.node.source.tags
-            ):
-                log = TaintLog(
-                    path=self.path,
-                    taint_level=Taints.TAINTED,
-                    line_no=context.node.line_no,
-                    message="Node has been marked as tainted because it is defined as a taint source"
-                )
-                context.node.add_taint(Taints.TAINTED, context, taint_log=log)
-                return
-
-            elif t != Taints.UNKNOWN and t != context.node._taint_class:
-                # TODO: add taint log
-                context.node._taint_class = t
-                context.visitor.modified = True
-                return
+            self.__propagate_attribute(context)
+            return
         elif isinstance(context.node, Call):
             f_name = context.node.cached_full_name
             args_taints = []
@@ -352,6 +264,20 @@ class TaintAnalysis(Visitor):
 
                     except (TypeError,):
                         pass
+
+    def __propagate_attribute(self, context):
+        parent = context.node.source._taint_class
+
+        if parent != Taints.TAINTED:
+            return
+
+        log = TaintLog(
+            path=self.path,
+            taint_level=parent,
+            line_no=context.node.line_no,
+            message="Taint level has been propagated via attribute access"
+        )
+        context.node.add_taint(parent, context, taint_log=log)
 
     def _post_analysis(self):
         return #TODO

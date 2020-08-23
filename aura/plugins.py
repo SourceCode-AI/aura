@@ -79,6 +79,9 @@ def get_analyzers(names: Optional[List[str]]=None) -> List[AnalyzerType]:
     analyzers = []
 
     for x in names:
+        if x == "ast":  # Noop stage
+            continue
+
         if x in data["entrypoints"]:
             analyzers.append(data["entrypoints"][x])
             continue

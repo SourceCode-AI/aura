@@ -4,8 +4,6 @@ import sys
 import os
 import json
 import time
-import copy
-import inspect
 from pathlib import Path
 from functools import partial
 from typing import Union, Optional, Tuple
@@ -182,7 +180,7 @@ def scan_mirror(output_dir: Path):
             # )
 
 
-def parse_ast(path: Union[str, Path], stages: Optional[Tuple[str,...]]=None):
+def parse_ast(path: Union[str, Path], stages: Optional[Tuple[str,...]]=None, format="text"):
     from .analyzers.python.visitor import Visitor
 
     if stages:
@@ -194,7 +192,10 @@ def parse_ast(path: Union[str, Path], stages: Optional[Tuple[str,...]]=None):
     location = ScanLocation(location=path, metadata=meta)
 
     v = Visitor.run_stages(location=location, stages=stages)
-    pprint(v.tree["ast_tree"], indent=2)
+    if format == "text":
+        pprint(v.tree["ast_tree"], indent=2)
+    elif format == "json":
+        print(json.dumps(v.tree["ast_tree"], default=utils.json_encoder))
 
 
 def show_info():
