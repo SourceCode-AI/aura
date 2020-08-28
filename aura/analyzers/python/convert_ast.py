@@ -281,9 +281,14 @@ def visit_ExceptHandler(context):
     context.replace(new_node)
     return new_node
 
-
 def visit_Ellipsis(context):
     context.replace(...)
+
+def visit_Module(context):
+    new_node = Module(body=context.node.get("body", []))
+    new_node.enrich_from_previous(context.node)
+    context.replace(new_node)
+    return new_node
 
 
 VISITORS = {
@@ -317,6 +322,7 @@ VISITORS = {
     "ExceptHandler": visit_ExceptHandler,
     "complex": visit_Complex,
     "Ellipsis": visit_Ellipsis,
+    "Module": visit_Module,
 }
 
 

@@ -36,14 +36,6 @@ CRYPTO_GEN_KEYS = {
 MIN_KEY_SIZES = {"rsa": 2048, "dsa": 2048}
 
 
-class CryptoKeyGeneration(Detection):  # TODO: refactor to use the base Detection class
-    """
-    Detection hit to throw when crypto key generation is detected
-    """
-
-    pass
-
-
 @Analyzer.ID("cryptography_generate_keys")
 class CryptoGenKey(base.NodeAnalyzerV2):
     """Analyze the generation of cryptography keys"""
@@ -87,7 +79,8 @@ class CryptoGenKey(base.NodeAnalyzerV2):
         yield self._gen_hit(context, info, key_size)
 
     def _gen_hit(self, context, info, key_size=None):
-        hit = CryptoKeyGeneration(
+        hit = Detection(
+            detection_type="CryptoKeyGeneration",
             message="Generation of cryptography key detected",
             signature=f"crypto#gen_key#{context.visitor.normalized_path}#{context.node.line_no}",
             extra={

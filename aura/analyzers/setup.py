@@ -46,16 +46,15 @@ class SetupPy(NodeAnalyzerV2):
             parsed.update(self.__parse_cmdclass(context))
 
         pkgs = []
-        # TODO: refactor these `isinstance` into `type`
-        if isinstance(context.node.kwargs.get("packages"), list):
+        if type(context.node.kwargs.get("packages")) == list:
             pkgs = [self.__as_str(x) for x in context.node.kwargs["packages"]]
-        elif isinstance(context.node.kwargs.get("packages"), str):
+        elif type(context.node.kwargs.get("packages")) == str:
             pkgs = [context.node.kwargs["packages"]]
 
         for pkg in pkgs:
             parsed["packages"].append(pkg)
 
-            if isinstance(parsed.get("name"), str) and not self.__check_name(
+            if type(parsed.get("name")) == str and not self.__check_name(
                 parsed["name"], pkg
             ):
                 sig = Detection(

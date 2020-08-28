@@ -193,9 +193,9 @@ def parse_ast(path: Union[str, Path], stages: Optional[Tuple[str,...]]=None, for
 
     v = Visitor.run_stages(location=location, stages=stages)
     if format == "text":
-        pprint(v.tree["ast_tree"], indent=2)
+        pprint(v.tree, indent=2)
     elif format == "json":
-        print(json.dumps(v.tree["ast_tree"], default=utils.json_encoder))
+        print(json.dumps(v.tree, default=utils.json_encoder))
 
 
 def show_info():

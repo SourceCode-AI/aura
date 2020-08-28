@@ -38,10 +38,6 @@ REGEX_TYPE = type(re.compile(""))
 
 cli = None
 Detection = None
-cfg_path = os.fspath(Path(__file__).parent / "files" / "test_config.ini")
-
-os.environ['AURA_CFG'] = cfg_path
-assert os.environ.get('AURA_CFG') == cfg_path
 
 
 class MatchFound(ValueError):

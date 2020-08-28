@@ -29,7 +29,12 @@ class DataFinder(NodeAnalyzerV2):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.__min_blob_size = int(config.get_settings("aura.min-blob-size", 100))
+        self.__min_blob_size = self.get_min_size()
+        pass
+
+    @classmethod
+    def get_min_size(cls) -> int:
+        return config.get_settings("aura.min-blob-size", 100)
 
     def node_String(self, context: Context):
         val = context.node.value
@@ -110,6 +115,7 @@ class StringFinder(NodeAnalyzerV2):
             yield self.__generate_hit(context, hit, value)
 
     def __generate_hit(self, context: Context, hit, value: str):
+        score = hit._signature.get("score", 0)
         return Detection(
                 detection_type="StringMatch",
                 message=hit.message,
@@ -118,8 +124,9 @@ class StringFinder(NodeAnalyzerV2):
                     "string": value
                 },
                 signature=f"string_finder#{hit._signature['id']}#{utils.md5(value)}#{context.visitor.normalized_path}/{context.node.line_no}",
-                score=hit._signature.get("score", 0),
+                score=score,
                 node=context.node,
                 location=context.visitor.path,
-                tags=set(hit._signature.get("tags", []))
+                tags=set(hit._signature.get("tags", [])),
+                informational=hit._signature.get("informational", (score==0))
             )

@@ -3,11 +3,13 @@ import re
 import json
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from click.testing import CliRunner
 
 from aura import cli
+from aura.analyzers.data_finder import DataFinder
 
 
 OBFUSCATED_DEFAULT_MATCHES = [
@@ -56,7 +58,8 @@ def test_simple_cli_analysis(exec_mode, fixtures):
 
 @pytest.mark.extended
 def test_complex_cli_analysis(fixtures):
-    fixtures.scan_and_match("obfuscated.py", OBFUSCATED_DEFAULT_MATCHES)
+    with patch.object(DataFinder, "get_min_size", return_value=10) as m:
+        fixtures.scan_and_match("obfuscated.py", OBFUSCATED_DEFAULT_MATCHES)
 
 
 @pytest.mark.extended
@@ -100,8 +103,8 @@ def test_scan_min_score_option(fixtures):
     (
         ("!test_code",),
         ("shell_injection",),
-        ("test-code", "shell_injection"),
-        ("test-code",),
+        ("test_code", "shell_injection"),
+        ("test_code",),
         ("!shell_injection",),
         ("ratata_does_not_exists",),
         ("!ratata_does_not_exists",),

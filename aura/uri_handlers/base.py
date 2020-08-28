@@ -30,7 +30,6 @@ from ..analyzers.detections import DataProcessing, Detection
 logger = config.get_logger(__name__)
 HANDLERS = {}
 CLEANUP_LOCATIONS = set()
-TEST_REGEX = re.compile(r"^test(_.+|s)?$")  # TODO: move this to config
 
 
 class URIHandler(ABC):
@@ -139,11 +138,6 @@ class ScanLocation(KeepRefs):
         if self.metadata.get("depth") is None:
             self.metadata["depth"] = 0
             warn("Depth is not set for the scan location", stacklevel=2)
-
-        for x in self.location.parts:
-            if TEST_REGEX.match(x):  # TODO: refactor
-                self.metadata["flags"].add("test-code")
-                break
 
         if self.location.is_file():
             with self.location.open("rb") as fd:
@@ -271,7 +265,7 @@ class ScanLocation(KeepRefs):
 
         :return: True if the processing should continue otherwise an instance of Rule that would halt the processing
         """
-        max_depth = int(config.CFG["aura"].get("max-depth", fallback=5))
+        max_depth = int(config.CFG["aura"].get("max-depth", 5))
         if self.metadata["depth"] > max_depth:
             return DataProcessing(
                 message = f"Maximum processing depth reached",

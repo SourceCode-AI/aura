@@ -18,8 +18,6 @@ import tokenize
 import platform
 import traceback
 
-from collections import OrderedDict
-
 try:
     import simplejson as json
 except ImportError:
@@ -30,6 +28,13 @@ BUILTIN_PURE = [int, float, bool]
 BUILTIN_BYTES = (bytearray, bytes)
 BUILTIN_STR = (str,)
 ENCODING_REGEX = re.compile(r"^[ \t\f]*#.*?coding[:=][ \t]*(?P<encoding>[-_.a-zA-Z0-9]+)")
+
+
+if sys.version_info.major >= 3 and sys.version_info.minor >= 6:
+    OrderedDict = dict
+else:
+    from collections import OrderedDict
+
 
 
 def hex_decode(value):
@@ -180,7 +185,7 @@ def main(pth=None, out=sys.stdout):
     if pth != "-":
         encoding = get_encoding(pth)
 
-        with codecs.open(pth, "r", encoding=encoding) as fd:
+        with open(pth, "rb") as fd:
             source_code = fd.read()
     else:
         encoding = sys.getdefaultencoding()

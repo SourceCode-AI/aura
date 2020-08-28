@@ -98,15 +98,18 @@ class PrettyReport:
     def _align_text(self, text, width, pos=-1):
         content_len = self.ansi_length(text)
         remaining_len = width
+        overflow = content_len - remaining_len
 
         if content_len > remaining_len:
-            parts = self.ANSI_RE.split(text)
-            longest = max(filter(lambda x: not x.startswith(r"\x1b"), parts), key=len)
-            for idx, p in enumerate(parts):
-                if p == longest:
-                    parts[idx] = p[:len(p) - 6] + " [...]"  # TODO
+            parts = self.ANSI_RE.split(text)[::-1]
+            for idx, x in enumerate(parts):
+                if x.startswith(r"\x1b"):
+                    continue
+                if len(x) > overflow:
+                    parts[idx] = x[:-overflow-6] + " [...]"
+                    break
 
-            text = "".join(parts)
+            text = "".join(parts[::-1])
 
         if pos == -1:
             return text + " " * (remaining_len - content_len)
@@ -298,9 +301,17 @@ class TextInfoOutput(InfoOutputBase):
         out.print_top_separator()
 
         # Right hand side lists environment information (installed plugins, URI handlers etc.)
-        rhs_lines = [
-            "Installed analyzers:"
-        ]
+        rhs_lines = []
+
+        semantic = data["schema_validation"]["semantic_rules"]
+        if semantic is True:
+            rhs_lines.append(style(f" {OK} Semantic rules configuration is valid", fg="bright_green"))
+        else:
+            rhs_lines.append(style(f" {NOK} Semantic rules configuration is not valid:", fg="bright_red"))
+            rhs_lines.append(semantic)
+
+        rhs_lines.append("")
+        rhs_lines.append("Installed analyzers:")
 
         rhs_size = max(len(x) for x in rhs_lines)
 

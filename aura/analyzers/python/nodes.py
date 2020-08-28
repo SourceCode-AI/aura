@@ -184,7 +184,7 @@ class ASTNode(KeepRefs, metaclass=ABCMeta):
         return self._full_name
 
     @property
-    def json(self) -> typing.Mapping[str, typing.Any]:
+    def json(self) -> typing.Dict[str, typing.Any]:
         data = {
             "AST_Type": self.__class__.__name__,
         }
@@ -272,6 +272,32 @@ class ASTNode(KeepRefs, metaclass=ABCMeta):
 NodeType = typing.NewType(
     "NodeType", typing.Union[ASTNode, typing.Dict, typing.List, int, str]
 )
+
+
+@dataclass
+class Module(ASTNode):
+    body: typing.List[NodeType, ...]
+
+    def _visit_node(self, context: Context):
+        for idx, x in enumerate(self.body):
+            context.visit_child(
+                node = x,
+                replace = partial(self.__replace_body, idx=idx, visitor=context.visitor),
+                closure = self
+            )
+
+    def __replace_body(self, value: NodeType, idx: int, visitor):
+        self.body[idx] = value
+        visitor.modified = True
+
+    def __getitem__(self, item) -> NodeType:
+        return self.body[item]
+
+    @property
+    def json(self):
+        d = super().json
+        d["body"] = self.body
+        return d
 
 
 @dataclass
@@ -525,24 +551,6 @@ class Var(ASTNode):
 
         if type(self.value) == list and self.value == []:
             self.typing = "list"
-        elif type(self.value) == str:
-            try:
-                target = context.stack[self.value]
-                self._original = self.value
-                self.value = target
-                context.visitor.modified = True
-            except (TypeError, KeyError):
-                pass
-        elif isinstance(self.value, Arguments) and self._original in self.value.taints:
-            new_taint = self.value.taints[self._original]
-            log = TaintLog(
-                path=context.visitor.normalized_path,
-                taint_level=new_taint,
-                message="Taint propagated via the variable that is pointing to an argument",
-                node=self.value,
-                line_no=self.line_no
-            )
-            self.add_taint(new_taint, context=context, taint_log=log)
 
         context.visit_child(
             node=self.var_name,
@@ -584,9 +592,6 @@ class Attribute(ASTNode):
     def full_name(self):
         if self._full_name is not None:
             return self._full_name
-        if isinstance(self.source, Import) and self.__original_source in self.source.names:  # TODO: remove this as it's replaced by `Container`
-            self._full_name = f"{self.source.names[self.__original_source]}.{self.attr}"
-            return self._full_name
         elif isinstance(self.source, (Attribute, Call, Container, Var)):
             return f"{self.source.full_name}.{self.attr}"
         elif type(self.source) == str:
@@ -602,24 +607,6 @@ class Attribute(ASTNode):
         return d
 
     def _visit_node(self, context):
-        if type(self.source) == str:
-            try:
-                self.__original_source = self.source
-                target = context.stack[self.source]
-                if (
-                    isinstance(target, Var)
-                    and target.var_type == "assign"
-                    and target.line_no != self.line_no
-                ):
-                    self.source = target.value
-                else:
-                    self.source = target
-                context.visitor.modified = True
-            except (KeyError, TypeError):
-                # context.node.pprint()
-                # print(context.stack.frame.variables)
-                pass
-
         if type(self.source) != str:
             context.visit_child(
                 node=self.source,
@@ -731,11 +718,11 @@ class FunctionDef(ASTNode):
         context.stack[self.name] = self
         context.call_graph.definitions[self.name] = self
         context.stack.push()
-        # context.stack = context.stack.copy()
 
         context.visit_child(
             node=self.args,
             replace=partial(self.__replace_args, visitor=context.visitor),
+            closure=self
         )
 
         for idx, dec, in enumerate(self.decorator_list):
@@ -750,6 +737,7 @@ class FunctionDef(ASTNode):
             context.visit_child(
                 node=b,
                 replace=partial(self.__replace_body, idx=idx, visitor=context.visitor),
+                closure=self
             )
 
         context.stack.pop()
@@ -780,6 +768,7 @@ class ClassDef(ASTNode):
             context.visit_child(
                 node=b,
                 replace=partial(self.__replace_body, idx=idx, visitor=context.visitor),
+                closure=self
             )
 
         context.stack.pop()
@@ -837,7 +826,7 @@ class Call(ASTNode):
                 arg = self.args[idx]
                 if type(arg) == str:
                     arg = context.stack[arg]
-                    if arg.line_no != self.line_no:
+                    if arg.line_no is None or arg.line_no != self.line_no:
                         self._orig_args[idx] = self.args[idx]
                         self.args[idx] = arg
                         context.visitor.modified = True
@@ -1012,7 +1001,7 @@ class Arguments(ASTNode):  # TODO: not used yet
         if self.args:
             for x in self.args:
                 if type(x) == str:
-                    context.stack[x] = self
+                    context.stack[x] = Container(name=x, pointer=self)
 
         # TODO: add to stack other arguments
 
@@ -1218,22 +1207,6 @@ class BinOp(ASTNode):
         self._orig_right = None
 
     def _visit_node(self, context):
-        try:
-            if isinstance(self.left, str) and self.left in context.stack:
-                self._orig_left = self.left
-                self.left = context.stack[self.left]
-                context.visitor.modified = True
-        except (TypeError, KeyError):
-            pass
-
-        try:
-            if isinstance(self.right, str) and self.right in context.stack:
-                self._orig_right = self.right
-                self.right = context.stack[self.right]
-                context.visitor.modified = True
-        except (TypeError, KeyError):
-            pass
-
         context.visit_child(
             node=self.left,
             replace=partial(self.__replace_left, visitor=context.visitor),
@@ -1291,20 +1264,8 @@ class ReturnStmt(ASTNode):
     value: NodeType
 
     def _visit_node(self, context: Context):
-        parent = context.parent
-        while parent:
-            if isinstance(parent.node, FunctionDef):
-                parent.node.return_nodes[self.line_no] = self
-                break
-            parent = parent.parent
-
-        try:
-            if type(self.value) == str:
-                target = context.stack[self.value]
-                self.value = target
-                context.visitor.modified = True
-        except (TypeError, KeyError):
-            pass
+        if type(context.scope_closure) == FunctionDef:
+            context.scope_closure.return_nodes[self.line_no] = self
 
         context.visit_child(
             node=self.value,
@@ -1347,6 +1308,10 @@ class Subscript(ASTNode):
             node=self.value,
             replace=partial(self.__replace_value, visitor=context.visitor),
         )
+        context.visit_child(
+            node=self.slice,
+            replace=partial(self.__replace_slice, visitor=context.visitor)
+        )
 
     @property
     def json(self):
@@ -1358,6 +1323,10 @@ class Subscript(ASTNode):
 
     def __replace_value(self, value, visitor):
         self.value = value
+        visitor.modified = True
+
+    def __replace_slice(self, value, visitor):
+        self.slice = value
         visitor.modified = True
 
 
@@ -1418,6 +1387,17 @@ class Container(ASTNode):
         self.pointer._visit_node(context)
 
     @property
+    def _taint_class(self) -> Taints:
+        if type(self.pointer) == Arguments:
+            return self.pointer.taints.get(self.name, Taints.UNKNOWN)
+        else:
+            return self.pointer._taint_class
+
+    @_taint_class.setter
+    def _taint_class(self, value):
+        pass
+
+    @property
     def json(self):
         d = super().json
         d["name"] = self.name
@@ -1439,10 +1419,15 @@ class Container(ASTNode):
     stack=field(default_factory=Stack),
     depth=field(default=0),
     modified=field(default=False),
-    shared_state=field(default_factory=dict)
+    shared_state=field(default_factory=dict),
+    scope_closure=field(default=None)
 )
 class Context:
-    __slots__ = ("node", "parent", "replace", "visitor", "stack", "depth", "modified", "shared_state")
+    __slots__ = (
+        "node", "parent", "replace",
+        "visitor", "stack", "depth",
+        "modified", "shared_state", "scope_closure"
+    )
 
     node: NodeType
     parent: typing.Union[Context, None]
@@ -1453,6 +1438,7 @@ class Context:
     depth: int
     modified: bool
     shared_state: dict
+    scope_closure: typing.Optional[ASTNode]
 
     @property
     def call_graph(self):
@@ -1466,16 +1452,19 @@ class Context:
             visitor=self.visitor,
             replace=replace,
             stack=self.stack,
-            shared_state=self.shared_state
+            shared_state=self.shared_state,
+            scope_closure=self.scope_closure
         )
 
-    def visit_child(self, node, stack=None, replace=lambda x: None):
+    def visit_child(self, node, stack=None, replace=lambda x: None, closure=None):
         if type(node) in (str, int, type(...)) or node is None or node == ...:
             return
 
         new_context = self.as_child(node, replace=replace)
         if stack is not None:
             new_context.stack = stack
+        if closure is not None:
+            new_context.scope_closure = closure
         new_context.visitor.push(new_context)
 
 

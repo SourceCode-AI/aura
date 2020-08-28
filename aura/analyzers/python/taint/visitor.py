@@ -80,7 +80,8 @@ class TaintAnalysis(Visitor):
             if type(f_name) != str:
                 continue
 
-            if "django_view" in context.node.tags:
+
+            if "django_view" in r.value.tags:
                 context.node.args.taints["request"] = Taints.TAINTED
                 context.visitor.modified = True
                 return

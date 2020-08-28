@@ -6,13 +6,6 @@ from aura import config
 from aura import utils
 
 
-def test_config():
-    cfg_path = os.environ.get('AURA_CFG')
-    assert cfg_path.split('/')[-1] == 'test_config.ini', cfg_path
-    assert config.CFG_PATH == cfg_path
-    assert config.CFG.get("aura", "config_type") == "test_value"
-
-
 def test_path_traversal():
     pth = Path(__file__).absolute().parent
     paths = list(utils.walk(pth))

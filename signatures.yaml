@@ -385,7 +385,7 @@ files:
     pattern: "^test(_.+|s)?$"
     target: part
     tags:
-      - "test-code"
+      - test_code
 
   - type: exact
     pattern: ".pypirc"
@@ -548,7 +548,7 @@ files:
       - ignore
 
 
-string:
+strings:
   - id: all_interfaces
     type: regex
     pattern: "^0\\.0\\.0\\.0(:\\d{2,6})?$"
@@ -563,9 +563,10 @@ string:
 
   - id: url
     type: regex
-    pattern: "^(http|ftp)s?://.+"
+    pattern: "^(http|ftp)s?://.{5,}"
     message: "A possible URL has been found"
     score: 0
+    informational: false
     tags:
       - url
 

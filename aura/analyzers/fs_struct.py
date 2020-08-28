@@ -41,7 +41,8 @@ def analyze(*, location: ScanLocation) -> AnalyzerReturnType:
             extra={
                 "file_name": location.location.name,
             },
-            location=location.location
+            location=location.location,
+            tags = set(location.metadata["tags"])
         )
 
     name = location.location.name

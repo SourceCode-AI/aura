@@ -28,7 +28,7 @@ logger = config.get_logger(__name__)
 
 
 class Analyzer(object):
-    fork = config.CFG.getboolean("aura", "async", fallback=True)
+    fork = config.CFG["aura"].get("async", True)
 
     def __init__(self, location):
         self.location = location
@@ -136,9 +136,7 @@ class Analyzer(object):
                 else:
                     if x.location:
                         x.location = location.strip(x.location)
-                    x.tags |= location.metadata[
-                        "flags"
-                    ]  #  TODO: remove once moved somewhere else
+                    x.tags |= location.metadata["tags"]
                     if x._metadata is None:
                         x._metadata = location.metadata
 

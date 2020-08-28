@@ -1,5 +1,9 @@
+import json
 import inspect
 import shutil
+from importlib import resources
+
+import jsonschema
 
 from . import __version__ as version
 from .uri_handlers.base import URIHandler
@@ -41,12 +45,25 @@ def check_git() -> dict:
         }
 
 
+def check_schema() -> dict:
+    res = {}
+    semantic_schema = json.loads(resources.read_text("aura.data", "semantic_rules_schema.json"))
+    try:
+        jsonschema.validate(config.SEMANTIC_RULES, semantic_schema)
+        res["semantic_rules"] = True
+    except jsonschema.ValidationError as exc:
+        res["semantic_rules"] = exc.args[0]
+
+    return res
+
+
 def gather_aura_information() -> dict:
     info = {
         "aura_version": version,
         "analyzers": {},
         "integrations": {},
-        "uri_handlers": {}
+        "uri_handlers": {},
+        "schema_validation": check_schema()
     }
 
     analyzers = plugins.load_entrypoint("aura.analyzers")

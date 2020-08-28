@@ -229,6 +229,8 @@ class ASTPattern:
                 return self._match_list(node, other)
             elif type(node) == int:
                 return self._match_int(node, other)
+            elif type(node) == float:
+                return self._match_float(node, other)
 
             return node.match(other, self)
 
@@ -262,6 +264,11 @@ class ASTPattern:
                 return False
             return node == int(other)
 
+        def _match_float(self, node: float, other) -> bool:
+            if type(other) != float:
+                return False
+            return node == float(other)
+
         def _match_any_of(self, node, other: ASTPattern.AnyOf) -> bool:
             for sub_pattern in other:
                 if self.match(node, sub_pattern):
@@ -287,8 +294,8 @@ class ASTPattern:
     def _compile_src(cls, src: str) -> nodes.NodeType:
         ast_tree = collect(dedent(src), minimal=True)
         loc = ScanLocation(location="<unknown>")
-        v = visitor.Visitor.run_stages(location=loc, stages=("convert",), ast_tree=ast_tree)
-        return v.tree["ast_tree"]["body"][-1]  # TODO: assumption right now is it's a module with one body block
+        v = visitor.Visitor.run_stages(location=loc, stages=("convert", "rewrite"), ast_tree=ast_tree)
+        return v.tree[-1]  # TODO: assumption right now is it's a module with one body block
 
     @property
     def id(self) -> str:

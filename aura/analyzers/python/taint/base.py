@@ -6,19 +6,16 @@ from ...detections import Detection
 from ....utils import Analyzer
 
 
-class TaintAnomaly(Detection):  # TODO: refactor to use base Detection class
-    pass
-
-
 @Analyzer.ID("taint_analysis")
 class TaintDetection(NodeAnalyzerV2):
     """Analyze propagation of tainted data into sinks"""
 
-    def __generate_hit(self, context) -> TaintAnomaly:
+    def __generate_hit(self, context) -> Detection:
         log = TaintLog.extract_log(context.node)
         log = [x[0] for x in groupby(log)]  # Remove consecutive duplicate logs
 
-        return TaintAnomaly(
+        return Detection(
+            detection_type="TaintAnomaly",
             score=10,
             message="Tainted input is passed to the sink",
             node=context.node,

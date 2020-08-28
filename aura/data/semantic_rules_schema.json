@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+
+  "type": "object",
+  "properties": {
+    "strings": {
+      "type": "array",
+      "items": {"allOf": [
+        {"$ref": "#/definitions/pattern_matching"},
+        {
+          "type": "object",
+          "properties": {
+            "score": {
+              "type": "number",
+              "minimum": 0
+            },
+            "tags": {"type": "array", "items": {"type": "string"}},
+            "informational": {"type": "boolean"},
+            "message": {"type": "string"}
+          }
+        }
+      ]}
+    },
+    "files": {
+      "type":  "array",
+      "items": {"$ref": "#/definitions/pattern_matching"}
+    },
+
+    "patterns": {
+      "type":  "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {"type":  "string"},
+          "pattern": {"anyOf": [
+            {"type":  "string"},
+            {"type":  "array", "items":  {"type":  "string"}}
+          ]},
+          "detection": {
+            "type": "object",
+            "properties": {
+              "message": {"type": "string"},
+              "score": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false
+          },
+          "tags": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "taint": {"anyOf": [
+            {"enum": ["safe", "tainted", "sink"]},
+            {
+              "type": "object",
+              "properties": {
+                "level": {"enum": ["safe", "tainted", "sink"]},
+                "log_message": {"type": "string"},
+                "args": {"type": "object"}
+              },
+              "additionalProperties": false
+            }
+          ]}
+        }
+      }
+    }
+  },
+
+  "additionalProperties": false,
+  "definitions": {
+    "pattern_matching": {
+      "anyOf": [
+        {"type": "string"},
+        {
+          "type": "object",
+          "properties": {
+            "type": {"enum": ["regex", "exact", "contains", "glob"]},
+            "pattern": {"type": "string"},
+            "flags": {"type": "string"}
+          },
+          "required": ["type", "pattern"]
+        }
+      ]
+    },
+    "file_pattern": {
+      "allOf": [
+        {"$ref": "#/definitions/pattern_matching"},
+        {
+          "type": "object",
+          "properties": {
+            "target": {"enum": ["full", "part", "filename"]},
+            "tags": {"type": "array", "items": {"type": "string"}}
+          }
+        }
+      ]
+    }
+  }
+}

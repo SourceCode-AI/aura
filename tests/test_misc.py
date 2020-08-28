@@ -55,7 +55,6 @@ def test_redos(fixtures):
     # TODO: test that clean regexes don't trigger redos
 
 
-@pytest.mark.skip  # TODO
 def test_different_source_code_encoding(fixtures):
     matches = [
         {
@@ -101,7 +100,7 @@ def test_fs_structure_detections(fixtures, tmp_path):
         {
             "type": "SensitiveFile",
             "message": "A potentially sensitive file has been found",
-            "tags": ["sensitive-file"],
+            "tags": ["sensitive_file"],
             "extra": {
                 "file_name": ".pypirc"
             }

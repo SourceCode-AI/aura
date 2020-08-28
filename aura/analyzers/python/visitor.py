@@ -15,6 +15,7 @@ from typing import Optional, Tuple, Union
 import pkg_resources
 
 from .nodes import Context, ASTNode
+from ..detections import Detection
 from ...stack import CallGraph
 from .. import python_src_inspector
 from ...uri_handlers.base import ScanLocation
@@ -161,12 +162,11 @@ class Visitor:
         context.modified = True
         context.node[key] = new_node
 
-    def _replace_root(self, new_node, context):
+    def _replace_root(self, new_node):
         """
         Helper function to replace the root in a context call
         """
         self.modified = True
-        context.modified = True
         self.tree = new_node
 
     def traverse(self, _id=id):
@@ -197,7 +197,7 @@ class Visitor:
 
             root = self.tree
             if type(root) == dict and "ast_tree" in root:
-                root = root["ast_tree"]["body"]
+                root = root["ast_tree"]
 
             new_ctx = Context(
                 node=root, parent=None, replace=self._replace_root, visitor=self
@@ -220,7 +220,13 @@ class Visitor:
 
             self._post_iteration()
             self.iteration += 1
-            if self.iteration >= self.max_iterations:  # TODO: report this as a result so we can collect this data
+            if self.iteration >= self.max_iterations:
+                self.hits.append(Detection(
+                    detection_type="ASTAnalysisError",
+                    message="Maximum AST tree iterations reached",
+                    extra={"iterations": self.iteration},
+                    signature=f"ast_analysis_error#max_iterations#{str(self.location)}"
+                ))  # TODO: add tests for this
                 break
 
         self._post_analysis()
@@ -272,6 +278,8 @@ class Visitor:
         value = context.node[key]
 
         if type(value) == dict and len(value) == 1 and value.get("_type") == "Load":
+            return
+        elif type(value) in (tuple, list) and len(value) == 0:
             return
 
         context.visit_child(

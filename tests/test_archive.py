@@ -3,10 +3,11 @@ import pytest
 import zipfile
 import tarfile
 import tempfile
+from unittest.mock import patch
 
+from aura import config
 from aura.analyzers.detections import Detection
 from aura.analyzers import archive
-
 
 
 @pytest.mark.parametrize(
@@ -41,7 +42,7 @@ def test_zip_extractor(fixtures):
     result = fixtures.scan_test_file('evil.zip')
 
 
-def test_zip_bomb(fixtures, fuzzy_rule_match):
+def test_zip_bomb(fixtures):
     matches = [
         {
             'type': 'ArchiveAnomaly',
@@ -51,8 +52,8 @@ def test_zip_bomb(fixtures, fuzzy_rule_match):
             }
         } for x in '123456789abcdef'
     ]
-
-    fixtures.scan_and_match("zip_bomb.zip", matches=matches)
+    with patch.object(config, "get_maximum_archive_size", return_value=10) as m:
+        fixtures.scan_and_match("zip_bomb.zip", matches=matches)
 
 
 def test_damaged_zipfile(fixtures):

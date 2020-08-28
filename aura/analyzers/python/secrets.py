@@ -7,12 +7,8 @@ from ..detections import Detection
 from ...utils import Analyzer
 
 
-class LeakingSecret(Detection):  # TODO: refactor to use the base class
-    pass
-
-
 URL_REGEX = re.compile(r"^(https?|ftp)://.{5,}\?.{3,}")
-SECRET_REGEX = re.compile(r".*(pass(wd|word)?|pwd|token|secrete?).*")
+SECRET_REGEX = re.compile(r".*(pass(wd|word)?|pwd|token|secrete?).*")  # Be able to configure this
 TOKEN_FILTER_REGEX = re.compile(r"[a-z\d_\.-]{8,}", flags=re.IGNORECASE)
 
 
@@ -36,13 +32,13 @@ class SecretsAnalyzer(base.NodeAnalyzerV2):
         if len(secret) < 5:
             return
 
-        hit = LeakingSecret(
+        hit = Detection(
+            detection_type="LeakingSecret",
             message="Possible sensitive leaking secret",
             extra={"name": name, "secret": secret},
             line_no=context.node.line_no,
             signature=f"leaking_secret#{context.visitor.normalized_path}#{context.node.line_no}",
         )
-
 
         hit.extra.update(extra)
         yield hit

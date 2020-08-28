@@ -6,7 +6,6 @@ import time
 import resource
 import logging
 import warnings
-import configparser
 import concurrent.futures
 from pathlib import Path
 from functools import lru_cache
@@ -15,7 +14,6 @@ from typing import Optional
 
 import tqdm
 import pkg_resources
-import jsonschema
 from ruamel.yaml import YAML
 
 
@@ -25,7 +23,7 @@ except ImportError:
     import json
 
 
-CFG = configparser.ConfigParser(default_section="default", allow_no_value=True)
+CFG: Optional[dict] = None
 CFG_PATH = None
 SEMANTIC_RULES: Optional[dict] = None
 LOG_FMT = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -97,7 +95,7 @@ def get_relative_path(name: str) -> Path:
     if os.path.isabs(name):
         return Path(name)
 
-    pth = CFG.get("aura", name)
+    pth = CFG["aura"].get(name)
     return Path(CFG_PATH).parent.joinpath(pth)
 
 
@@ -130,11 +128,11 @@ def get_score_or_default(score_type: str, fallback: int) -> int:
     :param fallback: fallback default value
     :return: Score integer
     """
-    return int(CFG.get("score", score_type, fallback=fallback))
+    return CFG["score"].get(score_type, fallback)
 
 
 def find_configuration() -> Path:
-    pth = Path(os.environ.get("AURA_CFG", "config.ini"))
+    pth = Path(os.environ.get("AURA_CFG", "aura_config.yaml"))
     if pth.is_absolute():
         return pth
 
@@ -152,7 +150,7 @@ def load_config():
     global SEMANTIC_RULES, CFG, CFG_PATH
     pth = find_configuration()
     if pth.is_dir():
-        pth /= "config.ini"
+        pth /= "aura_config.yaml"
 
     if not pth.is_file():
         logger.fatal(f"Invalid configuration path: {pth}")
@@ -161,10 +159,11 @@ def load_config():
     logger.debug(f"Aura configuration located at {pth}")
 
     CFG_PATH = os.fspath(pth)
-    CFG.read(pth)
+    yaml = YAML(typ="safe")
+    CFG = yaml.load(pth.read_text())
 
     semantic_sig_pth = (
-        pth.parent / CFG.get("aura", "semantic-rules", fallback="signatures.yaml")
+        pth.parent / CFG["aura"].get("semantic-rules", "signatures.yaml")
     ).absolute()
 
     if not semantic_sig_pth.is_file():
@@ -175,40 +174,34 @@ def load_config():
     if not os.environ.get("AURA_SIGNATURES"):
         os.putenv("AURA_SIGNATURES", os.fspath(semantic_sig_pth))
 
-    yaml = YAML(typ="safe")
     SEMANTIC_RULES = yaml.load(semantic_sig_pth.read_text())
-
-    with (Path(__file__).parent / "config_schema.json").open("r") as fd:
-        schema = json.loads(fd.read())
-        # FIXME: jsonschema.validate(instance=SEMANTIC_RULES, schema=schema)
 
     if "AURA_LOG_LEVEL" in os.environ:
         log_level = logging.getLevelName(os.getenv("AURA_LOG_LEVEL").upper())
     else:
         log_level = logging.getLevelName(
-            CFG.get("aura", "log-level", fallback="warning").upper()
+            CFG["aura"].get("log-level", "warning").upper()
         )
 
     configure_logger(log_level)
 
     if not sys.warnoptions:
-        w_filter = CFG.get("aura", "warnings", fallback="default")
+        w_filter = CFG["aura"].get("warnings", "default")
         warnings.simplefilter(w_filter)
         os.environ["PYTHONWARNINGS"] = w_filter
 
-    if CFG["aura"].get("rlimit-memory"):
-        rss = int(CFG["aura"]["rlimit-memory"])
+    rss = CFG["aura"].get("rlimit-memory")
+    if rss:
         resource.setrlimit(resource.RLIMIT_RSS, (rss, rss))
 
-    if CFG["aura"].get("rlimit-fsize"):
-        fsize = int(CFG["aura"]["rlimit-fsize"])
+    fsize = CFG["aura"].get("rlimit-fsize")
+    if fsize:
         resource.setrlimit(resource.RLIMIT_FSIZE, (fsize, fsize))
 
-    if "AURA_RECURSION_LIMIT" in os.environ:
-        sys.setrecursionlimit(int(os.environ["AURA_RECURSION_LIMIT"]))
-    elif CFG["aura"].get("python-recursion-limit"):
-        rec_limit = int(CFG["aura"]["python-recursion-limit"])
-        sys.setrecursionlimit(rec_limit)
+    rec_limit = os.environ.get("AURA_RECURSION_LIMIT") or CFG["aura"].get("python-recursion-limit")
+
+    if rec_limit:
+        sys.setrecursionlimit(int(rec_limit))
 
 
 def get_maximum_archive_size() ->typing.Optional[int] :
@@ -218,19 +211,13 @@ def get_maximum_archive_size() ->typing.Optional[int] :
 
     :return: File int size in bytes for configured limit; otherwise None
     """
-    size = CFG["aura"].get("max-archive-size", fallback=None)
-    if size:
-        return int(size)
-    size = CFG["aura"].get("rlimit-fsize", fallback=None)
-    if size:
-        return int(size)
+    size = CFG["aura"].get("max-archive-size") or CFG["aura"].get("rlimit-fsize")
+    return size
 
 
 def get_default_tag_filters() -> typing.List[str]:
-    if "tags" not in CFG:
-        return []
-
-    return list(CFG["tags"].keys())
+    tags = CFG.get("tags", [])
+    return tags
 
 
 def get_installed_stages() -> typing.Generator[str,None,None]:
@@ -239,17 +226,8 @@ def get_installed_stages() -> typing.Generator[str,None,None]:
 
 
 def get_ast_stages() -> typing.Tuple[str,...]:
-    cfg_value = CFG["aura"].get("ast-stages", fallback=None)
-    if cfg_value is None:
-        return DEFAULT_AST_STAGES
-
-    stages = []
-    for x in cfg_value.split():
-        if not x:
-            continue
-        stages.append(x)
-
-    return tuple(stages)
+    cfg_value = CFG["aura"].get("ast-stages") or DEFAULT_AST_STAGES
+    return [x for x in cfg_value if x]
 
 
 def get_ast_patterns():

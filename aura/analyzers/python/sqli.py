@@ -19,10 +19,6 @@ def is_sql(data):
     return bool(SQL_REGEX.match(data))
 
 
-class SQLInjection(Detection):  # TODO: refactor to use the base class
-    pass
-
-
 @Analyzer.ID("sql_injection")
 class SQLi(base.NodeAnalyzerV2):
     """Finds possible SQL injections via direct string manipulations"""
@@ -48,7 +44,8 @@ class SQLi(base.NodeAnalyzerV2):
         if not is_sql(n.right.value):
             return
 
-        yield SQLInjection(
+        yield Detection(
+            detection_type="SQLInjection",
             score=50,
             message="Possible SQL injection found",
             signature=f"vuln#{context.visitor.normalized_path}#{context.node.line_no}",
@@ -72,7 +69,8 @@ class SQLi(base.NodeAnalyzerV2):
         if not is_sql(n.func.source.value):
             return
 
-        yield SQLInjection(
+        yield Detection(
+            detection_type="SQLInjection",
             score=50,
             message="Possible SQL injection found",
             signature=f"vuln#{context.visitor.normalized_path}#{context.node.line_no}",

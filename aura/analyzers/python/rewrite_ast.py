@@ -1,4 +1,5 @@
 import codecs
+from collections import OrderedDict
 
 from .visitor import Visitor
 from .nodes import *
@@ -17,6 +18,8 @@ class ASTRewrite(Visitor):
             self.inline_decode,
             self.rewrite_function_call,
             self.replace_string,
+            self.unary_op,
+            self.return_statement,
         )
         super().__init__(**kwargs)
 
@@ -35,6 +38,30 @@ class ASTRewrite(Visitor):
         if not isinstance(node, BinOp):
             return
 
+        # Lookup variables in a stack
+        if type(node.left) == str:
+            try:
+                node.left = context.stack[node.left]
+                context.visitor.modified = True
+            except (TypeError, KeyError):
+                pass
+
+        if type(node.right) == str:
+            try:
+                node.right = context.stack[node.right]
+                context.visitor.modified = True
+            except (TypeError, KeyError):
+                pass
+
+        # Rewrite `Var` pointers to their values they point to
+        if type(node.right) == Var and isinstance(node.right.value, ASTNode):
+            node.right = node.right.value
+            context.visitor.modified = True
+
+        if type(node.left) == Var and isinstance(node.left.value, ASTNode):
+            node.left = node.left.value
+            context.visitor.modified = True
+
         if node.op == "add":
             if type(node.left) == String and type(node.right) == String:
                 new_str = str(node.right) + str(node.left)
@@ -42,7 +69,7 @@ class ASTRewrite(Visitor):
                 new_node.enrich_from_previous(node)
                 context.replace(new_node)
                 return True
-            if type(node.left) == Number and type(node.right) == Number:
+            elif type(node.left) == Number and type(node.right) == Number:
                 new_node = Number(node.left.value + node.right.value)
                 new_node.enrich_from_previous(node)
                 context.replace(new_node)
@@ -52,33 +79,26 @@ class ASTRewrite(Visitor):
     def string_slice(self, context):
         if not type(context.node) == Subscript:
             return
-        elif not type(context.node.value) in (String, str):
+        elif not type(context.node.value) in (String,):
             return
 
         step = context.node.slice.get("step")
-        if step is None:
-            step = 1
-        elif type(step) == Number:
+        if type(step) == Number:
             step = int(step)
-        else:
+        elif step is not None and type(step) != int:
             return
 
         value = str(context.node.value)
         lower = context.node.slice.get("lower")
-
-        if lower is None:
-            lower = 0 if step >= 0 else len(value)
-        elif type(lower) == Number:
+        if type(lower) == Number:
             lower = int(lower)
-        else:
+        elif lower is not None and type(lower) != int:
             return
 
         upper = context.node.slice.get("upper")
-        if upper is None:
-            upper = len(value) if step >= 0 else 0
-        elif type(upper) == Number:
+        if type(upper) == Number:
             upper = int(upper)
-        else:
+        elif upper is not None and type(upper) != int:
             return
 
         sliced_str = value[lower:upper:step]
@@ -92,29 +112,47 @@ class ASTRewrite(Visitor):
         """
         if (
             type(context.node) == Attribute
-        ):  # TODO: transition inside the visit_node of Attr
+        ):
             # Replace attributes such as x.decode("base64") to "test".decode("base64")
             source = context.node.source
 
-            try:
-                target = context.stack[source]
-            except (TypeError, KeyError):
-                return
+            if type(source) == str:
+                try:
+                    target = context.stack[source]
+                    if (
+                        type(target) == Var
+                        and target.line_no != context.node.line_no
+                        and target.var_type == "assign"
+                    ):
+                        context.node.source = target.value
+                    else:
+                        context.node.source = target
+                    context.visitor.modified = True
+                except (TypeError, KeyError):
+                    return
+        elif (type(context.node) == Subscript):
+            if type(context.node.value) == str:
+                try:
+                    target = context.stack[context.node.value]
+                except (TypeError, KeyError):
+                    return
 
-            if target.line_no == context.node.line_no:
-                return
+                if target:
+                    context.node.value = target
+                    context.visitor.modified = True
 
-            if target:
-                context.node._original = context.node.source
-                if isinstance(target, Var):
-                    context.node.source = target.value
-                else:
-                    context.node.source = target
-        elif type(context.node) == Var and context.parent is not None and type(context.parent.node) == Call:
-            # Replace the following:
-            # c = 10; x(c) *~> c = 10; x(c=10) -> x(10)
-            context.replace(context.node.value)
+            elif type(context.node.value) == Var:
+                context.node.value = context.node.value.value
+                context.visitor.modified = True
 
+        elif type(context.node) == Var:
+            if type(context.node.value) == str:
+                try:
+                    context.node._original = context.node.value
+                    context.node.value = context.stack[context.node.value]
+                    context.visitor.modified = True
+                except (TypeError, KeyError):
+                    pass
 
     def inline_decode(self, context):
         node = context.node
@@ -184,6 +222,13 @@ class ASTRewrite(Visitor):
         except (TypeError, KeyError, AttributeError):
             pass
 
+        # Rewrite call var arguments
+        # x(Var(c=10)) -> x(10)
+        for idx, arg in enumerate(context.node.args):
+            if type(arg) == Var and arg.var_type == "assign":
+                context.node.args[idx] = arg.value
+                context.visitor.modified = True
+
         if type(context.node.func) == str and context.node.func in context.stack:
             try:
                 context.node._original = context.node.func
@@ -245,7 +290,7 @@ class ASTRewrite(Visitor):
         context.replace(new_node)
 
     def unary_op(self, context):
-        if not type(context.node) == dict:
+        if not type(context.node) in (dict, OrderedDict):
             return
         elif context.node.get("_type") != "UnaryOp":
             return
@@ -267,3 +312,24 @@ class ASTRewrite(Visitor):
         new_node = Number(value= op(value))
         new_node.enrich_from_previous(context.node)
         context.replace(new_node)
+
+    def return_statement(self, context):
+        if not isinstance(context.node, ReturnStmt):  # Covers also yield and yield from
+            return
+
+        # Try to resolve return constant such as:
+        # ...
+        # x = 10
+        # return x
+        if type(context.node.value) == str:
+            try:
+                target = context.stack[context.node.value]
+                context.node.value = target
+                context.visitor.modified = True
+            except (TypeError, KeyError):
+                pass
+
+        # Rewrite variable pointer `ReturnStmt(Var(x=10))` into `ReturnStmt(10)`
+        # We don't need the `Var` itself but only the target value it points to
+        if type(context.node.value) == Var and isinstance(context.node.value.value, ASTNode):
+            context.node.value = context.node.value.value

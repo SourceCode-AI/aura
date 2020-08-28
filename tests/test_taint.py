@@ -1,4 +1,27 @@
-from aura.analyzers.python.nodes import Taints
+from textwrap import dedent
+from unittest.mock import patch
+
+from aura import config
+from aura.uri_handlers.base import ScanLocation
+from aura.pattern_matching import ASTPattern
+from aura.analyzers.python.visitor import Visitor
+from aura.analyzers.python.nodes import *
+from aura.analyzers.python_src_inspector import collect
+
+
+
+def process_taint(src: str, pattern: str, taint: str="tainted"):
+    tree = collect(dedent(src), minimal=True)
+    loc = ScanLocation(location="<unknown>")
+    p = ASTPattern({
+        "pattern": pattern,
+        "taint": taint
+    })
+
+    with patch.object(config, "get_ast_patterns", return_value=[p]) as mock:
+        v = Visitor.run_stages(location=loc,  ast_tree=tree)
+        return v.tree[-1]
+
 
 
 def test_taint_operations():
@@ -66,11 +89,6 @@ def test_taint_log_flask_app(fixtures, fuzzy_rule_match):
             "taint_level": "TAINTED"
         },
         {
-            "line_no": 44,
-            "message": "Taint propagated via variable assignment",
-            "taint_level": "TAINTED"
-        },
-        {
             "line_no": 45,
             "message": "Taint propagated by return/yield statement",
             "taint_level": "TAINTED"
@@ -87,3 +105,79 @@ def test_taint_log_flask_app(fixtures, fuzzy_rule_match):
         raise AssertionError("Taint log hit not found")
 
     assert fuzzy_rule_match(log, match_log)
+
+
+def test_variable_assignment_propagation():
+    src = """
+    x = c()
+    y = x
+    """
+    p = "c()"
+    node = process_taint(src, p)
+    assert node.var_name == "y"
+    assert node._taint_class == Taints.TAINTED
+
+
+def test_attribute_propagation():
+    src = """
+    x = c()
+    x.y
+    """
+    p = "c()"
+    node = process_taint(src, p)
+    assert isinstance(node, Attribute)
+    assert node.full_name == "c.y"
+    assert node._taint_class == Taints.TAINTED
+
+
+def test_subscript_propagation():
+    src = """
+    x = c()
+    x[:3]
+    """
+    p = "c()"
+    node = process_taint(src, p)
+    assert node._taint_class == Taints.TAINTED
+
+
+def test_return_statement_propagation():
+    src = """
+    def x():
+        return c()
+    
+    x()
+    """
+    p = "c()"
+    node = process_taint(src, p)
+    assert isinstance(node, Call)
+    assert node.full_name == "x"
+    assert node._taint_class == Taints.TAINTED
+
+
+def test_binop_propagation():
+    src = """
+    x = c()
+    a = "test" + x
+    b = a + "test"
+    """
+    p = "c()"
+    node = process_taint(src, p)
+    assert isinstance(node, Var)
+    assert node.var_name == "b"
+    assert node._taint_class == Taints.TAINTED
+
+
+def test_function_argument_propagation():
+    src = """
+    def x(arg):
+        copy = arg
+        return copy
+    
+    y = c()
+    result = x(y)
+    """
+    p = "c()"
+    node = process_taint(src, p)
+    assert isinstance(node, Var)
+    assert node.var_name == "result"
+    assert node._taint_class == Taints.TAINTED

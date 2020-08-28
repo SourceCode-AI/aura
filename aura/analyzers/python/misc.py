@@ -7,7 +7,7 @@ from ...utils import Analyzer
 from ... import config
 
 
-ENTROPY_THRESHOLD = float(config.CFG.get("aura", "shanon_entropy", fallback=0.0))
+ENTROPY_THRESHOLD = float(config.CFG["aura"].get("shanon_entropy", 0.0))
 
 
 @Analyzer.ID("misc")

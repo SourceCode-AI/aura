@@ -19,11 +19,11 @@ def test_basic_ast(fixtures):
 
 def test_interpreters():
     args = ['-c', 'import sys; print(sys.version)']
-    py2 = config.CFG.get('interpreters', 'python2')
+    py2 = config.CFG["interpreters"].get('python2')
     py2_version = subprocess.check_output([py2] + args).decode().strip().split()[0]
     assert re.match(r'^2\.7\.\d+$', py2_version)
 
-    py3 = config.CFG.get('interpreters', 'python3')
+    py3 = config.CFG["interpreters"].get('python3')
     py3_version = subprocess.check_output([py3] + args).decode().strip().split()[0]
     assert re.match(r'^3\.(6|7|8)\.\d+$', py3_version)
 
