@@ -27,8 +27,8 @@ WORKDIR /analyzer
 ADD custom_analyzer.py \
     entrypoint.sh \
     rules.yara \
-    signatures.json \
-    config.ini \
+    signatures.yaml \
+    aura_config.yaml \
     LICENSE.txt \
     README.md \
     pyproject.toml \
