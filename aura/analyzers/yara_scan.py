@@ -22,9 +22,8 @@ except ImportError:
     )
 
 try:
-    rules = yara.compile(
-        filepath=config.CFG["aura"].get("yara-rules", "rules.yara")
-    )
+    rules_pth = config.CFG["aura"].get("yara-rules", "aura.data.rules.yara")
+    rules = yara.compile(source=config.get_file_content(rules_pth, config.CFG_PATH))
 except yara.Error as exc:
     raise AnalyzerDeactivated("Can't compile/find yara rules")
 

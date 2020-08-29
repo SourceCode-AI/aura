@@ -12,10 +12,10 @@ aura:
 
   # Path to the yara rules for scanning data blobs
   # See example_rules.yara for documentation on format and examples
-  yara-rules: rules.yara
+  yara-rules: aura.data.rules.yara
 
   # Path to the semantic rules used by python code analyzer
-  semantic-rules: signatures.yaml
+  semantic-rules: aura.data.signatures.yaml
 
   # This file is needed for typosquatting detections
   pypi_stats: pypi_stats.json

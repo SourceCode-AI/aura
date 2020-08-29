@@ -211,26 +211,23 @@ def check_name(name: str, full_list: bool=False, download_threshold: Optional[in
     """
     download_threshold = threshold_or_default(download_threshold)
     name = canonicalize_name(name)
-
-    pth = config.get_relative_path("pypi_stats")
     typos = []
-    with pth.open() as fd:
-        for line in fd:
-            line = json.loads(line)
-            pkg_name = canonicalize_name(line["package_name"])
-            downloads = int(line.get("downloads", 0))
-            if downloads < download_threshold:
+
+    for line in config.iter_pypi_stats():
+        pkg_name = canonicalize_name(line["package_name"])
+        downloads = int(line.get("downloads", 0))
+        if downloads < download_threshold:
+            break
+
+        if name == pkg_name:
+            if full_list:
+                continue
+            else:
                 break
 
-            if name == pkg_name:
-                if full_list:
-                    continue
-                else:
-                    break
-
-            dist = damerau_levenshtein(name, pkg_name)
-            if dist and dist < 3:
-                typos.append(pkg_name)
+        dist = damerau_levenshtein(name, pkg_name)
+        if dist and dist < 3:
+            typos.append(pkg_name)
 
     return typos
 

@@ -125,8 +125,15 @@ def test_tag_filtering(tag_filter, fixtures):
                 assert tag in hit["tags"], (tag, hit)
 
 
-def test_info_command(fixtures):
-    result = fixtures.get_cli_output(['info'])
+def test_info_command(fixtures, tmp_path, mock_pypi_stats):
+    from aura import config
+    stats: Path = tmp_path / "pypi_stats.json"
+    stats.write_text("\n".join(json.dumps(x) for x in config.iter_pypi_stats()))
+    os.environ["AURA_PYPI_STATS"] = str(stats)
+    try:
+        result = fixtures.get_cli_output(['info'])
+    finally:
+        del os.environ["AURA_PYPI_STATS"]
 
 
 def test_ast_parser(fixtures):

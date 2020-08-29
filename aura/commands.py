@@ -210,7 +210,7 @@ def show_info():
 
 def generate_typosquatting(out, distance=2, limit=None):
     f = partial(typos.damerau_levenshtein, max_distance=distance)
-    pth = config.get_relative_path("pypi_stats")
+    pth = config.get_pypi_stats_path()
     for num, (x, y) in enumerate(typos.enumerator(typos.generate_popular(pth), f)):
         if limit and num >= limit:
             break

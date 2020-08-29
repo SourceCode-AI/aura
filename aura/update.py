@@ -21,7 +21,7 @@ def backup_file(file_path):
 
 def update_pypi_stats(outfile=None):
     if outfile is None:
-        outfile = config.get_relative_path("pypi_stats")
+        outfile = config.get_pypi_stats_path()
 
     backup_file(outfile)
     secho("Downloading latest pypi download stats dataset")

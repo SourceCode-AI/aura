@@ -25,7 +25,10 @@ packages = [
 include = [
     "README.md",
     "LICENSE.txt",
-    "aura/data/semantic_rules_schema.json"
+    "aura/data/semantic_rules_schema.json",
+    "aura/data/aura_config.yaml",
+    "aura/data/rules.yara",
+    "aura/data/signatures.yaml"
 ]
 
 [tool.poetry.dependencies]

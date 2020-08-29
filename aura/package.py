@@ -295,17 +295,10 @@ class PackageScore:
         self.github = github.GitHub.from_url(self.repo_url)
 
     def score_pypi_downloads(self) -> int:
-        pth = config.get_relative_path("pypi_stats")
-
-        if not (pth and pth.exists()):
-            return 0
-
-        with pth.open() as fd:
-            for line in fd:
-                line = json.loads(line)
-                pkg_name = canonicalize_name(line["package_name"])
-                if pkg_name == self.package_name:
-                    return math.ceil(math.log(int(line.get("downloads", 0)), 10))
+        for line in config.iter_pypi_stats():
+            pkg_name = canonicalize_name(line["package_name"])
+            if pkg_name == self.package_name:
+                return math.ceil(math.log(int(line.get("downloads", 0)), 10))
 
         return 0
 
@@ -452,7 +445,7 @@ def md5_filter(release, md5=None) -> bool:
 
 def get_reverse_dependencies(pkg_name: str) -> List[str]:
     pkg_name = canonicalize_name(pkg_name)
-    dataset_path = Path("reverse_dependencies.json")
+    dataset_path = Path("reverse_dependencies.json_blah")
     with dataset_path.open("r") as fd:
         dataset = json.loads(fd.read())
 

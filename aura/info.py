@@ -19,7 +19,7 @@ def get_analyzer_description(analyzer) -> str:
 
 
 def check_pypi_stats() -> dict:
-    if config.get_relative_path("pypi_stats").is_file():
+    if config.get_pypi_stats_path():  # Put into try except
         return {
             "enabled": True,
             "description": "PyPI typosquatting protection enabled"

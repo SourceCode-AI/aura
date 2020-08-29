@@ -36,26 +36,26 @@ CASES = (  # (<pattern_definition:dict>, <test_file_path:str>, <should_pattern_m
     (
         {
             "type": "exact",
-            "pattern": "/etc/shadow",
+            "pattern": "/blah/something",
         },
-        "/etc/shadow",
+        "/blah/something",
         True
     ),
     (
         {
             "type": "exact",
-            "pattern": "/etc/shadow",
+            "pattern": "/blah/something",
             "target": "full"  # This is the same as the default target is "full"
         },
-        "/etc/shadow",
+        "/blah/something",
         True
     ),
     (
         {
             "type": "exact",
-            "pattern": "/etc/shadow",
+            "pattern": "/blah/something",
         },
-        "prefix/etc/shadow",
+        "prefix/blah/something",
         False
     ),
     (

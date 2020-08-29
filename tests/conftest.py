@@ -33,6 +33,20 @@ MIRROR_FILES = {
     )
 }
 
+
+PYPI_STATS = [
+    {"package_name": "flask", "downloads": "15321221"},
+    {"package_name": "requests", "downloads": "73783549"},
+    {"package_name": "pip", "downloads": "53292414"},
+    {"package_name": "jinja2", "downloads": "14341233"},
+    {"package_name": "botocore", "downloads": "46938232"},
+    {"package_name": "pyyaml", "downloads": "37729212"},
+    {"package_name": "futures", "downloads": "27441369"},
+    {"package_name": "urllib3", "downloads": "65405956"},
+    {"package_name": "google-api-core", "downloads": "11263406"}
+]
+
+
 REGEX_TYPE = type(re.compile(""))
 
 
@@ -318,6 +332,13 @@ def mock_pypi_rest_api(fixtures):
 
 
     return _activate_mock
+
+
+@pytest.fixture()
+def mock_pypi_stats():
+    import aura.config
+    with mock.patch.object(aura.config, "iter_pypi_stats", return_value=PYPI_STATS) as m:
+        yield m
 
 
 @pytest.fixture(scope="function", autouse=True)

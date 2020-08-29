@@ -26,19 +26,14 @@ WORKDIR /analyzer
 # Aura specific installation steps
 ADD custom_analyzer.py \
     entrypoint.sh \
-    rules.yara \
-    signatures.yaml \
-    aura_config.yaml \
     LICENSE.txt \
     README.md \
     pyproject.toml \
     poetry.lock \
-    files/pypi_stats.json \
     /analyzer/
 
 ADD aura /analyzer/aura
 ADD tests /analyzer/tests
-ADD files /analyzer/files
 
 # Install Aura
 RUN cd /analyzer &&\

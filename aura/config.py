@@ -7,10 +7,11 @@ import resource
 import logging
 import warnings
 import concurrent.futures
+from importlib import resources
 from pathlib import Path
 from functools import lru_cache
 from logging.handlers import RotatingFileHandler
-from typing import Optional
+from typing import Optional, Generator
 
 import tqdm
 import pkg_resources
@@ -88,17 +89,6 @@ def get_token(name: str) -> str:
     return value
 
 
-def get_relative_path(name: str) -> Path:
-    """
-    Fetch a path to the file based on configuration and relative path of Aura
-    """
-    if os.path.isabs(name):
-        return Path(name)
-
-    pth = CFG["aura"].get(name)
-    return Path(CFG_PATH).parent.joinpath(pth)
-
-
 def get_logger(name: str) -> logging.Logger:
     _log = logging.getLogger(name)
     if LOG_ERR is not None:
@@ -131,50 +121,62 @@ def get_score_or_default(score_type: str, fallback: int) -> int:
     return CFG["score"].get(score_type, fallback)
 
 
-def find_configuration() -> Path:
+def find_configuration() -> Path:  # TODO: add tests
     pth = Path(os.environ.get("AURA_CFG", "aura_config.yaml"))
     if pth.is_absolute():
         return pth
 
     cwd = Path.cwd()
-    while cwd not in (cwd.root, cwd.drive):
+    root = (cwd.root, cwd.drive, "/")
+    while str(cwd) not in root:
         if (cwd / pth).exists():
             return cwd/pth
         else:
             cwd = cwd.parent
 
-    return pth
+    return Path("aura.data.aura_config.yaml")
+
+
+def get_file_location(location: str, base_path: Optional[str]=None) -> str:
+    if location.startswith("aura.data."):  # Load file as a resource from aura package
+        return location
+
+    if os.path.exists(location):
+        return location
+
+    if base_path is not None:
+        pth = Path(base_path) / location
+        if pth.is_file():
+            return str(pth)
+
+    # TODO: use custom exception here so we can log as fatal and sys.exit(1)
+    raise ValueError(f"Can't find configuration file `{location}` using base path `{base_path}`")
+
+
+def get_file_content(location: str, base_path: Optional[str]=None) -> str:
+    pth = get_file_location(location, base_path)
+
+    if pth.startswith("aura.data."):  # Load file as a resource from aura package
+        filename = pth[len("aura.data."):]
+        return resources.read_text("aura.data", filename)
+
+    else:
+        with open(location, "r") as fd:
+            return fd.read()
 
 
 def load_config():
     global SEMANTIC_RULES, CFG, CFG_PATH
-    pth = find_configuration()
-    if pth.is_dir():
-        pth /= "aura_config.yaml"
 
-    if not pth.is_file():
-        logger.fatal(f"Invalid configuration path: {pth}")
-        sys.exit(1)
+    CFG_PATH = str(find_configuration())
+    logger.debug(f"Aura configuration located at {CFG_PATH}")
 
-    logger.debug(f"Aura configuration located at {pth}")
-
-    CFG_PATH = os.fspath(pth)
     yaml = YAML(typ="safe")
-    CFG = yaml.load(pth.read_text())
+    CFG = yaml.load(get_file_content(CFG_PATH))
 
-    semantic_sig_pth = (
-        pth.parent / CFG["aura"].get("semantic-rules", "signatures.yaml")
-    ).absolute()
+    semantic_sig_pth = CFG["aura"]["semantic-rules"]
 
-    if not semantic_sig_pth.is_file():
-        logger.fatal(f"Invalid path to the signatures file: {semantic_sig_pth}")
-        sys.exit(1)
-
-    # this environment variable is needed by python AST parser to pick up location of signatures
-    if not os.environ.get("AURA_SIGNATURES"):
-        os.putenv("AURA_SIGNATURES", os.fspath(semantic_sig_pth))
-
-    SEMANTIC_RULES = yaml.load(semantic_sig_pth.read_text())
+    SEMANTIC_RULES = yaml.load(get_file_content(semantic_sig_pth, CFG_PATH))
 
     if "AURA_LOG_LEVEL" in os.environ:
         log_level = logging.getLevelName(os.getenv("AURA_LOG_LEVEL").upper())
@@ -202,6 +204,18 @@ def load_config():
 
     if rec_limit:
         sys.setrecursionlimit(int(rec_limit))
+
+
+def get_pypi_stats_path() -> Path:
+    pth = os.environ.get("AURA_PYPI_STATS", None) or CFG["aura"]["pypi_stats"]
+    return Path(get_file_location(pth, CFG_PATH))
+
+
+def iter_pypi_stats() -> Generator[dict, None, None]:
+    pth = get_pypi_stats_path()
+    with pth.open() as fd:
+        for line in fd:
+            yield json.loads(line)
 
 
 def get_maximum_archive_size() ->typing.Optional[int] :

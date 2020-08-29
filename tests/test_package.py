@@ -2,7 +2,7 @@ import uuid
 import os
 import datetime
 import tempfile
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from xmlrpc import client as xml_client
 
 import responses
@@ -11,6 +11,9 @@ import pytest
 
 from aura import package
 from aura import exceptions
+
+
+REQUESTS_DEPS = [str(uuid.uuid4()) for _ in range(2896)]  # Mock `requests` reverse dependencies for pacakge score matrix
 
 
 def test_non_existing_package():
@@ -54,7 +57,8 @@ def test_package_retrieval(mock_pypi_rest_api):
 
 
 @responses.activate
-def test_package_score(mock_github, mock_pypi_rest_api):
+@patch("aura.package.get_reverse_dependencies", return_value=REQUESTS_DEPS)
+def test_package_score(mock1, mock_github, mock_pypi_rest_api, mock_pypi_stats):
     mock_github(responses)
     mock_pypi_rest_api(responses)
 
@@ -90,7 +94,8 @@ def test_package_score(mock_github, mock_pypi_rest_api):
 
 
 @responses.activate
-def test_bad_package_score(mock_github, mock_pypi_rest_api):
+@patch("aura.package.get_reverse_dependencies", return_value=[])
+def test_bad_package_score(mock1, mock_github, mock_pypi_rest_api, mock_pypi_stats):
     mock_pypi_rest_api(responses)
     mock_github(responses)
 
