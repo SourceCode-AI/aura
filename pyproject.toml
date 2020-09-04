@@ -34,7 +34,6 @@ include = [
 [tool.poetry.dependencies]
 python = "^3.7 || ^3.8"
 blinker = "~1.4"
-requirements-parser = "~0.2.0"
 packaging = "~20.4"
 python-magic = "~0.4.18"
 click = "~7.1.2"
@@ -52,6 +51,7 @@ python-tlsh = "~3.17.0"
 defusedxml = "~0.6.0"
 python-rapidjson = "~0.9.1"
 "ruamel.yaml" = "~0.15"
+tomlkit = "~0.7.0"
 # TODO: Extras, autodetect their presence in aura
 yara-python = {version = "~4.0.1", optional = true}
 networkx = {version = "~2.4", optional = true}
@@ -110,6 +110,7 @@ diff_archive = "aura.analyzers.archive:diff_archive"
 [tool.poetry.plugins."aura.analyzers"]
 file_analyzer = "aura.analyzers.fs_struct:analyze"
 archive = "aura.analyzers.archive:archive_analyzer"
+pyproject_toml = "aura.analyzers.pyproject:analyze_pyproject"
 req_analyzer = "aura.analyzers.requirements_analyzer:analyze_requirements_file"
 yara = "aura.analyzers.yara_scan:analyze"
 xml = "aura.analyzers.xml:analyze"

@@ -100,15 +100,6 @@ def test_sqlite_scan_output(fixtures, tmp_path: Path):
     for d in detections:
         assert d["location"] == loc_id
 
-    files = [dict(x) for x in db.execute("SELECT * FROM files").fetchall()]
-    assert len(files) == 1
-    for f in files:
-        assert f["location"] == loc_id
-
-    with open(scan_path, 'rb') as fd:
-        data = fd.read()
-        assert data == files[0]['data']
-
 
 def test_non_existing(fixtures):
     """

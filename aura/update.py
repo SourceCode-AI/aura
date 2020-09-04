@@ -1,13 +1,14 @@
 import os
 import shutil
+from pathlib import Path
 
-from click import secho, File
+from click import secho
 
-from . import config
 from . import utils
 
 
-STATS_CDN_URL = "https://cdn.sourcecode.ai/datasets/typosquatting/pypi_stats.json"
+STATS_CDN_URL = "https://cdn.sourcecode.ai/aura/pypi_stats.json"
+REVERSE_CDN_URL = "https://cdn.sourcecode.ai/aura/reverse_dependencies.json"
 
 
 def backup_file(file_path):
@@ -21,7 +22,7 @@ def backup_file(file_path):
 
 def update_pypi_stats(outfile=None):
     if outfile is None:
-        outfile = config.get_pypi_stats_path()
+        outfile = Path("pypi_stats.json")
 
     backup_file(outfile)
     secho("Downloading latest pypi download stats dataset")
@@ -30,5 +31,17 @@ def update_pypi_stats(outfile=None):
     utils.download_file(STATS_CDN_URL, fd)
 
 
+def update_reverse_dependencies(outfile=None):
+    if outfile is None:
+        outfile = Path("reverse_dependencies.json")
+
+    backup_file(outfile)
+    secho("Downloading latest reverse PyPI dependencies dataset")
+
+    fd = outfile.open("wb")
+    utils.download_file(REVERSE_CDN_URL, fd)
+
+
 def update_all():
     update_pypi_stats()
+    update_reverse_dependencies()

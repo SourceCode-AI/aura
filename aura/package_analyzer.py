@@ -33,7 +33,7 @@ class Analyzer(object):
     def __init__(self, location):
         self.location = location
 
-    @contextmanager
+    #@contextmanager
     def run(self):
 
         if self.location.metadata.get("fork") is True:
@@ -45,7 +45,11 @@ class Analyzer(object):
         files_queue = executor.create_queue()
         hits = executor.create_queue()
         cleanup = executor.create_queue()
-        progress = progressbar.QueueProgressBar(queue=files_queue, desc="Analyzing files")
+        progress = progressbar.QueueProgressBar(
+            queue=files_queue,
+            desc="Analyzing files",
+            bar_format="{desc}: {percentage:3.0f}% |{bar}|"
+        )
         files_queue.put(self.location)
 
         try:
@@ -102,7 +106,7 @@ class Analyzer(object):
             while hits.qsize():
                 hits_items.append(hits.get())
 
-            yield hits_items
+            yield from hits_items
         finally:
             progress.close()
             while cleanup.qsize():
@@ -122,30 +126,27 @@ class Analyzer(object):
     ):
         try:
             logger.debug(f"Analyzing file '{location.str_location}' {location.metadata.get('mime')}")
-            # TODO: let analyzer specify mime_types
-            #    return
-
             analyzers = plugins.get_analyzer_group(location.metadata.get("analyzers", []))
+
+            detections = []
 
             for x in analyzers(location=location):
                 if isinstance(x, base.ScanLocation):
                     if x.cleanup:
                         cleanup.put(x.location)
-
                     queue.put(x)
                 else:
-                    if x.location:
-                        x.location = location.strip(x.location)
-                    x.tags |= location.metadata["tags"]
-                    if x._metadata is None:
-                        x._metadata = location.metadata
+                    detections.append(x)
 
-                    hits.put(x)
+            location.post_analysis(detections)
+
+            for x in detections:
+                hits.put(x)
         finally:
             pass
 
     def scan_directory(self, item: base.ScanLocation):
-        logger.info(f"Collecting files in a directory '{item.str_location}")
+        logger.debug(f"Collecting files in a directory '{item.str_location}")
         topo = TopologySort()
         collected = []
 
@@ -172,6 +173,6 @@ class Analyzer(object):
         collected.sort(
             key=lambda x: topology.index(x.location) if x.location in topology else 0
         )
-        logger.debug("Topoplogy sorting finished")
+        logger.debug("Topology sorting finished")
 
         return collected

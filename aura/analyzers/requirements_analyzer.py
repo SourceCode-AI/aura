@@ -6,9 +6,7 @@ import locale
 from typing import Optional, Generator, List, Tuple, Text
 
 import chardet
-import requirements
-from packaging.specifiers import SpecifierSet
-from pkg_resources import RequirementParseError
+from packaging.requirements import Requirement, InvalidRequirement
 
 from .detections import Detection
 from ..utils import Analyzer
@@ -57,41 +55,39 @@ def auto_decode(data: bytes) -> str:
         return data.decode(encoding)
 
 
-def check_unpinned(requirement, location) -> Optional[Detection]:
-    if not requirement.specs:
+def check_unpinned(requirement: Requirement, location: ScanLocation) -> Optional[Detection]:
+    if len(requirement.specifier) == 0:
         return Detection(
-            detection_type="UnpinnedRequirement",
+            detection_type="UnpinnedPackage",
             message=f"Package {requirement.name} is unpinned",
             signature=f"req_unpinned#{str(location)}#{requirement.name}",
             score=get_score_or_default("requirement-unpinned", 10),
             extra={
                 "package": requirement.name
             },
-            tags={"unpinned_requirement"},
+            tags={"unpinned_package"},
             location=location.location
         )
 
 
-def check_outdated(requirement, location) -> Optional[Detection]:
+def check_outdated(requirement: Requirement, location: ScanLocation) -> Optional[Detection]:
     pypi = package.PypiPackage.from_pypi(requirement.name)
     latest = pypi.get_latest_release()
-
-    specs = ",".join(x+y for (x, y) in requirement.specs)
-    spec_set = SpecifierSet(specs)
+    spec_set = requirement.specifier
 
     if latest not in spec_set:
         return Detection(
-            detection_type="OutdatedRequirement",
-            message=f"Package {requirement.name}{specs} is outdated, newest version is {latest}",
-            signature=f"req_outdated#{str(location)}#{requirement.name}#{requirement.specs}#{latest}",
+            detection_type="OutdatedPackage",
+            message=f"Package {requirement.name}{str(spec_set)} is outdated, newest version is {latest}",
+            signature=f"req_outdated#{str(location)}#{requirement.name}#{str(spec_set)}#{latest}",
             score=get_score_or_default("requirement-outdated", 5),
             location=location.location,
             extra={
                 "package": requirement.name,
-                "specs": specs,
+                "specs": str(spec_set),
                 "latest": latest
             },
-            tags={"outdated_requirement"}
+            tags={"outdated_package"}
         )
 
 
@@ -126,6 +122,11 @@ def analyze_requirements_file(*, location: ScanLocation) -> Generator[Detection,
 
         if not req_line:
             continue
+        elif req_line.startswith("#"):
+            continue
+
+        if "#" in req_line:
+            req_line = req_line.split("#")[0].strip()
 
         if URL.match(req_line):
             yield Detection(
@@ -144,17 +145,16 @@ def analyze_requirements_file(*, location: ScanLocation) -> Generator[Detection,
             continue
 
         try:
-            for req in requirements.parse(req_line):
-                hit = check_unpinned(req, location)
-                if hit:
-                    yield hit
-                    continue
+            req = Requirement(req_line)
 
-                hit = check_outdated(req, location)
-                if hit:
-                    yield hit
-                    continue
-        except (RequirementParseError, ValueError, FileNotFoundError, NoSuchPackage) as exc:
+            hit = check_unpinned(req, location)
+            if hit:
+                yield hit
+
+            hit = check_outdated(req, location)
+            if hit:
+                yield hit
+        except (ValueError, NoSuchPackage, InvalidRequirement) as exc:
             yield Detection(
                 detection_type="InvalidRequirement",
                 message = f"Could not parse the requirement for analysis",
@@ -163,7 +163,8 @@ def analyze_requirements_file(*, location: ScanLocation) -> Generator[Detection,
                     "reason": "cant_parse",
                     "line": req_line.strip(),
                     "line_no": idx,
-                    "exc_message": exc.args[0]
+                    "exc_message": exc.args[0],
+                    "exc_type": exc.__class__.__name__
                 },
                 score = get_score_or_default("requirement-invalid", 0),
                 tags = {"invalid_requirement", "cant_parse"}

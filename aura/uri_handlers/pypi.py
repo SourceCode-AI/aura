@@ -59,14 +59,23 @@ class PyPiHandler(URIHandler, PackageProvider):
                 tempfile.mkdtemp(prefix="aura_pypi_download_")
             )
             self.opts["cleanup"] = True
+
         for f in self.package.download_release(
             dest=self.opts["download_dir"], release=self.release
         ):
-            loc = self.opts["download_dir"] / f
+            loc = self.opts["download_dir"] / f["filename"]
+
+            if metadata:
+                meta = metadata.copy()
+            else:
+                meta = {"depth": 0}
+
+            meta.setdefault("package", {})["info"] = f
+
             yield ScanLocation(
                 location=loc,
                 strip_path=os.fspath(self.opts["download_dir"]),
-                metadata=metadata or {"depth": 0}
+                metadata=meta
             )
 
     def get_diff_paths(

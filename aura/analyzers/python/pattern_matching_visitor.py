@@ -1,3 +1,5 @@
+import os
+
 from ..detections import Detection
 from .nodes import Context, Import
 from .visitor import Visitor
@@ -13,7 +15,7 @@ class ASTPatternMatcherVisitor(Visitor):
         super().__init__(location=location)
         self.convergence = None
         self._signatures = config.get_ast_patterns()
-        self._always_report = config.CFG["aura"].get("always_report_module_imports", True)
+        self._always_report = config.CFG["aura"].get("always_report_module_imports", True) or os.environ.get("AURA_ALL_MODULE_IMPORTS", False)
 
     def _visit_node(self, context: Context):
         for signature in self._signatures:  # type: ASTPattern

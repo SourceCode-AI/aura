@@ -220,31 +220,32 @@ class ASTPattern:
             elif node is None:
                 return other is None
             elif type(node) == bool:
-                return self._match_bool(node, other)
+                if type(other) != bool:
+                    return False
+                return node is other
             elif type(node) == str:
-                return self._match_str(node, other)
+                if type(other) not in (str, nodes.String):
+                    return False
+                return node == str(other)
             elif type(node) == dict:
                 return self._match_dict(node, other)
             elif type(node) in (list, tuple):
                 return self._match_list(node, other)
             elif type(node) == int:
-                return self._match_int(node, other)
+                if type(other) not in (int, nodes.Number):
+                    return False
+                return node == int(other)
             elif type(node) == float:
-                return self._match_float(node, other)
+                if type(other) != float:
+                    return False
+                return node == other
 
-            return node.match(other, self)
+            try:
+                return node.match(other, self)
+            except AttributeError:
+                return False
 
         # Dispatch method for basic python types
-        def _match_bool(self, node: bool, other) -> bool:
-            if type(other) != bool:
-                return False
-            return node is other
-
-        def _match_str(self, node: str, other) -> bool:
-            if type(other) != str:
-                return False
-            return node == other
-
         def _match_dict(self, node: dict, other) -> bool:
             if type(other) != dict:
                 return False
@@ -258,16 +259,6 @@ class ASTPattern:
 
         def _match_list(self, node: list, other) -> bool:
             return False  # TODO
-
-        def _match_int(self, node: int, other) -> bool:
-            if type(other) != int:
-                return False
-            return node == int(other)
-
-        def _match_float(self, node: float, other) -> bool:
-            if type(other) != float:
-                return False
-            return node == float(other)
 
         def _match_any_of(self, node, other: ASTPattern.AnyOf) -> bool:
             for sub_pattern in other:

@@ -79,27 +79,16 @@ class SQLiteScanOutput(DiffBase, ScanOutputBase):
             )
         """
 
-        FILES_SCHEMA = """
-            CREATE TABLE IF NOT EXISTS files (
-                location INTEGER UNIQUE,
-                data BLOB,
-                FOREIGN KEY (location) REFERENCES locations(id)
-            )
-        """
-
 
         with self._db:
             self._db.execute(INPUT_SCHEMA)
             self._db.execute(LOCATION_SCHEMA)
             self._db.execute(DETECTION_SCHEMA)
-            self._db.execute(FILES_SCHEMA)
 
     def output(self, hits: List[Detection], scan_metadata: dict):
         cur = self._db.cursor()
         try:
             location_ids = {}
-            stored_files = set()
-
             cur.execute("""
                 INSERT INTO inputs (input, metadata) VALUES (?,?)
             """, [
@@ -146,14 +135,6 @@ class SQLiteScanOutput(DiffBase, ScanOutputBase):
                     json.dumps(detection, default=json_encoder),
                     location_id
                 ])
-
-                if full_path not in stored_files:
-                    with open(full_path, "rb") as fd:
-                        target_content = fd.read()
-                    cur.execute("""
-                        INSERT OR IGNORE INTO files (location, data) VALUES (?,?)
-                    """, [location_id, sqlite3.Binary(target_content)])
-                    stored_files.add(full_path)
         except:
             self._db.rollback()
             raise

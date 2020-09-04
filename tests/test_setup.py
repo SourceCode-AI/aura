@@ -1,3 +1,13 @@
+import os
+
+
+def setup_module(module):
+    os.environ["AURA_ALL_MODULE_IMPORTS"] = "true"
+
+
+def teardown_module(module):
+    del os.environ["AURA_ALL_MODULE_IMPORTS"]
+
 
 def test_setup(fixtures):
     matches = [

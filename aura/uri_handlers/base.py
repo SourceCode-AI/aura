@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import os
-import re
 import atexit
 import urllib.parse
 import mimetypes
@@ -13,7 +12,7 @@ from abc import ABC, abstractmethod
 from itertools import product
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Union, Optional, Generator, Tuple
+from typing import Union, Optional, Generator, Tuple, Iterable
 from warnings import warn
 
 import tlsh
@@ -21,10 +20,10 @@ import pkg_resources
 import magic
 
 from .. import config
-from ..utils import KeepRefs
+from ..utils import KeepRefs, lookup_lines
 from ..exceptions import PythonExecutorError, UnsupportedDiffLocation
 from ..analyzers import find_imports
-from ..analyzers.detections import DataProcessing, Detection
+from ..analyzers.detections import DataProcessing, Detection, get_severity
 
 
 logger = config.get_logger(__name__)
@@ -131,9 +130,6 @@ class ScanLocation(KeepRefs):
         self.metadata["path"] = self.location
         self.metadata["normalized_path"] = str(self)
         self.metadata["tags"] = set()
-
-        if not self.metadata.get("flags"):
-            self.metadata["flags"] = set()
 
         if self.metadata.get("depth") is None:
             self.metadata["depth"] = 0
@@ -281,6 +277,30 @@ class ScanLocation(KeepRefs):
     def pprint(self):
         from prettyprinter import pprint as pp
         pp(self)
+
+    def post_analysis(self, detections: Iterable[Detection]):
+        encoding = self.metadata.get("encoding") or "utf-8"
+        line_numbers = [d.line_no for d in detections if d.line_no is not None and d.line is None]
+
+        lines = lookup_lines(self.str_location, line_numbers, encoding=encoding)
+
+        for d in detections:
+            d.tags |= self.metadata["tags"]  # Lookup if we can remove this
+
+            if d.location is None:
+                d.location = str(self)
+            else:
+                d.location = self.strip(d.location)
+
+            if d.line is None:
+                line = lines.get(d.line_no)
+                d.line = line
+
+            if d._metadata is None:
+                d._metadata = self.metadata
+
+            if d._severity is None:
+                d._severity = get_severity(d)
 
 
 def cleanup_locations():

@@ -23,22 +23,7 @@ class ReadOnlyAnalyzer(Visitor):
             for x in self.hooks:
                 x.post_analysis(self)
 
-            hits = []
-            locations = []
-
-            for x in self.hits:
-                if type(x) == ScanLocation:
-                    locations.append(x)
-                    continue
-                else:
-                    hits.append(x)
-
-                if x.location is None:
-                    x.location = self.location.location
-
-            Detection.lookup_lines(hits, location=self.location)
-            yield from hits
-            yield from locations
+            yield from self.hits
 
         finally:
             for x in self.hooks:

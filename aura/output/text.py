@@ -2,15 +2,16 @@ import re
 import sys
 from shutil import get_terminal_size
 from dataclasses import dataclass
-from textwrap import shorten, wrap
+from textwrap import wrap
 from prettyprinter import pformat
 from typing import Optional, Any
+from collections import Counter
 
-from click import echo, secho, style
+from click import secho, style
 
 from .. import utils
 from .. import config
-from ..exceptions import MinimumScoreNotReached
+from ..analyzers.detections import get_severity
 from .base import ScanOutputBase, DiffOutputBase, InfoOutputBase
 from .table import Table
 
@@ -40,6 +41,16 @@ LOGO = """
           ▝▀██████████████████▀▘                                     
                ▔▀▀▀▀▀▀▀▀▀▀▔                                                                         
 """
+
+
+SEVERITY_COLORS = {
+    "critical": "bright_red",
+    "high": "red",
+    "medium": "yellow",
+    "low": "magenta",
+    "unknown": "white"
+}
+
 
 
 class PrettyReport:
@@ -139,6 +150,8 @@ class TextBase:
 
         if header is None:
             header = style(hit["type"], "green", bold=True)
+            color = SEVERITY_COLORS[hit["severity"]]
+            header += style(f" / {hit['severity'].capitalize()} severity", fg=color)
         out.print_heading(header)
 
         out.print_separator()
@@ -241,6 +254,7 @@ class TextScanOutput(TextBase, ScanOutputBase):
         imported_modules = {h.extra["name"] for h in hits if h.name == "ModuleImport"}
         score = 0
         tags = set()
+        severities = Counter(get_severity(d) for d in hits)
 
         for h in hits:
             score += h.score
@@ -256,6 +270,16 @@ class TextScanOutput(TextBase, ScanOutputBase):
         self._formatter.print_heading(style(f"Scan results for {scan_metadata.get('name', 'N/A')}", fg="bright_green"))
         score_color = "bright_green" if score == 0 else "bright_red"
         self._formatter.align(style(f"Scan score: {score}", fg=score_color, bold=True))
+
+        self._formatter.align("")
+
+        for severity, color in SEVERITY_COLORS.items():
+            count = severities[severity]
+            if count == 0:
+                color = "bright_black"
+            self._formatter.align(style(f"{severity.capitalize()} severity - {count}x", fg=color))
+
+        self._formatter.align("")
 
         if len(tags) > 0:
             self._formatter.align(f"Tags:")

@@ -378,8 +378,7 @@ class DiffDetections:
 
     def scan_location(self, location):
         sandbox = Analyzer(location=location)
-        with sandbox.run() as hits:
-            return hits
+        return tuple(sandbox.run())
 
     def pair_hits(self, diff_refs, hits):
         orphans = []

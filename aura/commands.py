@@ -6,8 +6,7 @@ import json
 import time
 from pathlib import Path
 from functools import partial
-from typing import Union, Optional, Tuple
-from contextlib import contextmanager, ExitStack
+from typing import Union, Optional, Tuple, Generator
 
 import click
 from prettyprinter import pprint
@@ -23,6 +22,7 @@ from . import typos
 from . import diff
 from . import worker_executor
 from .package import PypiPackage
+from .analyzers.detections import Detection
 from .output.base import ScanOutputBase, DiffOutputBase, InfoOutputBase
 
 
@@ -63,15 +63,13 @@ def check_requirement(pkg):
     sys.exit(1)
 
 
-@contextmanager
-def scan_worker(item: ScanLocation) -> list:
+def scan_worker(item: ScanLocation) -> Generator[Detection, None, None]:
     if not item.location.exists():
         logger.error(f"Location '{item.str_location}' does not exists. Skipping")
         yield []
     else:
         sandbox = Analyzer(location=item)
-        with sandbox.run() as hits:
-            yield hits
+        yield from sandbox.run()
 
 
 def scan_uri(uri, metadata: Union[list, dict]=None) -> list:
@@ -102,21 +100,18 @@ def scan_uri(uri, metadata: Union[list, dict]=None) -> list:
                 "depth": 0
             })
 
-            with ExitStack() as stack:
-                # FIXME: metadata=metadata
-                for x in handler.get_paths(metadata={"analyzers": metadata["analyzers"]}):  # type: ScanLocation
-                    all_hits.extend(
-                        stack.enter_context(scan_worker(x))
-                    )
+            # FIXME: metadata=metadata
+            for x in handler.get_paths(metadata={"analyzers": metadata["analyzers"]}):  # type: ScanLocation
+                all_hits.extend(scan_worker(x))
 
-                for formatter in formatters:
-                    try:
-                        filtered_hits = formatter.filtered(all_hits)
-                    except exceptions.MinimumScoreNotReached:
-                        pass
-                    else:
-                        with formatter:
-                            formatter.output(hits=filtered_hits, scan_metadata=metadata)
+            for formatter in formatters:
+                try:
+                    filtered_hits = formatter.filtered(all_hits)
+                except exceptions.MinimumScoreNotReached:
+                    pass
+                else:
+                    with formatter:
+                        formatter.output(hits=filtered_hits, scan_metadata=metadata)
 
         except exceptions.NoSuchPackage:
             logger.warn(f"No such package: {uri}")

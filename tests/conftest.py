@@ -69,8 +69,12 @@ class Fixtures(object):
             return fp.read()
 
     def scan_test_file(self, name, decode=True, args=None):
-        pth = self.path(name)
-        cmd = ["scan", os.fspath(pth)]
+        if name.startswith("mirror://"):
+            pth = name
+        else:
+            pth = os.fspath(self.path(name))
+
+        cmd = ["scan", pth]
 
         if args:
             cmd += args
@@ -216,6 +220,7 @@ def match_rule(source, target) -> bool:
     return True
 
 
+
 @pytest.fixture(scope="module")
 def fixtures():
     yield Fixtures()
@@ -292,22 +297,22 @@ def mock_github(fixtures):
 
 @pytest.fixture()
 def mock_pypi_rest_api(fixtures):
-    pkgs = (
-        "https://files.pythonhosted.org/packages/8c/23/848298cccf8e40f5bbb59009b32848a4c38f4e7f3364297ab3c3e2e2cd14/wheel-0.34.2-py2.py3-none-any.whl",
-        "https://files.pythonhosted.org/packages/75/28/521c6dc7fef23a68368efefdcd682f5b3d1d58c2b90b06dc1d0b805b51ae/wheel-0.34.2.tar.gz"
-    )
+    mirror_pth = Path(fixtures.path("mirror/"))
 
-    pth = fixtures.path("pypi_api_mock.json")
-    with open(pth, "r") as fd:
-        mock_data = json.loads(fd.read())
+    mock_data = {}
+
+    for x in mirror_pth.glob("*.json"):
+        mock_data[f"https://pypi.org/pypi/{x.name.split('.')[0]}/json"] = json.loads(x.read_text())
 
 
     def _callback_download(request):
         filename = request.url.split("/")[-1]
         file_pth = fixtures.path(f"mirror/{filename}")
-        assert os.path.exists(file_pth)
-        with open(file_pth, "rb") as fd:
-            return (200, {'Content-length': str(os.stat(file_pth).st_size)}, fd.read())
+        if os.path.exists(file_pth):
+            with open(file_pth, "rb") as fd:
+                return (200, {'Content-length': str(os.stat(file_pth).st_size)}, fd.read())
+        else:
+            return (404, {"Content-length": 0}, "")
 
 
     def _callback(request):
@@ -323,12 +328,11 @@ def mock_pypi_rest_api(fixtures):
                 callback=_callback
             )
 
-        for url in pkgs:
-            rsps.add_callback(
-                responses.GET,
-                url=url,
-                callback=_callback_download
-            )
+        rsps.add_callback(
+            responses.GET,
+            url=re.compile(r"https://files.pythonhosted.org/packages/.+"),
+            callback=_callback_download
+        )
 
 
     return _activate_mock

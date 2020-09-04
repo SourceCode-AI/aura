@@ -1,23 +1,24 @@
 def test_requirements_generic(fixtures):
     matches = [
         {
-            'type': 'OutdatedRequirement',
+            'type': 'OutdatedPackage',
             'extra': {
                 'package': 'wheel'
             },
-            'tags': ['outdated_requirement']
+            'tags': ['outdated_package']
         },
         {
-            'type': "UnpinnedRequirement",
+            'type': "UnpinnedPackage",
+            "message": "Package six is unpinned",
             "extra": {
                 "package": "six"
             },
-            "tags": ["unpinned_requirement"]
+            "tags": ["unpinned_package"]
         },
         {
             "type": "InvalidRequirement",
             "extra": {
-                "line": "invalid can't parse this"
+                "line": ".[test]"
             },
             "message": "Could not parse the requirement for analysis"
         }

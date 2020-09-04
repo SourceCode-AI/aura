@@ -31,7 +31,7 @@ aura:
   # Async processing is using the python's multiprocessing module
   # It has a much bigger performance but it is not very debugger friendly when developing new plugins
   # It is possible that some 3rd party plugins might require synchronous processing due to data pipelines
-  async: false
+  async: true
 
   # Max width for the default text output
   text-output-width: auto
@@ -95,13 +95,27 @@ aura:
 
   # Always produce an informational `Detection` informing on all module imports in the source code
   # This will report any and all modules (code imports) even if there is no semantic pattern defined for them
-  always_report_module_imports: true
+  always_report_module_imports: false
 
 tags:
   # Filter results that contain only the specified tags
   # Results can also be excluded using "!" to prefix a tag
   # This list would be used for default tag filtering and can be optionally overriden via cli parameter(s) -t
   #- "!test-code"
+
+
+severities:
+  critical:
+    score: 100
+    detections:
+      - TaintAnomaly
+      - LeakingSecret
+  high:
+    score: 50
+  medium:
+    score: 30
+  low:
+    score: 10
 
 
 binwalk:  # Binwalk scanner configuration

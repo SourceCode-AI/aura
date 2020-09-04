@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from functools import total_ordering
 from collections import defaultdict
 
+from .. import config
 from ..utils import lookup_lines, normalize_path
 from .python.nodes import NodeType, ASTNode
 
@@ -40,20 +41,21 @@ class Detection:
     line_no: Optional[int] = None  # Set to None to hide it from output
     line: Union[
         str, None
-    ] = None  #  Set to None or empty string to hide it from output
+    ] = None  # Set to None or empty string to hide it from output
     # If the rule is tied to the AST tree detections, then set the node pointer appropriately
-    #  Set to None to hide or for rules that are not tied to the AST tree
+    # Set to None to hide or for rules that are not tied to the AST tree
     detection_type: Optional[str] = None
     node: Optional[NodeType] = None
     tags: Set[str] = field(default_factory=set)
     extra: dict = field(default_factory=dict)
     informational: bool = False
-    location: Union[Path, str, None] = None
+    location: Optional[Path, str] = None
     _metadata: Optional[dict] = None
 
     def __post_init__(self):
         self._hash = None
         self._diff_hash = None
+        self._severity = None
 
         if isinstance(self.node, ASTNode) and self.line_no is None:
             self.line_no = self.node.line_no
@@ -69,7 +71,8 @@ class Detection:
         """
         data = {
             "score": self.score,
-            "type": self.name
+            "type": self.name,
+            "severity": get_severity(self)
         }
 
         if self.tags:
@@ -126,29 +129,6 @@ class Detection:
         except:
             return False
 
-    @classmethod
-    def lookup_lines(cls, rules: List[Detection], location):
-        """
-        For each rule in the list, look-up a content of the line based on
-        location and line number of the hit
-
-        Rule.line is then modified to contain the content of a line
-        """
-        paths = defaultdict(list)
-        for r in rules:
-            if r.line_no is not None and not r.line:
-                paths[r.location].append(r)
-                r.location = location.strip(r.location)
-
-        encoding = location.metadata.get("encoding") or "utf-8"
-
-        for pth, rlines in paths.items():
-            linenos = [x.line_no for x in rlines]
-            lines = lookup_lines(pth, linenos, encoding=encoding)
-            for r in rlines:
-                if r.line_no in lines:
-                    r.line = lines[r.line_no]
-
     @property
     def name(self) -> str:
         if self.detection_type:
@@ -165,3 +145,18 @@ class Detection:
 
 class DataProcessing(Detection):
     pass
+
+
+def get_severity(detection: Detection) -> str:
+    if detection._severity is not None:
+        return detection._severity
+
+    for category, catdef in config.CFG["severities"].items():
+        if "score" in catdef and detection.score >= catdef["score"]:
+            return category
+        if detection.name in catdef.get("detections", []):
+            return category
+        if set(catdef.get("tags", [])).intersection(detection.tags):
+            return category
+
+    return "unknown"

@@ -9,5 +9,5 @@ pyme
 # Local editable
 -e path/to/project
 
-invalid can't parse this
+# invalid can't parse this
 .[test]

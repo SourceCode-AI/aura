@@ -1,5 +1,4 @@
 import os
-import sys
 import codecs
 import hashlib
 import shutil
@@ -9,12 +8,11 @@ from contextlib import contextmanager
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from functools import partial, wraps, lru_cache
+from functools import partial, lru_cache
 from typing import Generator, Union, List, TypeVar, Generic, Mapping, cast, BinaryIO
 
 import tqdm
 import requests
-from click import secho
 
 from . import config
 from . import progressbar
@@ -56,18 +54,6 @@ def walk(location: Union[str, Path]) -> Generator[Path, None, None]:
             yield x
 
 
-def print_tty(msg: str, *args, **kwargs) -> None:
-    """
-    Print string to stdout only if it's not a pipe or redirect (e.g. tty)
-    Additional *args and **kwargs are passed to the `click.secho` function
-
-    :param msg: str to print
-    :return: None
-    """
-    if sys.stdout.isatty():
-        secho(msg, *args, **kwargs)
-
-
 def parse_iso_8601(date_string: str) -> datetime:
     if date_string.endswith("Z"):
         date_string = date_string[:-1] + "+00:00"
@@ -105,7 +91,7 @@ def download_file(url: str, fd: BinaryIO) -> None:
     :param fd: Open file-like descriptor
     """
     def _(*args, pbar, reader, **kwargs):
-        #  https://github.com/requests/requests/issues/2155
+        # https://github.com/requests/requests/issues/2155
         data = reader(*args, decode_content=True, **kwargs)
         pbar.update(len(data))
         return data

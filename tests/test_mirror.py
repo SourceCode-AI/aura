@@ -1,6 +1,7 @@
 import pytest
 
 from urllib.parse import urlparse
+from unittest.mock import patch
 
 from aura import mirror
 from aura import exceptions
@@ -47,3 +48,22 @@ def test_mirror_uri_variations(simulate_mirror):
     # Does not exists
     with pytest.raises(exceptions.NoSuchPackage):
         _ = umirror.MirrorHandler(urlparse("mirror://does_not_exists"))
+
+
+def test_mirror_metadata(simulate_mirror):
+    uri = urlparse("mirror://wheel")
+    handler = umirror.MirrorHandler(uri)
+
+    paths = tuple(handler.get_paths())
+
+    urls = {
+        'https://files.pythonhosted.org/packages/75/28/521c6dc7fef23a68368efefdcd682f5b3d1d58c2b90b06dc1d0b805b51ae/wheel-0.34.2.tar.gz',
+        'https://files.pythonhosted.org/packages/8c/23/848298cccf8e40f5bbb59009b32848a4c38f4e7f3364297ab3c3e2e2cd14/wheel-0.34.2-py2.py3-none-any.whl'
+    }
+
+    for p in paths:
+        url = p.metadata["package"]["info"]["url"]
+        assert url in urls
+        urls.remove(url)
+
+    assert len(urls) == 0

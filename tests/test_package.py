@@ -47,7 +47,7 @@ def test_package_retrieval(mock_pypi_rest_api):
         assert location.name.endswith(file_name), (location, file_name)
 
     with tempfile.TemporaryDirectory(prefix="aura_pytest_") as tmp:
-        downloaded = pkg.download_release(tmp, packagetype="all", release="0.34.2")
+        downloaded = [x["filename"] for x in pkg.download_release(tmp, packagetype="all", release="0.34.2")]
         content = os.listdir(tmp)
 
     assert "wheel-0.34.2.tar.gz" in downloaded
@@ -103,3 +103,18 @@ def test_bad_package_score(mock1, mock_github, mock_pypi_rest_api, mock_pypi_sta
 
     matrix = pkg.get_score_matrix()
     assert matrix["total"] == 0
+
+
+def test_package_diff_candidates(mock_pypi_rest_api):
+    convert = lambda x: (x[0]["filename"], x[1]["filename"])
+    requests = package.PypiPackage.from_pypi("requests")
+    requests2 = package.PypiPackage.from_pypi("requests2")
+
+    candidates = tuple(map(convert, requests.get_diff_candidates(requests2)))
+    assert ('requests-2.16.0.tar.gz', 'requests2-2.16.0.tar.gz') in candidates
+    assert ('requests-2.24.0.tar.gz', 'requests2-2.16.0.tar.gz') not in candidates
+
+    requests.opts["diff_include_latest"] = True
+    candidates = tuple(map(convert, requests.get_diff_candidates(requests2)))
+    assert ('requests-2.16.0.tar.gz', 'requests2-2.16.0.tar.gz') in candidates
+    assert ('requests-2.24.0.tar.gz', 'requests2-2.16.0.tar.gz') in candidates

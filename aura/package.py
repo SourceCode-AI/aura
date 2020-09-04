@@ -10,7 +10,7 @@ from urllib.parse import urlparse, ParseResult
 from pathlib import Path
 from itertools import product, chain
 from contextlib import contextmanager
-from typing import Optional, Generator, Tuple, List
+from typing import Optional, Generator, Tuple, List, NewType
 
 import pytz
 import requests
@@ -27,6 +27,7 @@ from . import exceptions
 from .uri_handlers.base import ScanLocation
 from .output import table
 from .mirror import LocalMirror
+from .type_definitions import ReleaseInfo
 
 
 LOGGER = config.get_logger(__name__)
@@ -35,17 +36,18 @@ LOGGER = config.get_logger(__name__)
 class PypiPackage:
     mirror = None
 
-    def __init__(self, name, info, source=None):
-        self.name = name
-        self.info = info
-        self.source = source
-        self.release = "all"
-        self.packagetype = None
-        self.filename = None
-        self.md5 = None
+    def __init__(self, name: str, info: dict, source: Optional[str]=None, opts: Optional[dict]=None):
+        self.name: str = name
+        self.info: dict = info
+        self.source: Optional[str] = source
+        self.release: str = "all"
+        self.packagetype: Optional[str] = None
+        self.filename: Optional[str] = None
+        self.md5: Optional[str] = None
+        self.opts: dict = opts or {}
 
     @classmethod
-    def from_pypi(cls, name, *args, **kwargs):
+    def from_pypi(cls, name: str, *args, **kwargs):
         name = canonicalize_name(name)
         resp = requests.get(f"https://pypi.org/pypi/{name}/json")
         if resp.status_code == 404:
@@ -58,7 +60,7 @@ class PypiPackage:
         return cls(name, *args, **kwargs)
 
     @classmethod
-    def from_local_mirror(cls, name, *args, **kwargs):
+    def from_local_mirror(cls, name: str, *args, **kwargs):
         name = canonicalize_name(name)
 
         if cls.mirror is None:
@@ -108,12 +110,12 @@ class PypiPackage:
         for url in filtered:
             with open(dest / url["filename"], "wb") as fd:
                 utils.download_file(url["url"], fd)
-            files.append(url["filename"])
+            files.append(url)
 
         return files
 
     @contextmanager
-    def url2local(self, url: str):
+    def url2local(self, url: str) -> Generator[Path, None, None]:
         if not isinstance(url, ParseResult):
             url = urlparse(url)
 
@@ -129,11 +131,11 @@ class PypiPackage:
 
     def filter_package_types(
         self,
-        release="latest",
-        packagetype=None,
-        filename=None,
-        md5=None,
-    ):
+        release: str = "latest",
+        packagetype: Optional[str] = None,
+        filename: Optional[str] =None,
+        md5: Optional[str] =None,
+    ) -> List[ReleaseInfo, ...]:
         if release == "latest":
             release = self.get_latest_release()
 
@@ -172,7 +174,9 @@ class PypiPackage:
         other_latest = other.get_latest_release()
         other_parsed = Version(other_latest)
 
-        yield (self_latest, other_latest)
+        if self.opts.get("diff_include_latest", False):
+            yield (self_latest, other_latest)
+
         if self_parsed != other_parsed:
             if self_latest in other:
                 yield (self_latest, self_latest)
@@ -181,10 +185,10 @@ class PypiPackage:
 
     def _yield_archive_md5(
         self,
-        self_version,
-        other,
-        other_version,
-    ) -> Generator[Tuple[dict, dict], None, None]:
+        self_version: str,
+        other: PypiPackage,
+        other_version: str,
+    ) -> Generator[Tuple[ReleaseInfo, ReleaseInfo], None, None]:
         sortkey = lambda x: (-1 if x.get("packagetype") == "sdist" else 0)
 
         self_releases = sorted(self.info["releases"][self_version], key=sortkey)
@@ -205,6 +209,11 @@ class PypiPackage:
         else:
             # If there are no candidates after filtering, fallback to just take the first ones from each
             yield (self_releases[0], other_releases[0])
+
+    def get_diff_candidates(self, other: PypiPackage) -> Generator[Tuple[ReleaseInfo, ReleaseInfo], None, None]:
+        for self_version, other_version in self._yield_cmp_versions(other):
+            for self_archive, other_archive in self._yield_archive_md5(self_version, other, other_version):
+                yield (self_archive, other_archive)
 
     def _cmp_info(self, other: PypiPackage) -> table.Table:
         info_table = table.Table(metadata={"title": "PyPI metadata diff"})
@@ -232,15 +241,12 @@ class PypiPackage:
         return info_table
 
     def _cmp_archives(self, other: PypiPackage) -> Generator[Tuple[ScanLocation, ScanLocation], None, None]:
-        diff_candidates = []
         temp_dir = Path(tempfile.mkdtemp(prefix="aura_pkg_diff_"))
 
         try:
-            for self_version, other_version in self._yield_cmp_versions(other):
-                for self_archive, other_archive in self._yield_archive_md5(self_version, other, other_version):
-                    diff_candidates.append((self_archive, other_archive))
+            for (x, y) in self.get_diff_candidates(other):
+                LOGGER.info(f"Diffing `{x['filename']}` and `{y['filename']}`")
 
-            for (x, y) in diff_candidates:
                 x_path = temp_dir / x["md5_digest"]
                 x_path.mkdir()
                 x_path /= x["filename"]
@@ -295,11 +301,13 @@ class PackageScore:
         self.github = github.GitHub.from_url(self.repo_url)
 
     def score_pypi_downloads(self) -> int:
-        for line in config.iter_pypi_stats():
-            pkg_name = canonicalize_name(line["package_name"])
-            if pkg_name == self.package_name:
-                return math.ceil(math.log(int(line.get("downloads", 0)), 10))
-
+        try:
+            for line in config.iter_pypi_stats():
+                pkg_name = canonicalize_name(line["package_name"])
+                if pkg_name == self.package_name:
+                    return math.ceil(math.log(int(line.get("downloads", 0)), 10))
+        except ValueError:
+            pass
         return 0
 
     def score_reverse_dependencies(self) -> int:
@@ -420,7 +428,7 @@ class PackageScore:
 
 
 
-def packagetype_filter(release, packagetype="all") -> bool:
+def packagetype_filter(release: ReleaseInfo, packagetype: str="all") -> bool:
     if packagetype == "all":
         return True
     elif packagetype and release.get("packagetype") == packagetype:
@@ -429,14 +437,14 @@ def packagetype_filter(release, packagetype="all") -> bool:
         return False
 
 
-def filename_filter(release, filename=None) -> bool:
+def filename_filter(release: ReleaseInfo, filename: Optional[str]=None) -> bool:
     if filename is None:
         return True
 
     return (release["filename"] == filename)
 
 
-def md5_filter(release, md5=None) -> bool:
+def md5_filter(release: ReleaseInfo, md5: Optional[str]=None) -> bool:
     if md5 is None:
         return True
 
@@ -445,7 +453,7 @@ def md5_filter(release, md5=None) -> bool:
 
 def get_reverse_dependencies(pkg_name: str) -> List[str]:
     pkg_name = canonicalize_name(pkg_name)
-    dataset_path = Path("reverse_dependencies.json_blah")
+    dataset_path = Path("reverse_dependencies.json")
     with dataset_path.open("r") as fd:
         dataset = json.loads(fd.read())
 
