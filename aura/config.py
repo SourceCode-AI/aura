@@ -16,12 +16,7 @@ from typing import Optional, Generator
 import tqdm
 import pkg_resources
 from ruamel.yaml import YAML
-
-
-try:
-    import simplejson as json
-except ImportError:
-    import json
+import rapidjson as json
 
 
 CFG: Optional[dict] = None
@@ -33,6 +28,7 @@ LOG_ERR = None
 DEBUG_LINES = set()
 DEFAULT_AST_STAGES = ("convert", "rewrite", "ast_pattern_matching", "taint_analysis", "readonly")
 AST_PATTERNS_CACHE = None
+PROGRESSBAR_DISABLED = ("AURA_NO_PROGRESS" in os.environ)
 
 
 if "AURA_DEBUG_LINES" in os.environ:

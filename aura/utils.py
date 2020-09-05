@@ -15,7 +15,6 @@ import tqdm
 import requests
 
 from . import config
-from . import progressbar
 
 
 logger = config.get_logger(__name__)
@@ -103,7 +102,7 @@ def download_file(url: str, fd: BinaryIO) -> None:
             unit_scale=True,
             unit_divisor=1024,
             desc="Downloading file",
-            disable=progressbar.DISABLED,
+            disable=config.PROGRESSBAR_DISABLED,
         )
         r.raw.read = partial(
             _,

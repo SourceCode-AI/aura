@@ -1,8 +1,3 @@
-from click.testing import CliRunner
-
-from aura import cli
-
-
 def test_wheel_analyzer(fixtures):
     matches = [
         {

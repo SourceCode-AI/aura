@@ -20,7 +20,6 @@ from . import utils
 from . import mirror
 from . import typos
 from . import diff
-from . import worker_executor
 from .package import PypiPackage
 from .analyzers.detections import Detection
 from .output.base import ScanOutputBase, DiffOutputBase, InfoOutputBase

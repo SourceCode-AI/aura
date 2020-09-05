@@ -1,8 +1,8 @@
-import queue
-import multiprocessing
 import time
 from concurrent import futures
 from typing import Optional
+
+import tqdm
 
 from . import config
 
@@ -11,7 +11,7 @@ Wait = object()
 
 
 class AuraExecutor:
-    def __init__(self, fork: Optional[bool]=None):
+    def __init__(self, fork: Optional[bool]=None, *, job_queue=None):
         if fork is None:
             self.fork = config.CFG["aura"].get("async", True)
         else:
@@ -22,75 +22,60 @@ class AuraExecutor:
         else:
             self.executor = futures.ThreadPoolExecutor()
 
-        self.queue = []
+        self.jobs = set()
         self.total = 0
         self.completed = 0
-
-
-class MultiprocessingExecutor:
-    _instance = None
-
-    def __init__(self):
-        self.manager = multiprocessing.Manager()
-        self.worker_pool = self.get_pool()
-        self.jobs = []
-
-    def get_pool(self):
-        return multiprocessing.Pool(
-            #processes=processes,
-            maxtasksperchild=1
+        self.q = job_queue
+        self.pg = tqdm.tqdm(
+            desc="Analyzing files",
+            bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}",
+            leave=False,
+            disable=config.PROGRESSBAR_DISABLED
         )
 
-    def join(self):
-        self.worker_pool.join()
+    def __len__(self):
+        return sum(x.done() for x in self.jobs)
 
-    def close(self):
-        self.worker_pool.close()
+    def __bool__(self):
+        """
+        Returns `False` if all jobs finished executing, otherwise returns `True`
+        """
+        return len(self.jobs) != 0 and all(x.done() for x in self.jobs)
+
+    def __iter__(self) -> futures.Future:
+        for future in futures.as_completed(tuple(self.jobs)):
+            self.jobs.remove(future)
+            self._update_progress()
+            yield future
+
+    def __del__(self):
+        self.pg.close()
+
+    def completed_cb(self, _):
+        self.completed += 1
+        self._update_progress()
+
+    def submit(self, fn, *args, **kwargs) -> futures.Future:
+        future = self.executor.submit(fn, *args, **kwargs)
+        future.add_done_callback(self.completed_cb)
+        self.total += 1
+        self.jobs.add(future)
+        self._update_progress()
+        return future
 
     def wait(self):
-        while any((not x.ready()) for x in self.jobs):
+        while not bool(self):
             time.sleep(0.05)
 
-    def create_queue(self):
-        return self.manager.Queue()
+    def _update_progress(self):
+        if config.PROGRESSBAR_DISABLED:
+            return
 
-    def apply_async(self, func, args=None, kwds=None):
-        job = self.worker_pool.apply_async(
-            func=func,
-            args=(args or ()),
-            kwds=(kwds or {}),
-            error_callback=self.log_error
-        )
-        self.jobs.append(job)
-        return job
+        if self.q is not None:
+            total = self.total + self.q.qsize()
+        else:
+            total = self.total
 
-    def log_error(self, traceback):
-        raise traceback
-
-
-class LocalExecutor(MultiprocessingExecutor):
-    def __init__(self):
-        self.jobs = []
-
-    def join(self):
-        pass
-
-    def close(self):
-        pass
-
-    def apply_async(self, func, args=None, kwds=None):
-        if args is None:
-            args = ()
-        if kwds is None:
-            kwds = {}
-
-        try:
-            return func(*args, **kwds)
-        except Exception as exc:
-            self.log_error(exc)
-
-    def wait(self):
-        pass
-
-    def create_queue(self):
-        return queue.Queue()
+        self.pg.reset(total)
+        self.pg.n = self.completed
+        self.pg.refresh()

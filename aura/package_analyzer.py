@@ -7,7 +7,6 @@ Produced hits from analyzers are collected for later processing
 import os
 import shutil
 import queue
-import multiprocessing
 from pathlib import Path
 from typing import Union, Tuple, List
 
@@ -15,7 +14,6 @@ from . import utils
 from . import config
 from . import plugins
 from . import worker_executor
-from . import progressbar
 from .uri_handlers import base
 from .analyzers.detections import Detection
 from .analyzers.find_imports import TopologySort
@@ -32,105 +30,58 @@ class Analyzer(object):
 
     def run(self):
 
-        if self.location.metadata.get("fork") is True:
-            executor = worker_executor.MultiprocessingExecutor()
-        else:
-            executor = worker_executor.LocalExecutor()
-
+        cleanup = []
         hits_items = []
-        files_queue = executor.create_queue()
-        hits = executor.create_queue()
-        cleanup = executor.create_queue()
-        progress = progressbar.QueueProgressBar(
-            queue=files_queue,
-            desc="Analyzing files",
-            bar_format="{desc}: {percentage:3.0f}% |{bar}|"
-        )
+        files_queue = queue.Queue()
+        executor = worker_executor.AuraExecutor(job_queue=files_queue)
         files_queue.put(self.location)
+        files_queue.put(worker_executor.Wait)
 
         try:
-            while files_queue.qsize() or sum([not x.ready() for x in executor.jobs]):
-                progress._update_queue()
+            while files_queue.qsize() or bool(executor):
                 try:
-                    item: Union[worker_executor.Wait, base.ScanLocation] = files_queue.get(False, 1)
-
-                    if item is False or item is worker_executor.Wait:
-                        executor.wait()
-                        continue
-
-                    should_continue: Union[bool, Detection] = item.should_continue()
-                    # Equals True if it's ok to process this item
-                    # Otherwise returns `Rule` indicating why processing of this location should be halted
-                    if should_continue is not True:
-                        hits_items.append(should_continue)
-                        continue
-
-                    if item.location.is_dir():
-                        collected = self.scan_directory(item=item)
-
-                        for x in collected:
-                            files_queue.put(x)
-
-                        files_queue.put(worker_executor.Wait)
-                        executor.wait()
-                        continue
-
-                    kwargs = {
-                        "location": item,
-                        "queue": files_queue,
-                        "hits": hits,
-                        "cleanup": cleanup
-                    }
-                    executor.apply_async(func=self._worker, kwds=kwargs)
-
+                    item: Union[worker_executor.Wait, base.ScanLocation] = files_queue.get(False, 0.1)
                 except queue.Empty:
                     executor.wait()
+                    item = False
+
+                if item is False or item is worker_executor.Wait:
+                    for f in executor:
+                        locations, detections = f.result()
+                        for loc in locations:  # type: base.ScanLocation
+                            if loc.cleanup:
+                                cleanup.append(loc.location)
+
+                            files_queue.put(loc)
+
+                        hits_items.extend(detections)
                     continue
-                except Exception:
-                    raise
 
-            progress._update_queue()
-            executor.close()
-            executor.join()
+                should_continue: Union[bool, Detection] = item.should_continue()
+                # Equals True if it's ok to process this item
+                # Otherwise returns `Rule` indicating why processing of this location should be halted
+                if should_continue is not True:
+                    hits_items.append(should_continue)
+                    continue
 
-            # Re-raise the exceptions if any occurred during the processing
-            for x in executor.jobs:
-                if not x.successful():
-                    x.get()
+                if item.location.is_dir():
+                    collected = self.scan_directory(item=item)
 
-            while hits.qsize():
-                hits_items.append(hits.get())
+                    for x in collected:
+                        files_queue.put(x)
+
+                    files_queue.put(worker_executor.Wait)
+                    continue
+
+                executor.submit(self.analyze, location=item)
 
             yield from hits_items
         finally:
-            progress.close()
-            while cleanup.qsize():
-                x = cleanup.get()
+            for x in cleanup:
                 if type(x) != str:
                     x = os.fspath(x)
                 if os.path.exists(x):
                     shutil.rmtree(x)
-
-    @classmethod
-    def _worker(
-        cls,
-        location: base.ScanLocation,
-        queue: queue.Queue,
-        hits: multiprocessing.Array,
-        cleanup: queue.Queue,
-    ):
-
-        locations, detections = cls.analyze(location)
-
-        for x in locations:
-            if x.cleanup:
-                cleanup.put(x.location)
-            queue.put(x)
-
-        location.post_analysis(detections)
-
-        for x in detections:
-            hits.put(x)
 
     @staticmethod
     def analyze(location: base.ScanLocation) -> Tuple[List[base.ScanLocation], List[Detection]]:

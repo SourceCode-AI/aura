@@ -31,7 +31,7 @@ aura:
   # Async processing is using the python's multiprocessing module
   # It has a much bigger performance but it is not very debugger friendly when developing new plugins
   # It is possible that some 3rd party plugins might require synchronous processing due to data pipelines
-  async: true
+  async: false
 
   # Max width for the default text output
   text-output-width: auto
@@ -127,6 +127,8 @@ binwalk:  # Binwalk scanner configuration
   mode: blacklist
   mimetypes:
     - "^text/."  # Do not analyze text files
+    - "application/zip"
+    - "application/gzip"
 
 
 score:
