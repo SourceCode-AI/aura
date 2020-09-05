@@ -29,7 +29,8 @@ jobs:
       script:
         - mkdir shared && chmod 777 shared
         - docker run -ti -v "$pwd/shared:/shared" --rm $IMAGE_NAME run_tests
-        - bash <(curl -s https://codecov.io/bash)
+        - ls -lah shared/
+        - bash <(curl -s https://codecov.io/bash) -f shared/coverage.xml
 
     - stage: deploy_prod
       if: branch = master
