@@ -7,6 +7,7 @@ if [ "$#" -ne 1 ]; then
 fi;
 
 export AURA_MIRROR_PATH=$1;
+export AURA_ALL_MODULE_IMPORTS=true
 export PYTHONWARNINGS=ignore;
 export TEMPDIR=$(dirname $(mktemp -u))
 
