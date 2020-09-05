@@ -4,9 +4,12 @@ import os
 import tqdm
 
 
+DISABLED = ("AURA_NO_PROGRESS" in os.environ)
+
+
 class QueueProgressBar(tqdm.tqdm):
     def __init__(self, *, queue, **kwargs):
-        super().__init__(disable=disable(), **kwargs)
+        super().__init__(disable=DISABLED, **kwargs)
         queue.put = partial(self.put_queue, progress=self, func=queue.put)
         self._track_queue = queue
         self._queue_total = 0
@@ -23,7 +26,3 @@ class QueueProgressBar(tqdm.tqdm):
         progress._queue_total += 1
         progress._update_queue()
         return func(*args, **kwargs)
-
-
-def disable():
-    return ("AURA_NO_PROGRESS" in os.environ)

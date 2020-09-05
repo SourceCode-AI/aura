@@ -103,7 +103,7 @@ def download_file(url: str, fd: BinaryIO) -> None:
             unit_scale=True,
             unit_divisor=1024,
             desc="Downloading file",
-            disable=progressbar.disable(),
+            disable=progressbar.DISABLED,
         )
         r.raw.read = partial(
             _,

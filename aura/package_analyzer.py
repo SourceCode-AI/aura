@@ -5,14 +5,11 @@ Produced hits from analyzers are collected for later processing
 """
 
 import os
-import re
 import shutil
 import queue
-import dataclasses
 import multiprocessing
 from pathlib import Path
-from typing import Union
-from contextlib import contextmanager
+from typing import Union, Tuple, List
 
 from . import utils
 from . import config
@@ -33,7 +30,6 @@ class Analyzer(object):
     def __init__(self, location):
         self.location = location
 
-    #@contextmanager
     def run(self):
 
         if self.location.metadata.get("fork") is True:
@@ -58,7 +54,7 @@ class Analyzer(object):
                 try:
                     item: Union[worker_executor.Wait, base.ScanLocation] = files_queue.get(False, 1)
 
-                    if item is False or isinstance(item, worker_executor.Wait):
+                    if item is False or item is worker_executor.Wait:
                         executor.wait()
                         continue
 
@@ -75,7 +71,7 @@ class Analyzer(object):
                         for x in collected:
                             files_queue.put(x)
 
-                        files_queue.put(worker_executor.Wait())
+                        files_queue.put(worker_executor.Wait)
                         executor.wait()
                         continue
 
@@ -98,7 +94,6 @@ class Analyzer(object):
             executor.join()
 
             # Re-raise the exceptions if any occurred during the processing
-            #for x in results:
             for x in executor.jobs:
                 if not x.successful():
                     x.get()
@@ -124,26 +119,36 @@ class Analyzer(object):
         hits: multiprocessing.Array,
         cleanup: queue.Queue,
     ):
-        try:
-            logger.debug(f"Analyzing file '{location.str_location}' {location.metadata.get('mime')}")
-            analyzers = plugins.get_analyzer_group(location.metadata.get("analyzers", []))
 
-            detections = []
+        locations, detections = cls.analyze(location)
 
-            for x in analyzers(location=location):
-                if isinstance(x, base.ScanLocation):
-                    if x.cleanup:
-                        cleanup.put(x.location)
-                    queue.put(x)
-                else:
-                    detections.append(x)
+        for x in locations:
+            if x.cleanup:
+                cleanup.put(x.location)
+            queue.put(x)
 
-            location.post_analysis(detections)
+        location.post_analysis(detections)
 
-            for x in detections:
-                hits.put(x)
-        finally:
-            pass
+        for x in detections:
+            hits.put(x)
+
+    @staticmethod
+    def analyze(location: base.ScanLocation) -> Tuple[List[base.ScanLocation], List[Detection]]:
+        locations = []
+        detections = []
+
+        logger.debug(f"Analyzing file '{location.str_location}' {location.metadata.get('mime')}")
+        analyzers = plugins.get_analyzer_group(location.metadata.get("analyzers", []))
+
+        for x in analyzers(location=location):
+            if isinstance(x, base.ScanLocation):
+                locations.append(x)
+            else:
+                detections.append(x)
+
+        location.post_analysis(detections)
+
+        return (locations, detections)
 
     def scan_directory(self, item: base.ScanLocation):
         logger.debug(f"Collecting files in a directory '{item.str_location}")

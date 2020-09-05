@@ -1,11 +1,30 @@
 import queue
 import multiprocessing
 import time
+from concurrent import futures
+from typing import Optional
+
+from . import config
 
 
+Wait = object()
 
-class Wait:
-    __slots__ = ()
+
+class AuraExecutor:
+    def __init__(self, fork: Optional[bool]=None):
+        if fork is None:
+            self.fork = config.CFG["aura"].get("async", True)
+        else:
+            self.fork = fork
+
+        if self.fork:
+            self.executor = futures.ProcessPoolExecutor()
+        else:
+            self.executor = futures.ThreadPoolExecutor()
+
+        self.queue = []
+        self.total = 0
+        self.completed = 0
 
 
 class MultiprocessingExecutor:

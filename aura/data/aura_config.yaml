@@ -112,8 +112,12 @@ severities:
       - LeakingSecret
   high:
     score: 50
+    detections:
+      - UnpinnedPackage
   medium:
     score: 30
+    detections:
+      - OutdatedPackage
   low:
     score: 10
 
