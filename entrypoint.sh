@@ -6,9 +6,8 @@ if [ $1 == "run_tests" ]; then
     cd /analyzer
     exec pytest --cov=aura --cov-report xml --cov-report term tests/
 
-    if [ -d "/shared" ]; then
-      echo "Copying coverage report to the /shared folder"
-      cp coverage.xml /shared/
+    if [[ -z "${CODECOV_TOKEN}" ]]; then
+      bash <(curl -s https://codecov.io/bash)
     fi
 
 fi;

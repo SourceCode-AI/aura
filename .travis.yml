@@ -27,10 +27,7 @@ jobs:
 
     - stage: test
       script:
-        - mkdir shared && chmod 777 shared
-        - docker run -ti -v "$PWD/shared:/shared" --rm $IMAGE_NAME run_tests
-        - ls -lah shared/
-        - bash <(curl -s https://codecov.io/bash) -f shared/coverage.xml
+        - docker run -ti -e "CODECOV_TOKEN=${CODECOV_TOKEN}" --rm $IMAGE_NAME run_tests
 
     - stage: deploy_prod
       if: branch = master
