@@ -27,7 +27,9 @@ jobs:
 
     - stage: test
       script:
-        - docker run -ti --rm $IMAGE_NAME run_tests
+        - mkdir shared && chmod 777 shared
+        - docker run -ti -v "$pwd/shared:/shared" --rm $IMAGE_NAME run_tests
+        - bash <(curl -s https://codecov.io/bash)
 
     - stage: deploy_prod
       if: branch = master
