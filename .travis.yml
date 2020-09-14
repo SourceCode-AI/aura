@@ -7,7 +7,7 @@ before_install:
   - GIT_TAG=$(git describe --long --tags --dirty --always)
   - DOCKER_REPO="rootlug/aura-security"
   - IMAGE_NAME="${DOCKER_REPO}:${GIT_TAG}"
-  - DOCKER_BUILDKIT=1
+  - export DOCKER_BUILDKIT=1
   - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 
 stages:
@@ -21,10 +21,8 @@ jobs:
     - stage: build
       script:
         - docker build --target aura-full-tests .
-        - docker run aura-full-tests
         - docker build --target aura-full -t ${IMAGE_NAME}-full .
         - docker build --target aura-lite-tests .
-        - docker run aura-lite-tests
         - docker build --target aura-lite -t ${IMAGE_NAME}-lite .
         - docker push ${IMAGE_NAME}-full
         - docker push ${IMAGE_NAME}-lite
