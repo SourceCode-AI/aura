@@ -9,10 +9,10 @@ from ..exceptions import PluginDisabled
 
 try:
     import binwalk
-except ImportError:
+except ImportError as exc:
     raise PluginDisabled(
         "You must install binwalk python module to enable this integration"
-    )
+    ) from exc
 
 FILTER_MODE = None
 FILE_FILTERING = None

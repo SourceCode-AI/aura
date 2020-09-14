@@ -1,4 +1,4 @@
-FROM python:3.8.3-alpine3.12
+FROM python:3.8.3-alpine3.12 AS aura-base
 
 # This is a specific order of installing the dependencies first so we can use caching mechanism to quickly rebuild the image in case only aura source code changed
 RUN addgroup analysis && adduser -S -G analysis analysis
@@ -11,15 +11,18 @@ RUN apk add --no-cache \
     openssl-dev \
     autoconf \
     libtool \
-    git \
     build-base \
-    libxml2-dev \
-    libxslt-dev \
-    tree
+    git
 
 RUN mkdir /analyzer && \
-    mkdir /config && \
-    curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python
+    curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python && \
+    source $HOME/.poetry/env  && \
+    poetry config virtualenvs.create false && \
+    echo "source $HOME/.poetry/env" >>/etc/profile
+
+WORKDIR /analyzer
+
+FROM aura-base AS aura-lite
 
 WORKDIR /analyzer
 
@@ -36,16 +39,54 @@ ADD aura /analyzer/aura
 ADD tests /analyzer/tests
 
 # Install Aura
-RUN cd /analyzer &&\
-    source $HOME/.poetry/env && \
-    poetry config virtualenvs.create false && \
-    poetry install -E full &&\
+RUN source $HOME/.poetry/env && \
+    poetry install --no-dev &&\
     python -c "import aura;"  &&\
     find /analyzer -name '*.pyc' -delete -print &&\
-    chown -R analysis /analyzer /config &&\
     chmod +x /analyzer/entrypoint.sh &&\
     chmod 777 -R /analyzer
 
 USER analysis
 ENTRYPOINT ["/analyzer/entrypoint.sh"]
 CMD ["--help"]
+
+
+FROM aura-lite AS aura-lite-tests
+USER root
+
+RUN source $HOME/.poetry/env && \
+    poetry install
+
+USER analysis
+RUN pytest tests/
+
+ENTRYPOINT ["/analyzer/entrypoint.sh"]
+CMD ["run_tests"]
+
+FROM aura-lite AS aura-full
+
+USER root
+
+RUN apk add --no-cache \
+    libxml2-dev \
+    libxslt-dev
+
+RUN source $HOME/.poetry/env && \
+    poetry install --no-dev -E full
+
+USER analysis
+ENTRYPOINT ["/analyzer/entrypoint.sh"]
+CMD ["--help"]
+
+
+FROM aura-full AS aura-full-tests
+
+USER root
+RUN source $HOME/.poetry/env && \
+    poetry install -E full
+
+USER analysis
+RUN pytest tests/
+
+ENTRYPOINT ["/analyzer/entrypoint.sh"]
+CMD ["run_tests"]

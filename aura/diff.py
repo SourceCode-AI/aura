@@ -37,7 +37,7 @@ DIFF_EXCLUDE = re.compile(r"^Binary files .+ differ$")
 
 
 @dataclass()
-class Diff(DiffType):
+class Diff():
     operation: str
     a_size: Optional[int]
     b_size: Optional[int]
@@ -153,7 +153,7 @@ class Diff(DiffType):
         pp(self)
 
 
-class DiffAnalyzer(DiffAnalyzerType):
+class DiffAnalyzer():
     def __init__(self):
         self.hits = []
         self.diffs = []

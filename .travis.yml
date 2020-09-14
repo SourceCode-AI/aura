@@ -2,14 +2,12 @@ language: minimal
 services:
   - docker
 
-
-
-
 before_install:
   - BRANCH=$(git branch| grep \* |cut -d ' ' -f2)
   - GIT_TAG=$(git describe --long --tags --dirty --always)
   - DOCKER_REPO="rootlug/aura-security"
   - IMAGE_NAME="${DOCKER_REPO}:${GIT_TAG}"
+  - DOCKER_BUILDKIT=1
   - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 
 stages:
@@ -22,26 +20,38 @@ jobs:
   include:
     - stage: build
       script:
-        - docker build -t $IMAGE_NAME .
-        - docker push $IMAGE_NAME
+        - docker build --target aura-full-tests .
+        - docker run aura-full-tests
+        - docker build --target aura-full -t ${IMAGE_NAME}-full .
+        - docker build --target aura-lite-tests .
+        - docker run aura-lite-tests
+        - docker build --target aura-lite -t ${IMAGE_NAME}-lite .
+        - docker push ${IMAGE_NAME}-full
+        - docker push ${IMAGE_NAME}-lite
 
-    - stage: test
-      script:
-        - docker run -ti -e "CODECOV_TOKEN=${CODECOV_TOKEN}" --rm $IMAGE_NAME run_tests
+    #- stage: test
+    #  script:
+    #    - docker run -ti -e "CODECOV_TOKEN=${CODECOV_TOKEN}" --rm $IMAGE_NAME run_tests
 
     - stage: deploy_prod
       if: branch = master
       script:
-        - docker pull $IMAGE_NAME
-        - docker tag $IMAGE_NAME ${DOCKER_REPO}:latest
+        - docker pull ${IMAGE_NAME}-full
+        - docker tag ${IMAGE_NAME}-full ${DOCKER_REPO}:latest
         - docker push ${DOCKER_REPO}:latest
+        - docker pull ${IMAGE_NAME}-lite
+        - docker tag ${IMAGE_NAME}-lite ${DOCKER_REPO}:latest-lite
+        - docker push ${DOCKER_REPO}:latest-lite
 
     - stage: deploy_dev
       if: branch = dev
       script:
-        - docker pull $IMAGE_NAME
-        - docker tag $IMAGE_NAME ${DOCKER_REPO}:dev
+        - docker pull ${IMAGE_NAME}-full
+        - docker tag ${IMAGE_NAME}-full ${DOCKER_REPO}:dev
         - docker push ${DOCKER_REPO}:dev
+        - docker pull ${IMAGE_NAME}-lite
+        - docker tag ${IMAGE_NAME}-lite ${DOCKER_REPO}:dev-lite
+        - docker push ${DOCKER_REPO}:dev-lite
 
 notifications:
   email:
