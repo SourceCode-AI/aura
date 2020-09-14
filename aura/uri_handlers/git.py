@@ -3,10 +3,14 @@ import pathlib
 import shutil
 from urllib.parse import ParseResult
 
-import git
-
 from .. import config
+from ..exceptions import PluginDisabled
 from .base import URIHandler, ScanLocation
+
+try:
+    import git
+except ImportError:
+    raise PluginDisabled("`GitPython` module is not installed")
 
 
 LOGGER = config.get_logger(__name__)

@@ -8,9 +8,8 @@ from typing import List, Union, Mapping, Optional, Iterable
 
 import pkg_resources
 
-from .table import Table
 from .. import exceptions
-from ..diff import Diff, DiffAnalyzer
+from ..type_definitions import DiffType, DiffAnalyzerType
 
 
 OUTPUT_HANDLER_CACHE = {}
@@ -198,7 +197,7 @@ class DiffOutputBase(OutputBase, metaclass=ABCMeta):
 
         return fmt_class(**opts)
 
-    def filtered(self, diffs: List[Diff]) -> List[Diff]:
+    def filtered(self, diffs: List[DiffType]) -> List[DiffType]:
         out = []
 
         for diff in diffs:
@@ -211,7 +210,7 @@ class DiffOutputBase(OutputBase, metaclass=ABCMeta):
         return out
 
     @abstractmethod
-    def output_diff(self, diff_analyzer: DiffAnalyzer):
+    def output_diff(self, diff_analyzer: DiffAnalyzerType):
         ...
 
     @abstractmethod

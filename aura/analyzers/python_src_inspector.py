@@ -17,11 +17,7 @@ import codecs
 import tokenize
 import platform
 import traceback
-
-try:
-    import simplejson as json
-except ImportError:
-    import json
+import json
 
 
 BUILTIN_PURE = [int, float, bool]

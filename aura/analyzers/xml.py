@@ -1,8 +1,14 @@
-import os
 from typing import Generator
 from xml.etree.ElementTree import ParseError
 
-from defusedxml import cElementTree
+from ..exceptions import PluginDisabled
+
+try:
+    from defusedxml import cElementTree
+except ImportError:
+    raise PluginDisabled(
+        "defusedxml package is not installed"
+    )
 
 from defusedxml import (
     DTDForbidden,

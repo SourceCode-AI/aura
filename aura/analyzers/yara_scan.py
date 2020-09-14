@@ -3,21 +3,17 @@
 import os
 import time
 
-
-from .base import AnalyzerDeactivated
 from .detections import Detection
 from ..uri_handlers.base import ScanLocation
 from ..utils import Analyzer
+from ..exceptions import PluginDisabled
 from .. import config
 
-
-rules = None
-yara = None
 
 try:
     import yara
 except ImportError:
-    raise AnalyzerDeactivated(
+    raise PluginDisabled(
         "Yara for python is not installed or can't be imported, see docs."
     )
 
@@ -25,7 +21,7 @@ try:
     rules_pth = config.CFG["aura"].get("yara-rules", "aura.data.rules.yara")
     rules = yara.compile(source=config.get_file_content(rules_pth, config.CFG_PATH))
 except yara.Error as exc:
-    raise AnalyzerDeactivated("Can't compile/find yara rules")
+    raise PluginDisabled("Can't compile/find yara rules")
 
 
 logger = config.get_logger(__name__)

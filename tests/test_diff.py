@@ -3,8 +3,15 @@ import os
 from pathlib import Path
 from dataclasses import asdict
 
-from aura import diff
-from aura.uri_handlers.base import ScanLocation
+import pytest
+
+from aura.exceptions import FeatureDisabled
+
+try:
+    from aura import diff
+    from aura.uri_handlers.base import ScanLocation
+except FeatureDisabled as exc:
+    pytest.skip(exc.args[0], allow_module_level=True)
 
 
 def create_same_files(pth: Path, fixtures):

@@ -1,10 +1,15 @@
-from unittest import mock
+from pytest import fixture, skip
 
-from pytest import fixture
+try:
+    import networkx
+except ImportError:
+    skip("networkx module is not installed", allow_module_level=True)
 
-from aura import config
+
 from aura import graph
 from aura import package
+
+
 
 
 GRAPH_DATA = {

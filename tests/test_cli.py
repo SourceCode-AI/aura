@@ -11,6 +11,11 @@ from click.testing import CliRunner
 from aura import cli
 from aura.analyzers.data_finder import DataFinder
 
+try:
+    import yara
+except ImportError:
+    yara = None
+
 
 OBFUSCATED_DEFAULT_MATCHES = [
     {
@@ -57,6 +62,7 @@ def test_simple_cli_analysis(exec_mode, fixtures):
 
 
 @pytest.mark.extended
+@pytest.mark.skipif(yara is None, reason="Yara module/analyzer is not installed")
 def test_complex_cli_analysis(fixtures):
     with patch.object(DataFinder, "get_min_size", return_value=10) as m:
         fixtures.scan_and_match("obfuscated.py", OBFUSCATED_DEFAULT_MATCHES)

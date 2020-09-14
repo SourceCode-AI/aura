@@ -8,6 +8,7 @@ import mimetypes
 import tempfile
 import shutil
 import copy
+import hashlib
 from abc import ABC, abstractmethod
 from itertools import product
 from dataclasses import dataclass, field
@@ -21,7 +22,7 @@ import magic
 
 from .. import config
 from ..utils import KeepRefs, lookup_lines
-from ..exceptions import PythonExecutorError, UnsupportedDiffLocation
+from ..exceptions import PythonExecutorError, UnsupportedDiffLocation, FeatureDisabled
 from ..analyzers import find_imports
 from ..analyzers.detections import DataProcessing, Detection, get_severity
 
@@ -66,16 +67,20 @@ class URIHandler(ABC):
         return (cls.default(parsed1), cls.default(parsed2))
 
     @classmethod
-    def load_handlers(cls):
+    def load_handlers(cls, ignore_disabled=True):
         global HANDLERS
 
         if not HANDLERS:
             handlers = {}
             for x in pkg_resources.iter_entry_points("aura.uri_handlers"):
-                hook = x.load()
-                handlers[hook.scheme] = hook
-                if hook.default and not cls.default:
-                    cls.default = hook
+                try:
+                    hook = x.load()
+                    handlers[hook.scheme] = hook
+                    if hook.default and not cls.default:
+                        cls.default = hook
+                except FeatureDisabled as exc:
+                    if not ignore_disabled:
+                        handlers.setdefault("disabled", {})[x.name] = exc.args[0]
 
             HANDLERS = handlers
         return HANDLERS
@@ -113,7 +118,6 @@ class ScanLocation(KeepRefs):
     cleanup: bool = False
     parent: Optional[str] = None
     strip_path: str = ""
-    tlsh: Optional[str] = None
     size: Optional[int] = None
 
     def __post_init__(self):
@@ -136,8 +140,7 @@ class ScanLocation(KeepRefs):
             warn("Depth is not set for the scan location", stacklevel=2)
 
         if self.location.is_file():
-            with self.location.open("rb") as fd:
-                self.tlsh = tlsh.hash(fd.read())
+            self.__compute_hashes()
 
             self.size = self.location.stat().st_size
             self.metadata["mime"] = magic.from_file(self.str_location, mime=True)
@@ -152,6 +155,39 @@ class ScanLocation(KeepRefs):
                         self.metadata["py_imports"] = imports
                 except PythonExecutorError:
                     pass
+
+
+    def __compute_hashes(self):
+        tl = tlsh.Tlsh()
+        md5 = hashlib.md5()
+        sha1 = hashlib.sha1()
+        sha256 = hashlib.sha256()
+        sha512 = hashlib.sha512()
+
+        with self.location.open("rb") as fd:
+            buffer = fd.read(4096)
+
+            while buffer:
+                tl.update(buffer)
+                md5.update(buffer)
+                sha1.update(buffer)
+                sha256.update(buffer)
+                sha512.update(buffer)
+
+                buffer = fd.read(4096)
+
+        try:
+            tl.final()
+        except ValueError:  # TLSH needs at least 256 bytes
+            pass
+        else:
+            self.metadata["tlsh"] = tl.hexdigest()
+
+        self.metadata["md5"] = md5.hexdigest()
+        self.metadata["sha1"] = sha1.hexdigest()
+        self.metadata["sha256"] = sha256.hexdigest()
+        self.metadata["sha512"] = sha512.hexdigest()
+
 
     def __str__(self):
         return self.strip(self.str_location)
@@ -263,14 +299,17 @@ class ScanLocation(KeepRefs):
         """
         max_depth = int(config.CFG["aura"].get("max-depth", 5))
         if self.metadata["depth"] > max_depth:
-            return DataProcessing(
+            d = DataProcessing(
                 message = f"Maximum processing depth reached",
                 extra = {
                     "reason": "max_depth",
                     "location": str(self)
                 },
+                location=self.location,
                 signature = f"data_processing#max_depth#{str(self)}"
             )
+            self.post_analysis([d])
+            return d
 
         return True
 
@@ -291,6 +330,9 @@ class ScanLocation(KeepRefs):
                 d.location = str(self)
             else:
                 d.location = self.strip(d.location)
+
+            if d.scan_location is None:
+                d.scan_location = self
 
             if d.line is None:
                 line = lines.get(d.line_no)

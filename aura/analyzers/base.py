@@ -9,7 +9,3 @@ class NodeAnalyzerV2:
 
     def post_analysis(self, analyzer: ReadOnlyAnalyzer):  # TODO: check why is this here
         pass
-
-
-class AnalyzerDeactivated(exceptions.PluginDisabled):
-    pass

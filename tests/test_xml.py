@@ -1,3 +1,10 @@
+import pytest
+
+try:
+    import defusedxml
+except ImportError:
+    pytest.skip("defusedxml package is not installed", allow_module_level=True)
+
 
 def test_malformed_general(fixtures):
     matches = [

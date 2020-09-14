@@ -1,12 +1,18 @@
 from packaging.version import Version
-from tomlkit import parse as parse_toml
 
 from .detections import Detection
 from .. import package
 from ..utils import Analyzer
 from ..uri_handlers.base import ScanLocation
-from ..exceptions import NoSuchPackage
+from ..exceptions import NoSuchPackage, PluginDisabled
 from ..config import get_score_or_default
+
+
+try:
+    from tomlkit import parse as parse_toml
+except ImportError:
+    raise PluginDisabled("`tomlkit` python package is not installed")
+
 
 
 @Analyzer.ID("pyproject_toml")

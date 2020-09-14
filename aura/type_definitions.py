@@ -9,3 +9,6 @@ AnalyzerReturnType = Generator[Union[ScanLocation, Detection], None, None]
 AnalyzerFunction = Callable[[ScanLocation], AnalyzerReturnType]
 AnalyzerType = Union[NodeAnalyzerV2, AnalyzerFunction]
 ReleaseInfo = NewType("ReleaseInfo", dict)
+DiffType = NewType("DiffType", object)
+DiffAnalyzerType = NewType("DiffAnalyzerType", object)
+

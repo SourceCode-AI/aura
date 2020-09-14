@@ -123,7 +123,7 @@ severities:
 
 
 binwalk:  # Binwalk scanner configuration
-  # enabled: false  # You can disable the whole binwalk analysis also here, which has impact on performance
+  # enabled: false  # You can disable the whole binwalk analysis here which has impact on performance
   mode: blacklist
   mimetypes:
     - "^text/."  # Do not analyze text files

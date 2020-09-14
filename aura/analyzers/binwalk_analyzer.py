@@ -1,16 +1,16 @@
 import re
 
 from .. import config
-from .base import AnalyzerDeactivated
 from .detections import Detection
 from ..uri_handlers.base import ScanLocation
 from ..utils import Analyzer, md5
+from ..exceptions import PluginDisabled
 
 
 try:
     import binwalk
 except ImportError:
-    raise AnalyzerDeactivated(
+    raise PluginDisabled(
         "You must install binwalk python module to enable this integration"
     )
 

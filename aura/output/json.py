@@ -4,8 +4,7 @@ from typing import Any
 import rapidjson as json
 
 from .base import ScanOutputBase, DiffOutputBase
-from ..diff import Diff
-from ..exceptions import MinimumScoreNotReached
+from ..type_definitions import DiffType, DiffAnalyzerType
 from ..utils import json_encoder
 
 
@@ -65,7 +64,7 @@ class JSONDiffOutput(JSONOutputBase, DiffOutputBase):
         if self._fd:
             self._fd.close()
 
-    def output_diff(self, diff_analyzer):
+    def output_diff(self, diff_analyzer: DiffAnalyzerType):
         payload = {
             "tables": [],
             "diffs": []
@@ -74,7 +73,7 @@ class JSONDiffOutput(JSONOutputBase, DiffOutputBase):
         for table in diff_analyzer.tables:
             payload["tables"].append(table.asdict())
 
-        for d in self.filtered(diff_analyzer.diffs):  # type: Diff
+        for d in self.filtered(diff_analyzer.diffs):  # type: DiffType
             diff = {
                 "operation": d.operation,
                 "a_ref": d.a_ref,

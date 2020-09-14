@@ -48,9 +48,9 @@ def load_entrypoint(name: str, names=None) -> dict:
         try:
             plugin = x.load()
             data["entrypoints"][x.name] = initialize_analyzer(plugin)
-        except exceptions.PluginDisabled as exc:
+        except exceptions.FeatureDisabled as exc:
             msg = exc.args[0]
-            data["disabled"].append((x, msg))
+            data["disabled"].append((x.name, msg))
 
     PLUGIN_CACHE[name] = data
     return data

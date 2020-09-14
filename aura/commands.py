@@ -4,6 +4,7 @@ import sys
 import os
 import json
 import time
+import traceback
 from pathlib import Path
 from functools import partial
 from typing import Union, Optional, Tuple, Generator
@@ -19,7 +20,6 @@ from . import exceptions
 from . import utils
 from . import mirror
 from . import typos
-from . import diff
 from .package import PypiPackage
 from .analyzers.detections import Detection
 from .output.base import ScanOutputBase, DiffOutputBase, InfoOutputBase
@@ -126,6 +126,12 @@ def scan_uri(uri, metadata: Union[list, dict]=None) -> list:
 
 
 def data_diff(a_path: str, b_path: str, format_uri=("text",), output_opts=None):
+    try:
+        from . import diff
+    except exceptions.FeatureDisabled:
+        traceback.print_exc(file=sys.stderr)
+        sys.exit(2)
+
     if output_opts is None:
         output_opts = {}
 

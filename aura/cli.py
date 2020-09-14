@@ -14,8 +14,7 @@ from prettyprinter import install_extras
 
 from . import commands
 from . import exceptions
-from .uri_handlers.base import URIHandler, ScanLocation
-from .diff import DiffAnalyzer
+from .uri_handlers.base import URIHandler
 
 from . import __version__
 from . import config
@@ -110,6 +109,10 @@ def scan(
 
     try:
         commands.scan_uri(uri, metadata=meta)
+    except exceptions.FeatureDisabled as e:
+        LOGGER.exception(e.args[0], exc_info=e)
+        click.secho(e.args[0], err=True, fg="red")
+        return sys.exit(2)
     except exceptions.AuraException as e:
         click.secho(e.args[0], err=True, fg='red')
         return sys.exit(1)

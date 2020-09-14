@@ -3,7 +3,7 @@ name = "aura"
 version = "2.0a1"
 description = "Security auditing and static analysis for python"
 authors = [
-    "Martin Carnogursky <intense.feel@gmail.com>"
+    "Martin Carnogursky <admin@sourcecode.ai>"
 ]
 repository = "https://github.com/RootLUG/aura"
 readme = "README.md"
@@ -14,6 +14,7 @@ classifiers = [
     "Intended Audience :: System Administrators",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3 :: Only",
     "Topic :: Security",
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)"
@@ -33,32 +34,35 @@ include = [
 
 [tool.poetry.dependencies]
 python = "^3.7 || ^3.8"
-blinker = "~1.4"
 packaging = "~20.4"
 python-magic = "~0.4.18"
 click = "~7.1.2"
 colorama = "~0.4.3"
 requests = "~2.24.0"
-GitPython = "~3.1.3"
 jsonschema = "~3.2.0"
 prettyprinter = "~0.18.0"
 jinja2 = "~2.11.2"
 tqdm = "~4.46.0"
 pytz = "~2020.1"
+"ruamel.yaml" = "~0.15"
+
+# TODO: make the following dependencies optional
 textdistance = "~4.2.0"
 python-tlsh = "~3.17.0"
-defusedxml = "~0.6.0"
 python-rapidjson = "~0.9.1"
-"ruamel.yaml" = "~0.15"
-tomlkit = "~0.7.0"
+
 # TODO: Extras, autodetect their presence in aura
+GitPython = { version = "~3.1.3", optional = true }
+defusedxml = { version = "~0.6.0", optional = true }
+tomlkit = {version = "~0.7.0", optional = true }
 yara-python = {version = "~4.0.1", optional = true}
 networkx = {version = "~2.4", optional = true}
 # Temporary forked repo fix until https://github.com/ReFirmLabs/binwalk/pull/478 is accepted
 binwalk = {git = "https://github.com/RootLUG/binwalk.git", optional = true}
 
 [tool.poetry.extras]
-full = ["yara-python", "networkx", "cssselect", "binwalk"]
+full = ["yara-python", "networkx", "cssselect", "binwalk", "GitPython"]
+diff = ["GitPython"]
 
 [tool.poetry.dev-dependencies]
 responses = "^0.10.15"
@@ -94,6 +98,8 @@ readonly = "aura.analyzers.python.readonly:ReadOnlyAnalyzer"
 text = "aura.output.text:TextScanOutput"
 sqlite = "aura.output.sqlite:SQLiteScanOutput"
 json = "aura.output.json:JSONScanOutput"
+gitlab-sast = "aura.output.gitlab:GitlabSASTOutput"
+sarif = "aura.output.sarif:SARIFOutput"
 
 [tool.poetry.plugins."aura.diff_output_handlers"]
 text = "aura.output.text:TextDiffOutput"
@@ -129,4 +135,3 @@ binwalk = "aura.analyzers.binwalk_analyzer:analyze"
 [build-system]
 requires = ["poetry>=0.12"]
 build-backend = "poetry.masonry.api"
-

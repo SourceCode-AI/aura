@@ -1,6 +1,7 @@
 from urllib.parse import urlparse
 
 import requests
+import json
 
 from .exceptions import NoSuchRepository
 
@@ -40,7 +41,7 @@ class GitHub:
         if repo_data.status_code == 404:
             raise NoSuchRepository(f"{self.owner}/{self.name}")
 
-        return repo_data.json()
+        return json.loads(repo_data.text)
 
     def get_contributors(self):
         url = f"https://api.github.com/repos/{self.owner}/{self.name}/contributors"

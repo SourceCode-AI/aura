@@ -13,12 +13,12 @@ def analyze(*, location: ScanLocation):
 
     info = {
         "mime": location.metadata["mime"],
-        "size": location.location.stat().st_size,
-        "md5": md5(location.location)
+        "size": location.size,
     }
 
-    if location.tlsh:
-        info["tlsh"] = location.tlsh
+    for x in ("tlsh", "md5", "sha1", "sha256", "sha512"):
+        if x in location.metadata:
+            info[x] = location.metadata[x]
 
     yield Detection(
         detection_type="FileStats",

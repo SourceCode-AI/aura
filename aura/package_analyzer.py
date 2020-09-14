@@ -29,7 +29,6 @@ class Analyzer(object):
         self.location = location
 
     def run(self):
-
         cleanup = []
         hits_items = []
         files_queue = queue.Queue()
@@ -95,6 +94,7 @@ class Analyzer(object):
             if isinstance(x, base.ScanLocation):
                 locations.append(x)
             else:
+                x.scan_location = location
                 detections.append(x)
 
         location.post_analysis(detections)

@@ -337,9 +337,6 @@ class TextInfoOutput(InfoOutputBase):
         rhs_lines.append("")
         rhs_lines.append("Installed analyzers:")
 
-        rhs_size = max(len(x) for x in rhs_lines)
-
-        #out.align("Installed analyzers: ")
         for name, i in data["analyzers"].items():
             if i["enabled"]:
                 mark = OK
@@ -349,16 +346,16 @@ class TextInfoOutput(InfoOutputBase):
                 s = {"fg": "bright_red"}
 
             rhs_lines.append(style(f" {mark} {name}: {i['description']}", **s))
-            #out.align(style(f" {mark} {name}: {i['description']}", **s))
 
         rhs_lines.append("Installed URI handlers:")
-        #out.align("Installed URI handlers: ")
         for name, i in data["uri_handlers"].items():
-            mark = OK
-            s = {"fg": "bright_green"}
+            enabled = i.get("enabled", True)
+            mark = OK if enabled else NOK
+            s = {"fg": ("bright_green" if enabled else "bright_red") }
 
-            rhs_lines.append(style(f" {mark} {name}://", **s))
-            #out.align(style(f" {mark} {name}://", **s))
+            rhs_lines.append(style(f" {mark} `{name}://` - {i.get('description', 'Description N/A')}", **s))
+
+        rhs_size = max(len(x) for x in rhs_lines)
 
         for idx in range(max(len(rhs_lines), len(lhs_lines))):
             if idx < len(lhs_lines):

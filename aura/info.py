@@ -1,3 +1,7 @@
+"""
+Implementation of the `aura info` command
+"""
+
 import json
 import inspect
 import shutil
@@ -76,13 +80,18 @@ def gather_aura_information() -> dict:
         }
 
     for k, v in analyzers["disabled"]:
-        doc = get_analyzer_description(v)
+        #doc = get_analyzer_description(v)
         info["analyzers"][k] = {
             "enabled": False,
-            "description": doc
+            "description": v
         }
 
-    for k, v in URIHandler.load_handlers().items():
+    uris = URIHandler.load_handlers(ignore_disabled=False)
+
+    for k, v in uris.pop("disabled", {}).items():
+        info["uri_handlers"][k] = {"enabled": False, "description": v}
+
+    for k, v in uris.items():
         info["uri_handlers"][k] = {"enabled": True}
 
     info["integrations"]["pypi_stats"] = check_pypi_stats()

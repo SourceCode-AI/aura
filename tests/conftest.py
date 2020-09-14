@@ -100,12 +100,11 @@ class Fixtures(object):
         runner = CliRunner(mix_stderr=False)
         result = runner.invoke(cli.cli, args=args)
 
-
-        if result.exception and type(result.exception) != SystemExit:
+        if result.exception and (type(result.exception) != SystemExit or check_exit_code):
             raise result.exception
 
         if check_exit_code:
-            assert result.exit_code == 0, result.stdout
+            assert result.exit_code == 0, (result.stdout, result.stderr)
 
         return result
 
@@ -343,6 +342,21 @@ def mock_pypi_stats():
     import aura.config
     with mock.patch.object(aura.config, "iter_pypi_stats", return_value=PYPI_STATS) as m:
         yield m
+
+
+@pytest.fixture()
+def skip_binwalk():
+    from aura.exceptions import FeatureDisabled
+
+    try:
+        from aura.analyzers import binwalk_analyzer
+
+        m = mock.MagicMock()
+        m.return_value = False
+        binwalk_analyzer.can_process_location = m
+        yield m
+    except FeatureDisabled:
+        yield
 
 
 @pytest.fixture(scope="function", autouse=True)

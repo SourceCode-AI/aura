@@ -11,17 +11,23 @@ import pprint
 from typing import Union, Optional, List
 from pathlib import Path
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-import magic
-import tlsh
-from git import Repo, Diff as GitDiff, Blob
-from blinker import signal
+from .exceptions import UnsupportedDiffLocation, FeatureDisabled
+from .type_definitions import DiffType, DiffAnalyzerType
+
+try:
+    import magic
+    import tlsh
+    from git import Repo, Diff as GitDiff, Blob
+except ImportError as exc:
+    raise FeatureDisabled("Feature is disabled because one or more python packages are not installed: `GitPython`, `python-tlsh`") from exc
+
 
 from . import utils
 from . import plugins
 from .output.table import Table
-from .exceptions import UnsupportedDiffLocation
+
 from .analyzers.detections import Detection
 from .package_analyzer import Analyzer
 from .uri_handlers.base import ScanLocation, URIHandler
@@ -31,7 +37,7 @@ DIFF_EXCLUDE = re.compile(r"^Binary files .+ differ$")
 
 
 @dataclass()
-class Diff:
+class Diff(DiffType):
     operation: str
     a_size: Optional[int]
     b_size: Optional[int]
@@ -147,16 +153,12 @@ class Diff:
         pp(self)
 
 
-class DiffAnalyzer:
+class DiffAnalyzer(DiffAnalyzerType):
     def __init__(self):
         self.hits = []
         self.diffs = []
         self.tables = []
         self.same_files = set()
-        self.diff_hit = signal("aura:diff")
-        self.diff_hit.connect(self.on_diff)
-        self.same_file_hit = signal("aura:same_file")
-        self.same_file_hit.connect(self.on_same_file)
 
     @classmethod
     def get_diff_hooks(cls) -> dict:
@@ -273,7 +275,6 @@ class DiffAnalyzer:
         try:
             # Create an empty repository
             bare_repo = Repo.init(tmp)
-            #  bare_content = set(os.listdir(tmp))
             a_content = []
             same_files = set()
             b_content = []
@@ -336,9 +337,9 @@ class DiffAnalyzer:
 
             for x in same_files:
                 if a_path.location.is_dir():
-                    self.same_file_hit.send(a_path.location / x)
+                    self.on_same_file(a_path.location / x)
                 else:
-                    self.same_file_hit.send(x)
+                    self.on_same_file(x)
 
         finally:
             shutil.rmtree(tmp)

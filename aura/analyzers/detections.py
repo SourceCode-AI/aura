@@ -4,10 +4,9 @@ from typing  import List, Union, Set, Optional, Dict, cast
 from pathlib import Path
 from dataclasses import dataclass, field
 from functools import total_ordering
-from collections import defaultdict
 
 from .. import config
-from ..utils import lookup_lines, normalize_path
+from ..utils import normalize_path
 from .python.nodes import NodeType, ASTNode
 
 
@@ -50,6 +49,7 @@ class Detection:
     extra: dict = field(default_factory=dict)
     informational: bool = False
     location: Optional[Path, str] = None
+    scan_location = None
     _metadata: Optional[dict] = None
 
     def __post_init__(self):
