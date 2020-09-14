@@ -7,7 +7,6 @@ before_install:
   - GIT_TAG=$(git describe --long --tags --dirty --always)
   - DOCKER_REPO="rootlug/aura-security"
   - IMAGE_NAME="${DOCKER_REPO}:${GIT_TAG}"
-  - export DOCKER_BUILDKIT=1
   - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 
 stages:
