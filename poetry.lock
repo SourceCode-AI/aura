@@ -435,7 +435,7 @@ version = "0.4.18"
 category = "main"
 description = "Python wrapper around rapidjson"
 name = "python-rapidjson"
-optional = false
+optional = true
 python-versions = ">=3.4"
 version = "0.9.1"
 
@@ -782,10 +782,10 @@ testing = ["jaraco.itertools", "func-timeout"]
 
 [extras]
 diff = ["GitPython"]
-full = ["yara-python", "networkx", "binwalk", "GitPython"]
+full = ["yara-python", "networkx", "binwalk", "GitPython", "python-rapidjson", "defusedxml"]
 
 [metadata]
-content-hash = "a6fdac439bc052a40d7b1c88d8d94062a3f842355101ecd83f97ab14698455d8"
+content-hash = "e636f77d4f5b102d7da2486222bcd10431190f916bac319b3104c8aa1bfdffba"
 python-versions = "^3.7 || ^3.8"
 
 [metadata.files]

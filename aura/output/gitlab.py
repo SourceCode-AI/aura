@@ -1,10 +1,8 @@
 from uuid import uuid4
 from dataclasses import dataclass
 
-import rapidjson as json
-
 from .json import JSONScanOutput
-from ..utils import json_encoder
+from ..json_proxy import dumps
 from .. import __version__
 
 
@@ -58,4 +56,4 @@ class GitlabSASTOutput(JSONScanOutput):
             }
             tpl["vulnerabilities"].append(data)
 
-        print(json.dumps(tpl, default=json_encoder), file=self._fd)
+        print(dumps(tpl), file=self._fd)

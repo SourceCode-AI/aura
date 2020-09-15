@@ -1,9 +1,7 @@
 from dataclasses import dataclass
 
-import rapidjson as json
-
 from .json import JSONScanOutput
-from ..utils import json_encoder
+from ..json_proxy import dumps
 from .. import __version__
 
 # SARIF has only the following levels: ['none', 'note', 'warning', 'error']
@@ -56,9 +54,18 @@ class SARIFOutput(JSONScanOutput):
 
             if "line_no" in d:
                 region["startLine"] = d["line_no"]
+                region["endLine"] = d.get("end_line_no", d["line_no"])
+
+            if "col" in d:
+                region["startColumn"] = d["col"]
+
+            if "end_col" in d:
+                region["endColumn"] = d["end_col"]
 
             if "line" in d:
                 region["snippet"] = {"text": d["line"]}
+                if "endColumn" not in region:
+                    region["endColumn"] = len(d["line"])
 
             result = {
                 "ruleId": d["type"],
@@ -75,14 +82,17 @@ class SARIFOutput(JSONScanOutput):
                             "region": region
                         }
                     }
-                ]
+                ],
+                "partialFingerprints": {
+                    "primaryLocationLineHash": d["signature"]
+                }
             }
             run["results"].append(result)
 
         run["artifacts"].extend(locations.values())
         tpl["runs"].append(run)
 
-        print(json.dumps(tpl, default=json_encoder), file=self._fd)
+        print(dumps(tpl), file=self._fd)
 
     @staticmethod
     def _convert_to_artifact(detection) -> dict:

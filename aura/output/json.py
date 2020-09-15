@@ -1,11 +1,9 @@
 from dataclasses import dataclass
 from typing import Any
 
-import rapidjson as json
-
 from .base import ScanOutputBase, DiffOutputBase
 from ..type_definitions import DiffType, DiffAnalyzerType
-from ..utils import json_encoder
+from ..json_proxy import dumps
 
 
 class JSONOutputBase:
@@ -47,7 +45,7 @@ class JSONScanOutput(JSONOutputBase, ScanOutputBase):
             "name": scan_metadata["name"],
         }
 
-        print(json.dumps(data, default=json_encoder), file=self._fd)
+        print(dumps(data), file=self._fd)
 
 
 @dataclass()
@@ -98,4 +96,4 @@ class JSONDiffOutput(JSONOutputBase, DiffOutputBase):
 
             payload["diffs"].append(diff)
 
-        print(json.dumps(payload, default=json_encoder), file=self._fd)
+        print(dumps(payload), file=self._fd)

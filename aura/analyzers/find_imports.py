@@ -81,7 +81,11 @@ def find_imports(py_src: Path, metadata=None):
                 continue
             dependencies.add(d)
         else:
-            py_ext = dependency.with_suffix(".py")
+            try:
+                py_ext = dependency.with_suffix(".py")
+            except ValueError:
+                continue
+
             init = dependency / "__init__.py"
             if py_ext.exists():
                 dependencies.add(py_ext)

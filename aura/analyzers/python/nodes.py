@@ -194,6 +194,8 @@ class ASTNode(KeepRefs, metaclass=ABCMeta):
             data["tags"] = list(self.tags)
         if self.line_no is not None:
             data["line_no"] = self.line_no
+        if self.col is not None:
+            data["col"] = self.col
 
         if self._taint_class != Taints.UNKNOWN:
             data["taint"] = self._taint_class.name

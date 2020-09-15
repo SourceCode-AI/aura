@@ -14,7 +14,6 @@ from typing import Optional, Generator, Tuple, List, NewType
 
 import pytz
 import requests
-import rapidjson as json
 from packaging.version import Version
 from packaging.utils import canonicalize_name
 from packaging.requirements import Requirement
@@ -22,6 +21,7 @@ from textdistance import jaccard
 
 from . import config
 from . import github
+from .json_proxy import loads
 from . import utils
 from . import exceptions
 from .uri_handlers.base import ScanLocation
@@ -54,7 +54,7 @@ class PypiPackage:
             LOGGER.error(f"Package {name} does not exists on PyPI")
             raise exceptions.NoSuchPackage(f"{name} on PyPI repository")
 
-        kwargs["info"] = resp.json()
+        kwargs["info"] = loads(resp.text)
         kwargs["source"] = "pypi"
 
         return cls(name, *args, **kwargs)
@@ -455,7 +455,7 @@ def get_reverse_dependencies(pkg_name: str) -> List[str]:
     pkg_name = canonicalize_name(pkg_name)
     dataset_path = Path("reverse_dependencies.json")
     with dataset_path.open("r") as fd:
-        dataset = json.loads(fd.read())
+        dataset = loads(fd.read())
 
     if pkg_name in dataset:
         return dataset[pkg_name]

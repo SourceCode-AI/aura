@@ -13,9 +13,8 @@ import subprocess
 from shutil import which
 from typing import List
 
-import rapidjson as json
-
 from . import config
+from .json_proxy import loads, JSONDecodeError
 from .exceptions import PythonExecutorError
 
 
@@ -86,8 +85,8 @@ def execute_interpreter(*, command: List[str], interpreter: str, stdin=None):
         payload = None
         try:
             payload = proc.stdout
-            return json.loads(payload)
-        except json.JSONDecodeError:
+            return loads(payload)
+        except JSONDecodeError:
             LOGGER.exception(f"Error decoding interpreter JSON: {repr(payload)}")
             new_exception = PythonExecutorError("Error decoding python interpreter JSON")
             new_exception.stdout = payload

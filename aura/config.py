@@ -16,7 +16,10 @@ from typing import Optional, Generator
 import tqdm
 import pkg_resources
 from ruamel.yaml import YAML
-import rapidjson as json
+try:
+    import rapidjson as json
+except ImportError:
+    import json
 
 
 CFG: Optional[dict] = None

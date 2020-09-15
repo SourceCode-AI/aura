@@ -17,7 +17,11 @@ import codecs
 import tokenize
 import platform
 import traceback
-import json
+
+try:
+    import rapidjson as json
+except ImportError:
+    import json
 
 
 BUILTIN_PURE = [int, float, bool]
