@@ -186,6 +186,7 @@ def test_matching_triggers():
     compiled_src = ASTPattern._compile_src(src)
     p = ASTPattern(signature=sig)
     v = PatternMatchingVisitor(pattern=p)
+
     result = v.traverse(compiled_src)
     assert result is not None
     assert len(v.hits) == 1, v.hits

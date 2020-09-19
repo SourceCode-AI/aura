@@ -1,3 +1,4 @@
+import os
 import pytest
 
 
@@ -118,3 +119,24 @@ def test_fs_structure_detections(fixtures, tmp_path):
         matches=matches,
         excludes=excludes
     )
+
+
+def test_custom_config(tmp_path):
+    cfg_pth = tmp_path / "custom_cfg.yml"
+    cfg_content = """---
+aura:
+    <<: *aura_config
+    test_key: test_val
+    async: nope
+"""
+    cfg_pth.write_text(cfg_content)
+    os.environ["AURA_CFG"] = str(cfg_pth)
+
+    from aura import config
+
+    parsed = config.parse_config()
+    assert parsed["aura"]["test_key"] == "test_val"
+    # Inherited key
+    assert parsed["aura"]["text-output-width"] == "auto"
+    # Overwritten key
+    assert parsed["aura"]["async"] == "nope"

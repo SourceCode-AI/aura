@@ -41,9 +41,9 @@ def visit_Complex(context):
 
 
 def visit_Constant(context):
-    if context.node["kind"] is None and type(context.node["value"]) == str:
+    if context.node.get("kind") is None and type(context.node["value"]) == str:
         node = String(context.node["value"])
-    elif context.node["kind"] is None and type(context.node["value"]) == int:
+    elif context.node.get("kind") is None and type(context.node["value"]) == int:
         node = Number(context.node["value"])
     else:
         node = Constant(context.node["value"])
@@ -299,6 +299,7 @@ VISITORS = {
     "Bytes": visit_Bytes,
     "Num": visit_Num,
     "Constant": visit_Constant,
+    "NameConstant": visit_Constant,
     "Dict": visit_Dict,
     "Expr": visit_Expr,
     "Call": visit_Call,

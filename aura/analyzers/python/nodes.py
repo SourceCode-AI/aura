@@ -137,6 +137,8 @@ class ASTNode(KeepRefs, metaclass=ABCMeta):
         self._converged: bool = False
         self.line_no = None
         self.col = None
+        self.end_line_no = None
+        self.end_col = None
 
         if previous_node is not None:
             self.enrich_from_previous(previous_node)
@@ -160,13 +162,21 @@ class ASTNode(KeepRefs, metaclass=ABCMeta):
                 self.line_no = node["lineno"]
             if not self.col and "col_offset" in node:
                 self.col = node["col_offset"]
+            if not self.end_line_no and "end_lineno" in node:
+                self.end_line_no = node["end_lineno"]
+            if not self.end_col and "end_col_offset" in node:
+                self.end_col = node["end_col_offset"]
             if not self._docs:
                 self._docs = node.get("_doc_string")
         elif isinstance(node, ASTNode):
             if not self.line_no:
                 self.line_no = node.line_no
+            if not self.end_line_no:
+                self.end_line_no = node.end_line_no
             if not self.col:
                 self.col = node.col
+            if not self.end_col:
+                self.end_col = node.end_col
 
     @property
     def full_name(self):
@@ -961,7 +971,7 @@ class Call(ASTNode):
             return False
 
         for x in other.args:
-            if type(x) == Constant and type(x.value) == type(...):
+            if (type(x) == Constant and type(x.value) == type(...)) or type(x) == type(...):
                 is_wildcard = True
                 break
         else:

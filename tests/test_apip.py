@@ -5,6 +5,10 @@ import shutil
 import venv
 from pathlib import Path
 
+import pytest
+
+jsonschema = pytest.importorskip("jsonschema")
+
 
 def run_in_venv(venv_pth:str, cmd, stdin:bytes=b'', aura_path=None):
     env = os.environ.copy()

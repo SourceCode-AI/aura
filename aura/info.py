@@ -2,17 +2,21 @@
 Implementation of the `aura info` command
 """
 
-import json
 import inspect
 import shutil
 from importlib import resources
+from typing import Optional
 
-import jsonschema
+try:
+    import jsonschema
+except ImportError:
+    jsonschema = None
 
 from . import __version__ as version
 from .uri_handlers.base import URIHandler
 from . import plugins
 from . import config
+from .json_proxy import loads
 
 
 def get_analyzer_description(analyzer) -> str:
@@ -49,9 +53,15 @@ def check_git() -> dict:
         }
 
 
-def check_schema() -> dict:
+def check_schema() -> Optional[dict]:
+    """
+    Returns None if jsonschema is not installed indicating it's not possible to verify the schema
+    """
+    if jsonschema is None:
+        return None
+
     res = {}
-    semantic_schema = json.loads(resources.read_text("aura.data", "semantic_rules_schema.json"))
+    semantic_schema = loads(resources.read_text("aura.data", "semantic_rules_schema.json"))
     try:
         jsonschema.validate(config.SEMANTIC_RULES, semantic_schema)
         res["semantic_rules"] = True

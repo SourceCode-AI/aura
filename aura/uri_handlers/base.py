@@ -146,7 +146,7 @@ class ScanLocation(KeepRefs):
             self.metadata["mime"] = magic.from_file(self.str_location, mime=True)
 
             if self.metadata["mime"] in ("text/plain", "application/octet-stream", "text/none"):
-                self.metadata["mime"] = mimetypes.guess_type(self.location)[0]
+                self.metadata["mime"] = mimetypes.guess_type(self.__str_location)[0]
 
             if self.metadata["mime"] == "text/x-python" and "no_imports" not in self.metadata:
                 try:

@@ -5,6 +5,7 @@ Main CLI entry point for the Aura framework
 import json
 import sys
 import os
+import pwd
 import textwrap
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -257,6 +258,12 @@ def check_requirement():
 
 
 def main():
+    if "AURA_USER" in os.environ:
+        username = os.environ["AURA_USER"]
+        u = pwd.getpwnam(username)
+        LOGGER.info(f"Changing user to {username} (UID: {u.pw_uid})")
+        os.seteuid(u.pw_uid)
+
     cli(obj={})
 
 

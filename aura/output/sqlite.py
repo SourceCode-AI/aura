@@ -1,15 +1,29 @@
 import json
-import os
 import sqlite3
 from dataclasses import dataclass
-from pathlib import Path
 from typing import List, Any
 from abc import ABCMeta, abstractmethod
 
 from .base import ScanOutputBase, DiffOutputBase
 from ..analyzers.detections import Detection
 from ..utils import json_encoder
-from ..exceptions import InvalidOutput
+from ..exceptions import InvalidOutput, PluginDisabled
+
+
+def check_sqlite_support():
+    db = sqlite3.connect(":memory:")
+    try:
+        db.enable_load_extension(True)
+    except AttributeError:
+        raise PluginDisabled(
+            "You SQLite installation does not support loading extensions"
+        )
+
+    opts = [x[0] for x in db.execute("PRAGMA compile_options").fetchall()]
+    if "ENABLE_JSON1" not in opts:
+        raise PluginDisabled(
+            f"Your SQLite installation doesn't have support for JSON1, compile opts: {', '.join(opts)}"
+        )
 
 
 @dataclass()
@@ -270,3 +284,6 @@ class SQLiteDiffOutput(DiffBase, DiffOutputBase):
             raise
         else:
             self._db.commit()
+
+
+check_sqlite_support()

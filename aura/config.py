@@ -15,7 +15,8 @@ from typing import Optional, Generator
 
 import tqdm
 import pkg_resources
-from ruamel.yaml import YAML
+import ruamel.yaml
+from ruamel.yaml import YAML, composer
 try:
     import rapidjson as json
 except ImportError:
@@ -32,6 +33,7 @@ DEBUG_LINES = set()
 DEFAULT_AST_STAGES = ("convert", "rewrite", "ast_pattern_matching", "taint_analysis", "readonly")
 AST_PATTERNS_CACHE = None
 PROGRESSBAR_DISABLED = ("AURA_NO_PROGRESS" in os.environ)
+DEFAULT_CFG_PATH = "aura.data.aura_config.yaml"
 
 
 if "AURA_DEBUG_LINES" in os.environ:
@@ -76,6 +78,21 @@ def configure_logger(level):
     logger.addHandler(log_stream)
     if LOG_ERR is not None:
         logger.addHandler(LOG_ERR)
+
+
+def compose_document(self: ruamel.yaml.composer.Composer):
+    """
+    patch for yaml loader to preserve anchors in multi documents
+    See https://stackoverflow.com/questions/40701983/is-it-possible-to-have-aliases-in-a-multi-document-yaml-stream-that-span-all-doc
+    """
+    self.get_event()
+    node = self.compose_node(None, None)
+    self.get_event()
+    return node
+
+
+# Monkey patch the YAML composer
+ruamel.yaml.composer.Composer.compose_document = compose_document
 
 
 # Helper for loading API tokens for external integrations
@@ -133,7 +150,7 @@ def find_configuration() -> Path:  # TODO: add tests
         else:
             cwd = cwd.parent
 
-    return Path("aura.data.aura_config.yaml")
+    return Path(DEFAULT_CFG_PATH)
 
 
 def get_file_location(location: str, base_path: Optional[str]=None) -> str:
@@ -164,18 +181,29 @@ def get_file_content(location: str, base_path: Optional[str]=None) -> str:
             return fd.read()
 
 
-def load_config():
-    global SEMANTIC_RULES, CFG, CFG_PATH
+def parse_config():
+    global CFG_PATH
 
     CFG_PATH = str(find_configuration())
     logger.debug(f"Aura configuration located at {CFG_PATH}")
 
-    yaml = YAML(typ="safe")
-    CFG = yaml.load(get_file_content(CFG_PATH))
+    content = get_file_content(CFG_PATH)
+    if content.startswith("---"):
+        default_cfg = get_file_content(DEFAULT_CFG_PATH)
+        content = default_cfg + "\n" + content
+        docs = list(ruamel.yaml.safe_load_all(content))
+        return docs[-1]
+    else:
+        return ruamel.yaml.safe_load(content)
 
+
+def load_config():
+    global SEMANTIC_RULES, CFG, CFG_PATH
+
+    CFG = parse_config()
     semantic_sig_pth = CFG["aura"]["semantic-rules"]
 
-    SEMANTIC_RULES = yaml.load(get_file_content(semantic_sig_pth, CFG_PATH))
+    SEMANTIC_RULES = ruamel.yaml.safe_load(get_file_content(semantic_sig_pth, CFG_PATH))
 
     if "AURA_LOG_LEVEL" in os.environ:
         log_level = logging.getLevelName(os.getenv("AURA_LOG_LEVEL").upper())

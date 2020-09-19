@@ -1,4 +1,7 @@
-FROM python:3.8.3-alpine3.12 AS aura-base
+ARG pythonver=3.8.3
+ARG alpinever=3.12
+
+FROM python:${pythonver}-alpine${alpinever} AS aura-base
 
 # This is a specific order of installing the dependencies first so we can use caching mechanism to quickly rebuild the image in case only aura source code changed
 RUN addgroup analysis && adduser -S -G analysis analysis
@@ -46,13 +49,11 @@ RUN source $HOME/.poetry/env && \
     chmod +x /analyzer/entrypoint.sh &&\
     chmod 777 -R /analyzer
 
-USER analysis
 ENTRYPOINT ["/analyzer/entrypoint.sh"]
 CMD ["--help"]
 
 
 FROM aura-lite AS aura-lite-tests
-USER root
 
 RUN source $HOME/.poetry/env && \
     poetry install
@@ -65,8 +66,6 @@ CMD ["run_tests"]
 
 FROM aura-lite AS aura-full
 
-USER root
-
 RUN apk add --no-cache \
     libxml2-dev \
     libxslt-dev
@@ -74,14 +73,12 @@ RUN apk add --no-cache \
 RUN source $HOME/.poetry/env && \
     poetry install --no-dev -E full
 
-USER analysis
 ENTRYPOINT ["/analyzer/entrypoint.sh"]
 CMD ["--help"]
 
 
 FROM aura-full AS aura-full-tests
 
-USER root
 RUN source $HOME/.poetry/env && \
     poetry install -E full
 

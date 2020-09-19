@@ -6,6 +6,9 @@ from pathlib import Path
 
 import pytest
 
+from aura.exceptions import FeatureDisabled
+
+
 try:
     import binwalk
 except ImportError:
@@ -297,8 +300,11 @@ def test_diff_output_comprehensive(skip_binwalk, fixtures, fuzzy_rule_match):
 def test_diff_json_output(skip_binwalk, fixtures, fuzzy_rule_match):
     pth1 = fixtures.path("diffs/1_a")
     pth2 = fixtures.path("diffs/1_b")
+    try:
+        raw_output = fixtures.get_cli_output(["diff", pth1, pth2, "-f", "json"])
+    except FeatureDisabled as exc:
+        pytest.mark.skipif(reason=exc.args[0])
 
-    raw_output = fixtures.get_cli_output(["diff", pth1, pth2, "-f", "json"])
     output = json.loads(raw_output.stdout)
     diffs = output["diffs"]
 
@@ -312,7 +318,10 @@ def test_diff_sqlite_output(skip_binwalk, fixtures, fuzzy_rule_match, tmp_path):
     pth2 = fixtures.path("diffs/1_b")
     db_path = tmp_path / "aura_test_diff_output.sqlite"
 
-    _ = fixtures.get_cli_output(["diff", pth1, pth2, "-f", f"sqlite://{db_path}"])
+    try:
+        _ = fixtures.get_cli_output(["diff", pth1, pth2, "-f", f"sqlite://{db_path}"])
+    except FeatureDisabled as exc:
+        pytest.mark.skipif(reason=exc.args[0])
 
     db = sqlite3.connect(db_path)
     db.row_factory = sqlite3.Row

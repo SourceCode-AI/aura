@@ -327,12 +327,15 @@ class TextInfoOutput(InfoOutputBase):
         # Right hand side lists environment information (installed plugins, URI handlers etc.)
         rhs_lines = []
 
-        semantic = data["schema_validation"]["semantic_rules"]
-        if semantic is True:
-            rhs_lines.append(style(f" {OK} Semantic rules configuration is valid", fg="bright_green"))
+        if data["schema_validation"] is not None:
+            semantic = data["schema_validation"]["semantic_rules"]
+            if semantic is True:
+                rhs_lines.append(style(f" {OK} Semantic rules configuration is valid", fg="bright_green"))
+            else:
+                rhs_lines.append(style(f" {NOK} Semantic rules configuration is not valid:", fg="bright_red"))
+                rhs_lines.append(semantic)
         else:
-            rhs_lines.append(style(f" {NOK} Semantic rules configuration is not valid:", fg="bright_red"))
-            rhs_lines.append(semantic)
+            rhs_lines.append(style(f" ? - `jsonschema` is not installed, unable to verify the configuration", fg="cyan"))
 
         rhs_lines.append("")
         rhs_lines.append("Installed analyzers:")
