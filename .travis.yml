@@ -5,7 +5,7 @@ services:
 before_install:
   - BRANCH=$(git branch| grep \* |cut -d ' ' -f2)
   - GIT_TAG=$(git describe --long --tags --dirty --always)
-  - DOCKER_REPO="rootlug/aura-security"
+  - DOCKER_REPO="sourcecodeai/aura"
   - IMAGE_NAME="${DOCKER_REPO}:${GIT_TAG}"
   - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 
