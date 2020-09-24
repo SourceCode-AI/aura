@@ -6,9 +6,9 @@ Produced hits from analyzers are collected for later processing
 
 import os
 import shutil
-import queue
 from pathlib import Path
 from typing import Union, Tuple, List
+from collections import deque
 
 from . import utils
 from . import config
@@ -31,16 +31,16 @@ class Analyzer(object):
     def run(self):
         cleanup = []
         hits_items = []
-        files_queue = queue.Queue()
+        files_queue = deque()
         executor = worker_executor.AuraExecutor(job_queue=files_queue)
-        files_queue.put(self.location)
-        files_queue.put(worker_executor.Wait)
+        files_queue.append(self.location)
+        files_queue.append(worker_executor.Wait)
 
         try:
-            while files_queue.qsize() or bool(executor):
+            while len(files_queue) or bool(executor):
                 try:
-                    item: Union[worker_executor.Wait, base.ScanLocation] = files_queue.get(False, 0.1)
-                except queue.Empty:
+                    item: Union[worker_executor.Wait, base.ScanLocation] = files_queue.popleft()
+                except IndexError:  # Queue is empty
                     executor.wait()
                     item = False
 
@@ -51,7 +51,7 @@ class Analyzer(object):
                             if loc.cleanup:
                                 cleanup.append(loc.location)
 
-                            files_queue.put(loc)
+                            files_queue.append(loc)
 
                         hits_items.extend(detections)
                     continue
@@ -67,9 +67,9 @@ class Analyzer(object):
                     collected = self.scan_directory(item=item)
 
                     for x in collected:
-                        files_queue.put(x)
+                        files_queue.append(x)
 
-                    files_queue.put(worker_executor.Wait)
+                    files_queue.append(worker_executor.Wait)
                     continue
 
                 executor.submit(self.analyze, location=item)
@@ -101,7 +101,8 @@ class Analyzer(object):
 
         return (locations, detections)
 
-    def scan_directory(self, item: base.ScanLocation):
+    @staticmethod
+    def scan_directory(item: base.ScanLocation):
         logger.debug(f"Collecting files in a directory '{item.str_location}")
         topo = TopologySort()
         collected = []

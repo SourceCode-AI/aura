@@ -29,6 +29,12 @@ class DataFinder(NodeAnalyzerV2):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        self._no_blobs = False
+
+        if "AURA_NO_BLOB" in os.environ:
+            self._no_blobs = True
+
         self.__min_blob_size = self.get_min_size()
         pass
 
@@ -59,11 +65,11 @@ class DataFinder(NodeAnalyzerV2):
             except binascii.Error:
                 pass
 
-        if len(val) >= self.__min_blob_size:
+        if len(val) >= self.__min_blob_size and self._no_blobs is False:
             yield self.__export_blob(val, context)
 
     def node_Binary(self, context: Context):
-        if len(context.node.value) >= self.__min_blob_size:
+        if len(context.node.value) >= self.__min_blob_size and self._no_blobs is False:
             yield self.__export_blob(context.node.value, context)
 
     def __export_blob(self, blob: Union[bytes, str], context: Context) -> ScanLocation:

@@ -16,6 +16,8 @@ import logging
 import json
 import shlex
 import subprocess
+import shutil
+
 
 import pip
 from pip._internal import main as pip_main
@@ -29,6 +31,7 @@ except NameError:
 
 
 SUPPORTED_PIP_VERSIONS = ("19.*", "10.*", "20.*", "18.*")
+AURA_PATH = None
 logger = logging.getLogger("apip")
 
 
@@ -69,7 +72,7 @@ def check_package(pkg):
     payload = json.dumps(pkg)
 
     p = subprocess.Popen(
-        shlex.split(os.environ["AURA_PATH"]) + ["check_requirement"],
+        shlex.split(AURA_PATH) + ["check_requirement"],
         universal_newlines=True,
         stdin=subprocess.PIPE
     )
@@ -115,6 +118,8 @@ def monkey_patch():
 
 
 def main():
+    global AURA_PATH
+
     if not check_version():
         logger.warning("Unsupported pip version: '{}'".format(pip.__version__))
         logger.warning(
@@ -123,7 +128,13 @@ def main():
             )
         )
 
-    if not os.environ.get("AURA_PATH"):
+    if "AURA_PATH" in os.environ:
+        AURA_PATH = os.environ["AURA_PATH"]
+
+    if hasattr(shutil, "which"):
+        AURA_PATH = shutil.which("aura")
+
+    if AURA_PATH is None:
         logger.error(
             "You need to set AURA_PATH environment variable that points to the AURA framework executable"
         )

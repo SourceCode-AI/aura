@@ -26,6 +26,7 @@ def run_in_venv(venv_pth:str, cmd, stdin:bytes=b'', aura_path=None):
     env['AURA_PATH'] = aura_path
     env['PIP_DISABLE_PIP_VERSION_CHECK'] = '1'
     env['PIP_REQUIRE_VIRTUALENV'] = '1'
+    env["PYTHONWARNINGS"] = "ignore"
 
     cwd = os.getcwd()
     os.chdir(venv_pth)

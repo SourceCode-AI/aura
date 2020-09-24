@@ -72,7 +72,9 @@ class AuraExecutor:
             return
 
         if self.q is not None:
-            total = self.total + self.q.qsize()
+            queue_items = sum(1 for x in list(self.q) if x is not Wait)
+
+            total = self.total + queue_items
         else:
             total = self.total
 

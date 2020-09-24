@@ -31,6 +31,8 @@ logger = config.get_logger(__name__)
 def check_requirement(pkg):
     click.secho("Received payload from package manager, running security audit...")
 
+    out_format = ScanOutputBase.from_uri("text")
+
     handler = URIHandler.from_uri(f"{pkg['path']}")
     try:
         metadata = {  # FIXME, add to item scan location
@@ -41,10 +43,12 @@ def check_requirement(pkg):
             "min_score": 0,
         }
 
-        for location in handler.get_paths():
+
+        hits = []
+
+        for location in handler.get_paths(metadata=metadata):
             # print(f"Enumerating: {location}")
-            with scan_worker(location) as scan:
-                scan.pprint()
+            hits.extend(scan_worker(location))
 
         typosquatting = typos.check_name(pkg["name"])
         if typosquatting:

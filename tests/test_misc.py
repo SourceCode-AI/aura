@@ -1,5 +1,4 @@
 import os
-import pytest
 
 
 def test_misc_signatures(fixtures):
@@ -125,18 +124,51 @@ def test_custom_config(tmp_path):
     cfg_pth = tmp_path / "custom_cfg.yml"
     cfg_content = """---
 aura:
-    <<: *aura_config
+    <<: *aura_config  # test comment
     test_key: test_val
     async: nope
 """
     cfg_pth.write_text(cfg_content)
-    os.environ["AURA_CFG"] = str(cfg_pth)
+    try:
+        os.environ["AURA_CFG"] = str(cfg_pth)
 
-    from aura import config
+        from aura import config
 
-    parsed = config.parse_config()
-    assert parsed["aura"]["test_key"] == "test_val"
-    # Inherited key
-    assert parsed["aura"]["text-output-width"] == "auto"
-    # Overwritten key
-    assert parsed["aura"]["async"] == "nope"
+        config.CFG_PATH = config.find_configuration()
+        config.load_config()
+        assert config.CFG["aura"]["test_key"] == "test_val"
+        # Inherited key
+        assert config.CFG["aura"]["text-output-width"] == "auto"
+        # Overwritten key
+        assert config.CFG["aura"]["async"] == "nope"
+    finally:
+        del os.environ["AURA_CFG"]
+        config.CFG_PATH = config.find_configuration()
+        config.load_config()
+
+
+def test_custom_signatures(tmp_path):
+    sig_pth = tmp_path / "custom_sig.yml"
+    sig_content = """---
+patterns:
+    - <<: *default_patterns
+    - id: test_sig_pattern
+      pattern: "super_sig(...)"
+"""
+
+    sig_pth.write_text(sig_content)
+    try:
+        os.environ["AURA_SIGNATURES"] = str(sig_pth)
+
+        from aura import config
+
+        config.load_config()
+        sig = config.SEMANTIC_RULES["patterns"][-1]
+        assert sig["id"] == "test_sig_pattern"
+
+        first = config.SEMANTIC_RULES["patterns"][0]
+        assert first["id"] == "flask_run_debug"
+
+    finally:
+        del os.environ["AURA_SIGNATURES"]
+        config.load_config()

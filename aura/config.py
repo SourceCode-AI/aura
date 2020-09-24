@@ -33,7 +33,9 @@ DEBUG_LINES = set()
 DEFAULT_AST_STAGES = ("convert", "rewrite", "ast_pattern_matching", "taint_analysis", "readonly")
 AST_PATTERNS_CACHE = None
 PROGRESSBAR_DISABLED = ("AURA_NO_PROGRESS" in os.environ)
+
 DEFAULT_CFG_PATH = "aura.data.aura_config.yaml"
+DEFAULT_SIGNATURE_PATH = "aura.data.signatures.yaml"
 
 
 if "AURA_DEBUG_LINES" in os.environ:
@@ -181,15 +183,12 @@ def get_file_content(location: str, base_path: Optional[str]=None) -> str:
             return fd.read()
 
 
-def parse_config():
-    global CFG_PATH
+def parse_config(pth, default_pth):
+    logger.debug(f"Aura configuration located at {pth}")
 
-    CFG_PATH = str(find_configuration())
-    logger.debug(f"Aura configuration located at {CFG_PATH}")
-
-    content = get_file_content(CFG_PATH)
+    content = get_file_content(pth)
     if content.startswith("---"):
-        default_cfg = get_file_content(DEFAULT_CFG_PATH)
+        default_cfg = get_file_content(default_pth)
         content = default_cfg + "\n" + content
         docs = list(ruamel.yaml.safe_load_all(content))
         return docs[-1]
@@ -200,10 +199,15 @@ def parse_config():
 def load_config():
     global SEMANTIC_RULES, CFG, CFG_PATH
 
-    CFG = parse_config()
-    semantic_sig_pth = CFG["aura"]["semantic-rules"]
+    CFG_PATH = str(find_configuration())
+    CFG = parse_config(CFG_PATH, DEFAULT_CFG_PATH)
 
-    SEMANTIC_RULES = ruamel.yaml.safe_load(get_file_content(semantic_sig_pth, CFG_PATH))
+    if "AURA_SIGNATURES" in os.environ:
+        semantic_sig_pth = os.environ["AURA_SIGNATURES"]
+    else:
+        semantic_sig_pth = CFG["aura"]["semantic-rules"]
+
+    SEMANTIC_RULES = parse_config(semantic_sig_pth, DEFAULT_SIGNATURE_PATH)
 
     if "AURA_LOG_LEVEL" in os.environ:
         log_level = logging.getLevelName(os.getenv("AURA_LOG_LEVEL").upper())
@@ -283,4 +287,8 @@ def get_ast_patterns():
         logger.debug(f"AST Pattern compilation took {elapsed}s")
     return AST_PATTERNS_CACHE
 
+
+
+
+CFG_PATH = find_configuration()
 load_config()

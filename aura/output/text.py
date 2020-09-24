@@ -39,7 +39,7 @@ LOGO = """
      ▝█████▄                  ▄█████▀          by SourceCode.AI      
        ▝▀█████▄▄▁        ▁▄▄██████▘                                  
           ▝▀██████████████████▀▘                                     
-               ▔▀▀▀▀▀▀▀▀▀▀▔                                                                         
+               ▔▀▀▀▀▀▀▀▀▀▀▔                                          
 """
 
 
@@ -63,8 +63,10 @@ class PrettyReport:
 
     def __init__(self, fd=None):
         width = config.get_settings("aura.text-output-width", "auto")
+        self.term_width = get_terminal_size(fallback=(120, 24))[0]
+
         if width == "auto":
-            self.width = get_terminal_size(fallback=(120, 24))[0]
+            self.width = self.term_width
         else:
             self.width = int(width or 120)
 
@@ -371,7 +373,11 @@ class TextInfoOutput(InfoOutputBase):
             else:
                 rhs = " "
 
-            out.align(f"{lhs} \u2502 {rhs}")
+
+            if out.term_width <= 150:
+                out.align(rhs)
+            else:
+                out.align(f"{lhs} \u2502 {rhs}")
 
         out.print_bottom_separator()
 

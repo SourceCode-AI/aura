@@ -1,4 +1,4 @@
-patterns:
+patterns: &default_patterns
   - id: flask_run_debug
     pattern: "flask.Flask.run(..., debug=True)"
     detection:
@@ -379,7 +379,7 @@ patterns:
       - "django"
 
 
-files:
+files: &default_files
   - id: tag_test_code
     type: regex
     pattern: "^test(_.+|s)?$"
@@ -548,7 +548,7 @@ files:
       - ignore
 
 
-strings:
+strings: &default_strings
   - id: all_interfaces
     type: regex
     pattern: "^0\\.0\\.0\\.0(:\\d{2,6})?$"
