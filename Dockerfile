@@ -79,11 +79,14 @@ CMD ["--help"]
 
 FROM aura-full AS aura-full-tests
 
+ADD docs /analyzer/docs
+
 RUN source $HOME/.poetry/env && \
     poetry install -E full
 
 USER analysis
 RUN pytest tests/
+RUN cd /analyzer/docs && make html
 
 ENTRYPOINT ["/analyzer/entrypoint.sh"]
 CMD ["run_tests"]
