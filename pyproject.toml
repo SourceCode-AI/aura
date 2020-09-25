@@ -24,7 +24,7 @@ packages = [
     { include = "tests", format = "sdist" }
 ]
 include = [
-    "README.md",
+    "README.rst",
     "LICENSE.txt",
     "aura/data/semantic_rules_schema.json",
     "aura/data/aura_config.yaml",

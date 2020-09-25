@@ -6,7 +6,7 @@
 venv
 __pycache__
 quarantine
-docs/
+docs/build
 files/logo
 aura_mirror_scan
 pypi_stats.json

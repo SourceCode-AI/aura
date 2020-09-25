@@ -33,7 +33,7 @@ WORKDIR /analyzer
 ADD custom_analyzer.py \
     entrypoint.sh \
     LICENSE.txt \
-    README.md \
+    README.rst \
     pyproject.toml \
     poetry.lock \
     /analyzer/
