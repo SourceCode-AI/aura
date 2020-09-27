@@ -58,7 +58,6 @@ FROM aura-lite AS aura-lite-tests
 RUN source $HOME/.poetry/env && \
     poetry install
 
-USER analysis
 RUN pytest tests/
 
 ENTRYPOINT ["/analyzer/entrypoint.sh"]
@@ -84,9 +83,7 @@ ADD docs /analyzer/docs
 RUN source $HOME/.poetry/env && \
     poetry install -E full
 
-USER analysis
 RUN pytest tests/
-RUN cd /analyzer/docs && make html
 
 ENTRYPOINT ["/analyzer/entrypoint.sh"]
 CMD ["run_tests"]

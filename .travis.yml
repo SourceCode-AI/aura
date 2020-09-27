@@ -14,6 +14,7 @@ stages:
   - test
   - deploy_prod
   - deploy_dev
+  - make_docs
 
 jobs:
   include:
@@ -26,9 +27,6 @@ jobs:
         - docker push ${IMAGE_NAME}-full
         - docker push ${IMAGE_NAME}-lite
 
-    #- stage: test
-    #  script:
-    #    - docker run -ti -e "CODECOV_TOKEN=${CODECOV_TOKEN}" --rm $IMAGE_NAME run_tests
 
     - stage: deploy_prod
       if: branch = master
@@ -49,6 +47,13 @@ jobs:
         - docker pull ${IMAGE_NAME}-lite
         - docker tag ${IMAGE_NAME}-lite ${DOCKER_REPO}:dev-lite
         - docker push ${DOCKER_REPO}:dev-lite
+
+    - stage: make_docs
+      script:
+        - docker pull ${IMAGE_NAME}-full
+        - mkdir docs_build && chmod 777 docs_build
+        - docker run --rm -v $(pwd)/docs_build:/analyzer/docs/build ${IMAGE_NAME}-full make_docs
+        - ls -lah docs_build
 
 notifications:
   email:

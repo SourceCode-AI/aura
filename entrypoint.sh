@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+source $HOME/.poetry/env
+
 
 if [ $1 == "run_tests" ]; then
     cd /analyzer
@@ -10,6 +12,15 @@ if [ $1 == "run_tests" ]; then
       bash <(curl -s https://codecov.io/bash)
     fi
 
+    exit
+fi;
+
+if [ $1 == "make_docs" ]; then
+  cd /analyzer
+  poetry install
+  cd /analyzer/docs
+  make html
+  exit
 fi;
 
 exec aura "$@"
