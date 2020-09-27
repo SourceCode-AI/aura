@@ -72,13 +72,14 @@ RUN apk add --no-cache \
 RUN source $HOME/.poetry/env && \
     poetry install --no-dev -E full
 
+ADD docs /analyzer/docs
+
+
 ENTRYPOINT ["/analyzer/entrypoint.sh"]
 CMD ["--help"]
 
 
 FROM aura-full AS aura-full-tests
-
-ADD docs /analyzer/docs
 
 RUN source $HOME/.poetry/env && \
     poetry install -E full

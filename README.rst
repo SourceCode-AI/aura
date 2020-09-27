@@ -3,7 +3,7 @@
 
 ======
 
-.. image:: https://travis-ci.com/RootLUG/aura.svg
+.. image:: https://travis-ci.com/SourceCode-AI/aura.svg?branch=dev
 
 Security auditing and static code analysis
 =================================================
