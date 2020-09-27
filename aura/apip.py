@@ -20,7 +20,11 @@ import shutil
 
 
 import pip
-from pip._internal import main as pip_main
+try:
+    from pip._internal.cli.main import main as pip_main
+except ImportError:
+    from pip._internal import main as pip_main
+
 from pip._internal.req import InstallRequirement
 
 # Polyfill for compatibility (Py2k & Py3k) to retrieve user input
@@ -130,8 +134,7 @@ def main():
 
     if "AURA_PATH" in os.environ:
         AURA_PATH = os.environ["AURA_PATH"]
-
-    if hasattr(shutil, "which"):
+    elif hasattr(shutil, "which"):
         AURA_PATH = shutil.which("aura")
 
     if AURA_PATH is None:

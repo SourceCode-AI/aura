@@ -93,7 +93,7 @@ def test_apip():
 
         stdout, _ = run_in_venv(venv_dir, [f'{venv_dir}/bin/apip freeze'])
         # print(stdout)
-        assert 'simplewheel==1.0' in stdout, stdout
+        assert 'simplewheel' in stdout, stdout
         assert 'Flask' not in stdout, stdout
     finally:
         shutil.rmtree(venv_dir)
