@@ -2,12 +2,21 @@ language: minimal
 services:
   - docker
 
+env:
+  global:
+    # include $HOME/.local/bin for `aws`
+    - PATH=$HOME/.local/bin:$PATH
+
 before_install:
   - BRANCH=$(git branch| grep \* |cut -d ' ' -f2)
   - GIT_TAG=$(git describe --long --tags --dirty --always)
   - DOCKER_REPO="sourcecodeai/aura"
   - IMAGE_NAME="${DOCKER_REPO}:${GIT_TAG}"
   - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+  - pyenv global 3.7.1
+  - pip install -U pip
+  - pip install awscli awscli-plugin-endpoint
+
 
 stages:
   - build
@@ -50,7 +59,6 @@ jobs:
 
     - stage: make_docs
       script:
-        - pip install awscli awscli-plugin-endpoint
         - mkdir .aws && cp files/awscli_scaleway.cfg .aws/config
         - docker pull ${IMAGE_NAME}-full
         - mkdir docs_build && chmod 777 docs_build
