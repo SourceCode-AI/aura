@@ -11,9 +11,6 @@ before_install:
   - DOCKER_REPO="sourcecodeai/aura"
   - IMAGE_NAME="${DOCKER_REPO}:${GIT_TAG}"
   - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-  - pip install -U pip
-  - pip install awscli awscli-plugin-endpoint
-
 
 stages:
   - build
@@ -56,7 +53,9 @@ jobs:
 
     - stage: make_docs
       script:
-        - mkdir .aws && cp files/awscli_scaleway.cfg .aws/config
+        - pip install -U pip
+        - pip install awscli awscli-plugin-endpoint
+        - mkdir ~/.aws && cp files/awscli_scaleway.cfg ~/.aws/config
         - docker pull ${IMAGE_NAME}-full
         - mkdir docs_build && chmod 777 docs_build
         - docker run --rm -v $(pwd)/docs_build:/analyzer/docs/build ${IMAGE_NAME}-full make_docs
