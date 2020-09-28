@@ -50,10 +50,12 @@ jobs:
 
     - stage: make_docs
       script:
+        - pip install awscli awscli-plugin-endpoint
+        - mkdir .aws && cp files/awscli_scaleway.cfg .aws/config
         - docker pull ${IMAGE_NAME}-full
         - mkdir docs_build && chmod 777 docs_build
         - docker run --rm -v $(pwd)/docs_build:/analyzer/docs/build ${IMAGE_NAME}-full make_docs
-        - ls -lah docs_build
+        - cd docs_build/html && aws s3 sync ./ s3://docs.aura.sourcecode.ai --acl public-read
 
 notifications:
   email:
