@@ -102,7 +102,7 @@ def mp_install_requirement(
         "format": "0.1",
         "cmd": sys.argv,
         "name": self.name,
-        "path": self.source_dir,
+        "path": self.source_dir or self.local_file_path,
         "wheel": self.is_wheel,
         "is_pinned": self.is_pinned,
         "editable": self.editable,

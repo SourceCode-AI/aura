@@ -20,8 +20,8 @@ Project goals:
 
 ============= ======
 License       GPLv3
-Documentation docs.aura.sourcecode.ai
-Homepage      aura.sourcecode.ai
+Documentation WIP
+Homepage      WIP
 Docker        https://hub.docker.com/r/sourcecodeai/aura
 ============= ======
 
@@ -29,7 +29,7 @@ Docker        https://hub.docker.com/r/sourcecodeai/aura
 Why Aura?
 ---------
 
-While there are other tools with a functionality that overlaps with Aura such as Bandit, dlint, semgrep etc. the focus of these alternatives is different which impacts functionality and how they are being used. These alternatives are mainly intended to be used in a similar way to linters, integrated into IDEs, frequently run during the development which makes it important to **minimize false positives** and reporting with clear **actionable** explanation in ideal cases.
+While there are other tools with a functionality that overlaps with Aura such as Bandit, dlint, semgrep etc. the focus of these alternatives is different which impacts functionality and how they are being used. These alternatives are mainly intended to be used in a similar way to linters, integrated into IDEs, frequently run during the development which makes it important to **minimize false positives** and reporting with clear **actionable** explanations in ideal cases.
 
 Aura on the other hand reports on **behaviour of the code**, **anomalies** and **vulnerabilities** with as much information as possible at the cost of false positive. There are a lot of things reported by aura that are not necessarily actionable by a user but they tell you a lot about the behaviour of the code such as doing network communication, accessing sensitive files or using mechanisms associated with obfuscation indicating a possible malicious code. By collecting this kind of data and aggregating it together, Aura can be compared in functionality to other security systems such as antivirus, IDS or firewalls that are essentially doing the same analysis but on a different kind of data (network communication, running processes etc).
 
