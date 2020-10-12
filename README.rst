@@ -20,7 +20,7 @@ Project goals:
 
 ============= ======
 License       GPLv3
-Documentation WIP
+Documentation https://docs.aura.sourcecode.ai/
 Homepage      WIP
 Docker        https://hub.docker.com/r/sourcecodeai/aura
 ============= ======

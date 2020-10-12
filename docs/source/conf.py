@@ -49,7 +49,7 @@ exclude_patterns = []
 html_theme = 'alabaster'
 
 html_theme_options = {
-    "github_user": "RootLUG",
+    "github_user": "SourceCode-AI",
     "github_repo": "aura",
     "github_banner": True,
     "show_powered_by": False
