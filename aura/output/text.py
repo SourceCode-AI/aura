@@ -52,6 +52,10 @@ SEVERITY_COLORS = {
 }
 
 
+OK = '\u2713'
+NOK = '\u2717'
+
+
 
 class PrettyReport:
     ANSI_RE = re.compile(r"""
@@ -311,10 +315,14 @@ class TextInfoOutput(InfoOutputBase):
     def protocol(cls) -> str:
         return "text"
 
-    def output_info_data(self, data):
-        OK = '\u2713'
-        NOK = '\u2717'
+    def get_feature_status(self, fmt, name, status):
+        enabled = status.get("enabled", True)
+        mark = OK if enabled else NOK
+        description = status.get("description", "Description N/A")
+        s = {"fg": ("bright_green" if enabled else "bright_red")}
+        return style(fmt.format(mark=mark, status=status, name=name, enabled=enabled, description=description), **s)
 
+    def output_info_data(self, data):
         out = PrettyReport()
 
         # Left hand side of the table contains logo and basic project information
@@ -343,22 +351,15 @@ class TextInfoOutput(InfoOutputBase):
         rhs_lines.append("Installed analyzers:")
 
         for name, i in data["analyzers"].items():
-            if i["enabled"]:
-                mark = OK
-                s = {"fg": "bright_green"}
-            else:
-                mark = NOK
-                s = {"fg": "bright_red"}
+            rhs_lines.append(self.get_feature_status(fmt=" {mark} {name}: {description}", name=name, status=i))
 
-            rhs_lines.append(style(f" {mark} {name}: {i['description']}", **s))
+        rhs_lines.append("Integrations:")
+        for name, i in data["integrations"].items():
+            rhs_lines.append(self.get_feature_status(fmt=" {mark} {name}: {description}", name=name, status=i))
 
         rhs_lines.append("Installed URI handlers:")
         for name, i in data["uri_handlers"].items():
-            enabled = i.get("enabled", True)
-            mark = OK if enabled else NOK
-            s = {"fg": ("bright_green" if enabled else "bright_red") }
-
-            rhs_lines.append(style(f" {mark} `{name}://` - {i.get('description', 'Description N/A')}", **s))
+            rhs_lines.append(self.get_feature_status(fmt=" {mark} `{name}://` - {description}", name=name, status=i))
 
         rhs_size = max(len(x) for x in rhs_lines)
 

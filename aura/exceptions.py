@@ -25,6 +25,10 @@ class NoSuchRepository(InvalidLocation):
     pass
 
 
+class InvalidConfiguration(AuraException, ValueError):
+    pass
+
+
 class ASTNodeRewrite(AuraException):
     pass
 

@@ -13,6 +13,7 @@ except ImportError:
     jsonschema = None
 
 from . import __version__ as version
+from .exceptions import InvalidConfiguration
 from .uri_handlers.base import URIHandler
 from . import plugins
 from . import config
@@ -27,16 +28,35 @@ def get_analyzer_description(analyzer) -> str:
 
 
 def check_pypi_stats() -> dict:
-    if config.get_pypi_stats_path():  # Put into try except
-        return {
-            "enabled": True,
-            "description": "PyPI typosquatting protection enabled"
-        }
-    else:
-        return {
-            "enabled": False,
-            "description": "PyPI download stats not found, typosquatting protection is disabled. Run `aura fetch-pypi-stats` to download"
-        }
+    try:
+        if config.get_pypi_stats_path():  # Put into try except
+            return {
+                "enabled": True,
+                "description": "PyPI typosquatting protection enabled"
+            }
+    except InvalidConfiguration:
+        pass
+
+    return {
+        "enabled": False,
+        "description": "PyPI download stats not found, typosquatting protection is disabled. Run `aura update` to download"
+    }
+
+
+def check_reverse_dependencies() -> dict:
+    try:
+        if config.get_reverse_dependencies_path():
+            return {
+                "enabled": True,
+                "description": "Reverse dependencies dataset present. Package scoring feature is fully enabled"
+            }
+    except InvalidConfiguration:
+        pass
+
+    return {
+        "enabled": False,
+        "description": "Reverse dependencies dataset not found, package scoring may be affected. Run `aura update` to download"
+    }
 
 
 def check_git() -> dict:
@@ -90,7 +110,6 @@ def gather_aura_information() -> dict:
         }
 
     for k, v in analyzers["disabled"]:
-        #doc = get_analyzer_description(v)
         info["analyzers"][k] = {
             "enabled": False,
             "description": v
@@ -105,6 +124,7 @@ def gather_aura_information() -> dict:
         info["uri_handlers"][k] = {"enabled": True}
 
     info["integrations"]["pypi_stats"] = check_pypi_stats()
+    info["integrations"]["reverse_dependencies"] = check_reverse_dependencies()
     info["integrations"]["git"] = check_git()
 
     return info

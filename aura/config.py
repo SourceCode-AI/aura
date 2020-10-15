@@ -22,6 +22,8 @@ try:
 except ImportError:
     import json
 
+from .exceptions import InvalidConfiguration
+
 
 CFG: Optional[dict] = None
 CFG_PATH = None
@@ -168,7 +170,7 @@ def get_file_location(location: str, base_path: Optional[str]=None) -> str:
             return str(pth)
 
     # TODO: use custom exception here so we can log as fatal and sys.exit(1)
-    raise ValueError(f"Can't find configuration file `{location}` using base path `{base_path}`")
+    raise InvalidConfiguration(f"Can't find configuration file `{location}` using base path `{base_path}`")
 
 
 def get_file_content(location: str, base_path: Optional[str]=None) -> str:
@@ -239,6 +241,11 @@ def load_config():
 
 def get_pypi_stats_path() -> Path:
     pth = os.environ.get("AURA_PYPI_STATS", None) or CFG["aura"]["pypi_stats"]
+    return Path(get_file_location(pth, CFG_PATH))
+
+
+def get_reverse_dependencies_path() -> Path:
+    pth = os.environ.get("AURA_REVERSE_DEPENDENCIES", None) or CFG["aura"]["reverse_dependencies"]
     return Path(get_file_location(pth, CFG_PATH))
 
 

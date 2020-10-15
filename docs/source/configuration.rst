@@ -115,14 +115,16 @@ Environment config options
 
 The following environment variable configuration options can be used to configure the aura behaviour:
 
-======================= =============================================================
-Environment variable    Explanation
-======================= =============================================================
-AURA_CFG                Overwrite the path to the main configuration file
-AURA_SIGNATURES         Overwrite the path to the configuration file for signatures/patterns
-AURA_MIRROR_PATH        Location to the local pypi mirror repository
-AURA_LOG_LEVEL          Output log level
-AURA_NO_BLOBS           Disable extraction of data blobs for further analysis
-AURA_NO_PROGRESS        Disable cli progress bar, useful when redirecting stderr and stdout
-AURA_DEBUG_LINES        List of line numbers separated by ``,``. Aura will then call ``breakpoint()`` when traversing AST tree and it visits a node located on those specific line numbers
-======================= =============================================================
+=========================== =============================================================
+Environment variable        Explanation
+=========================== =============================================================
+AURA_CFG                    Overwrite the path to the main configuration file
+AURA_SIGNATURES             Overwrite the path to the configuration file for signatures/patterns
+AURA_MIRROR_PATH            Location to the local pypi mirror repository
+AURA_PYPI_STATS             Overwrite the path to the aura `pypi_stats` dataset
+AURA_REVERSE_DEPENDENCIES   Overwrite the path to the aura `reverse_dependencies` dataset
+AURA_LOG_LEVEL              Output log level
+AURA_NO_BLOBS               Disable extraction of data blobs for further analysis
+AURA_NO_PROGRESS            Disable cli progress bar, useful when redirecting stderr and stdout
+AURA_DEBUG_LINES            List of line numbers separated by ``,``. Aura will then call ``breakpoint()`` when traversing AST tree and it visits a node located on those specific line numbers
+=========================== =============================================================

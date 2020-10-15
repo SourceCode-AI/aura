@@ -20,6 +20,8 @@ aura: &aura_config
   # This file is needed for typosquatting detections
   pypi_stats: &pypi_stats pypi_stats.json
 
+  reverse_dependencies: &reverse_dependencies reverse_dependencies.json
+
   # Threshold for package download after which the package is considered not legitimate
   pypi_download_threshold: 10000
 
