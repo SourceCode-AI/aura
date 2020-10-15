@@ -23,6 +23,7 @@ Misc
 ----
 
 .. toctree::
+    misc/datasets.rst
     python_2.rst
     misc/visitors.rst
     misc/plugin_templates.rst

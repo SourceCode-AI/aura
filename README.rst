@@ -3,7 +3,14 @@
 
 ======
 
+.. image:: https://img.shields.io/badge/Homepage-WIP-blue
+.. image:: https://img.shields.io/badge/-Documentation-blue
+   :target: https://docs.aura.sourcecode.ai/
+.. image:: https://img.shields.io/badge/docker-SourceCodeAI/aura-blue
+   :target: https://hub.docker.com/r/sourcecodeai/aura
+.. image:: https://img.shields.io/github/license/SourceCode-AI/aura?color=blue
 .. image:: https://travis-ci.com/SourceCode-AI/aura.svg?branch=dev
+
 
 Security auditing and static code analysis
 =================================================
@@ -16,14 +23,6 @@ Project goals:
 * provide an automated monitoring system over uploaded packages to PyPI, alert on anomalies that can either indicate an ongoing attack or vulnerabilities in the code
 * enable an organization to conduct automated security audits of the source code and implement secure coding practices with a focus on auditing 3rd party code such as python package dependencies
 * allow researches to scan code repositories on a large scale, create datasets and perform analysis to further advance research in the area of vulnerable and malicious code dependencies
-
-
-============= ======
-License       GPLv3
-Documentation https://docs.aura.sourcecode.ai/
-Homepage      WIP
-Docker        https://hub.docker.com/r/sourcecodeai/aura
-============= ======
 
 
 Why Aura?
