@@ -173,15 +173,13 @@ class ScanLocation(KeepRefs):
                 sha1.update(buffer)
                 sha256.update(buffer)
                 sha512.update(buffer)
-
                 buffer = fd.read(4096)
 
         try:
             tl.final()
+            self.metadata["tlsh"] = tl.hexdigest()
         except ValueError:  # TLSH needs at least 256 bytes
             pass
-        else:
-            self.metadata["tlsh"] = tl.hexdigest()
 
         self.metadata["md5"] = md5.hexdigest()
         self.metadata["sha1"] = sha1.hexdigest()

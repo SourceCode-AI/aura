@@ -1,13 +1,13 @@
 Datasets
 ========
 
-There are several datasets that are frequently published by the SourceCode.AI team that are not required in order to run Aura but can provide a much accurate results if the datasets are used being and frequently updated. Below is an overview of available datasets that are frequently published by the Aura team.
+Several datasets are frequently published by the SourceCode.AI team that are not required to run Aura but can provide a much accurate results if the datasets are used being and frequently updated. Below is an overview of available datasets that are frequently published by the Aura team.
 
 
 PyPI download stats
 -------------------
 
-This datasets contains aggregated statistics of package downloads from the official PyPI repository for the last 30 days. It contains a name of the package and how many times it was downloaded in the 30 day period. This is accomplished by aggregating the networks logs that are `published in the open dataset on google big query <https://packaging.python.org/guides/analyzing-pypi-package-downloads/>`_. The main usage is to calculate the popularity of a given package which is used as several places such as computing the aura score or in a typosquatting protection where it's suspicious for a package with very low number of downloads to have a very similar name to a package with a very high number of downloads. Google Big Query offers a free tier that is based/priced on amount of data analyzed and as such the current refresh period for this dataset is around 3 days.
+This datasets contains aggregated statistics of package downloads from the official PyPI repository for the last 30 days. It contains a name of the package and how many times it was downloaded in the 30 days. This is accomplished by aggregating the networks logs that are `published in the open dataset on google big query <https://packaging.python.org/guides/analyzing-pypi-package-downloads/>`_. The main usage is to calculate the popularity of a given package which is used as several places such as computing the aura score or in a typosquatting protection where it's suspicious for a package with very low number of downloads to have a very similar name to a package with a very high number of downloads. Google Big Query offers a free tier that is based/priced on amount of data analyzed and as such the current refresh period for this dataset is around 3 days.
 
 
 PyPI Package list

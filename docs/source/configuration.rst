@@ -1,7 +1,7 @@
 Configuration
 =============
 
-Aura can be configured using two yaml files. The first one is the main framework configuration that configures the behaviour of the framework such as scoring system, restrictions or interpreters used to parse the source code. The second file is a list of semantic signatures and patterns to look for inside the files. The framework is bundled with a default set of configuration files which can be found under `<repository_root>/aura/data`.
+Aura can be configured using two YAML files. The first one is the main framework configuration that configures the behavior of the framework such as scoring system, restrictions, or interpreters used to parse the source code. The second file is a list of semantic signatures and patterns to look for inside the files. The framework is bundled with a default set of configuration files which can be found under `<repository_root>/aura/data`.
 
 
 CLI options
@@ -13,15 +13,15 @@ CLI options
 Aura scan
 ^^^^^^^^^
 
--v              verbose, some detections items are hidden by default from output that are marked as informational such as file size of input data. Providing this flag would output also these informational data into the specified file format. This flag can be specified more then once. Second verbosity level would also output detectionbs filtered as false positives, such as AST parse errors for string blobs
--a              Analyzer name, can be specified more then once. Allows to override a list of default analyzers that are run on the input data.
+-v              verbose, some detections items are hidden by default from the output that is marked as informational such as file size of input data. Providing this flag would output also these informational data into the specified file format. This flag can be specified more than once. The second verbosity level would also output detections filtered as false positives, such as AST parse errors for string blobs
+-a              Analyzer name, can be specified more than once. Allows overriding a list of default analyzers that are run on the input data.
 -f              Output format
 --min-score     Aura would not write any output information if the total score of the scanned input data is below this threshold
 --benchmark     Run aura scan in a benchmark mode. This is intended for development purposes as it enables the python cProfile to run during the scan
 --benchmark-sort    Sort benchmark profile by a given statistics name
 --async     Run aura in async mode. After the input files are preprocessed, a separate process would be forked to scan that input file. Increases the speed of data scans in some circumstances, especially on multi-core machines.
 --no-async  Disable the aura async mode.
--t      Filter output detections to only given tags. Detections can also be filtered to be excluded if they contain a given tag when prefixed by exclamation mark, e.g. `"!test-code"`
+-t      Filter output detections to only given tags. Detections can also be filtered to be excluded if they contain a given tag when prefixed by an exclamation mark, e.g. `"!test-code"`
 
 
 Scan Output format options
@@ -44,12 +44,12 @@ Aura diff
 ^^^^^^^^^
 
 -f    Output format for the diff data
---detections    Enable scanning the diff data for detections. This is the same as performing the `aura scan` on the diff data. Detections are then diffed against each other in the same manner as diff is done on files, e.g. added/removed/modified. This option allows to semantically detect changes in the source code from the point of functionality and capabilities.
+--detections    Enable scanning the diff data for detections. This is the same as performing the `aura scan` on the diff data. Detections are then diffed against each other in the same manner as diff is done on files, e.g. added/removed/modified. This option allows aura to semantically detect changes in the source code from the point of functionality and capabilities.
 --no-detections     Disable the detections mode for diffed files.
 --patch     Output the diff patch to show changes in text files
 --no-patch  Disable the diff patch output
---output-same-renames   By default, if files between diffs are exactly the same but they only differ in a name, they are filtered from the diff output. This behaviour can be disabled by using this flag which would force to display diff also for same files that were just renamed.
---no-same-renames   Default behaviour, hide same files with only filenames changes/renames from the diff output.
+--output-same-renames   By default, if files between diffs are exactly the same but they only differ in a name, they are filtered from the diff output. This behavior can be disabled by using this flag which would force to display diff also for the same files that were just renamed.
+--no-same-renames   Default behavior, hide the same files with only filenames changes/renames from the diff output.
 
 
 Diff output format options
@@ -64,7 +64,7 @@ The following options are present for each of the built-in output URI formats:
 * fmt - same meaning as for aura scan
 * location - same meaning as for aura scan
 * detections - enable/disable outputting detections diff
-* output_same_renames - enable/disable hiding of a files that are same but only renamed
+* output_same_renames - enable/disable the hiding of files that are same but only renamed
 * patch - enable/disable output of a text diff patch
 
 
@@ -80,9 +80,9 @@ This a documented default configuration file
     :language: yaml
 
 
-You can easily overwrite or extend this configuration file by using YAML anchors. This native feature of YAML allows you to merge existing YAML documents/parts into a single document. Aura requires you to prefix the YAML configuration with the `---`, which indicated it's a multi document file. When Aura detects this string at the beginning of the YAML configuration file, it injects the default configuration anchors into the document allowing you to inherit default configuration without a need of copy/pasting the unchanged parts.
+You can easily overwrite or extend this configuration file by using YAML anchors. This native feature of YAML allows you to merge existing YAML documents/parts into a single document. Aura requires you to prefix the YAML configuration with the `---`, which indicated it's a multi-document file. When Aura detects this string at the beginning of the YAML configuration file, it injects the default configuration anchors into the document allowing you to inherit the default configuration without a need for copy/pasting the unchanged parts.
 
-An example of YAML file overriding the the configuration while preserving the default values:
+An example of YAML file overriding the configuration while preserving the default values:
 
 
 ::
@@ -94,7 +94,7 @@ An example of YAML file overriding the the configuration while preserving the de
         <<: *aura_config
         # Overwrite the default option
         min-score: 100
-        # You can also insert new config options in case some plugins needs it
+        # You can also insert new config options in case some plugins need it
         custom_option: "yes please"
 
 
@@ -113,7 +113,7 @@ Signature definitions can be overridden and extended in the same manner as the m
 Environment config options
 --------------------------
 
-The following environment variable configuration options can be used to configure the aura behaviour:
+The following environment variable configuration options can be used to configure the aura behavior:
 
 =========================== =============================================================
 Environment variable        Explanation

@@ -16,16 +16,16 @@ A stable (master) release of Aura has an official docker image that can be run v
 
 .. sidebar:: Lite version
 
-    We also provide docker images for lite version - a minimal installation that includes only the core dependencies. This version is available under the `dev-lite` docker tag.
+    We also provide docker images for the lite version - a minimal installation that includes only the core dependencies. This version is available under the `dev-lite` docker tag.
 
 
-The docker image also contains an override command `run_tests` that would execute a full unit test suite to verify the Aura functionality inside the docker image. Configuration files are located under the `/config` directory inside the docker image and if no configuration is provided a default one is copied (including semantic signatures and yara rules) to the `/config` directory when container starts. You can override this behaviour by mounting your own config directory/files inside the container or setting the `AURA_CFG` environment respectively.
+The docker image also contains an override command `run_tests` that would execute a full unit test suite to verify the Aura functionality inside the docker image. Configuration files are located under the `/config` directory inside the docker image and if no configuration is provided a default one is copied (including semantic signatures and Yara rules) to the `/config` directory when the container starts. You can override this behavior by mounting your own config directory/files inside the container or setting the `AURA_CFG` environment respectively.
 
 ------------------------
 Scanning the source code
 ------------------------
 
-The core part of the framework is scanning the source code to find anomalies as defined in the semantic rules, which can be done by running `aura scan <path_to_file_or_directory>`. There are several protocols supported for input and output data, for example `aura scan pypi://requests` would download and scan the latest release of a `requests` package directly from PyPI. You can pass these URIs to aura to specify the input source for data (provided by plugins) and/or even filter the input data (such as scanning a specific package release version). By default, if no URI protocol is specified, aura assumes it is a path on a local filesystem to a file or a directory. You can use the same method to also specify the format for the output data such as `aura scan ./quarantine -f json` which would output the scan data in a json format. Aura framework also supports specifying more then one output type so you can display the data for example into both, stdout as text format and as json into the file using `aura scan ./quarantine -f text -f json://my_results.json`. More command line options and format options are described in the :ref:`aura_scan_cli` documentation.
+The core part of the framework is scanning the source code to find anomalies as defined in the semantic rules, which can be done by running `aura scan <path_to_file_or_directory>`. There are several protocols supported for input and output data, for example `aura scan pypi://requests` would download and scan the latest release of a `requests` package directly from PyPI. You can pass these URIs to aura to specify the input source for data (provided by plugins) and/or even filter the input data (such as scanning a specific package release version). By default, if no URI protocol is specified, aura assumes it is a path on a local filesystem to a file or a directory. You can use the same method to also specify the format for the output data such as `aura scan ./quarantine -f json` which would output the scan data in a JSON format. Aura framework also supports specifying more than one output type so you can display the data for example into both, stdout as text format and as json into the file using `aura scan ./quarantine -f text -f json://my_results.json`. More command-line options and format options are described in the :ref:`aura_scan_cli` documentation.
 
 ----------
 Exit codes
@@ -39,5 +39,5 @@ Code Explanation
 ==== ===========
 0    Code scan completed successfully, passing all audit checks
 1    An error occurred during the code scan or the audit checks haven't passed
-2    This feature is disabled. This is most likely caused by missing dependencies. Run `aura info` for explanation.
+2    This feature is disabled. This is most likely caused by missing dependencies. Run `aura info` for an explanation.
 ==== ===========
