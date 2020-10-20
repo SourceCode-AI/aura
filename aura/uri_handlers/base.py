@@ -216,7 +216,7 @@ class ScanLocation(KeepRefs):
 
     @property
     def is_python_source_code(self) -> bool:
-        return (self.metadata["mime"] == "text/x-python")
+        return (self.metadata["mime"] in ("text/x-python", "text/x-script.python"))
 
     def create_child(self, new_location: Union[str, Path], metadata=None, **kwargs) -> ScanLocation:
         if metadata is None:

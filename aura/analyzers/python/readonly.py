@@ -17,7 +17,7 @@ class ReadOnlyAnalyzer(Visitor):
     def __call__(self) -> typing.Generator[Detection, None, None]:
         if not self.hooks:
             return
-        elif self.location.metadata["mime"] != "text/x-python":
+        elif self.location.is_python_source_code:
             return
         try:
             for x in self.hooks:
