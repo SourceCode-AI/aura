@@ -57,6 +57,13 @@ class Diff():
 
     def __post_init__(self):
         assert self.operation in ("A", "D", "M", "R")
+
+        if self.a_mime == "text/x-script.python":
+            self.a_mime = "text/x-python"
+
+        if self.b_mime == "text/x-script.python":
+            self.b_mime = "text/x-python"
+
         # a_path, b_path = self.a_path, self.b_path
         #
         # if a_path and b_path:

@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 import typing
 import inspect
+import logging
 from abc import ABCMeta, abstractmethod
 from enum import Enum
 from pathlib import Path
@@ -26,6 +27,8 @@ BASIC_ELEMENTS = (
     str,
     int,
 )
+logger = logging.getLogger(__name__)
+
 
 @total_ordering
 class Taints(Enum):
@@ -231,12 +234,15 @@ class ASTNode(KeepRefs, metaclass=ABCMeta):
         from prettyprinter import pprint as pp
         pp(self)
 
-    def add_taint(self, taint: Taints, context: Context, lock=False, taint_log=None) -> bool:
+    def add_taint(self, taint: Taints, context: Context, lock=False, taint_log: typing.Optional[TaintLog]=None) -> bool:
         """
         Assign a taint to the node
         Operation is ignored if the current taint is already higher or equal
         return True if the taint was modified (increased)
         """
+        if taint_log:
+            logger.debug(f"{taint_log.message} at {taint_log.path}:{taint_log.line_no}")
+
         if lock:
             self._taint_locked = True
             if taint != self._taint_class:

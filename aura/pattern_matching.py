@@ -4,6 +4,7 @@ import re
 import inspect
 import fnmatch
 import string
+import logging
 from abc import ABCMeta, abstractmethod
 from typing import List, Mapping
 from functools import lru_cache
@@ -16,6 +17,7 @@ from .type_definitions import ScanLocation
 
 
 PATTERN_CACHE = None
+logger = logging.getLogger(__name__)
 
 
 class PatternMatcher(metaclass=ABCMeta):
@@ -272,6 +274,7 @@ class ASTPattern:
 
 
     def __init__(self, signature: dict):
+        self._id = None
         self._signature = signature
 
         if type(self._signature["pattern"]) == str:
@@ -290,16 +293,21 @@ class ASTPattern:
 
     @property
     def id(self) -> str:
-        if "id" in self._signature:
-            return self._signature["id"]
+        if self._id is None:
+            if "id" in self._signature:
+                return self._signature["id"]
 
-        chars = string.ascii_letters + string.digits + "._-"
-        return "".join(x for x in self._signature["pattern"] if x in chars)
+            chars = string.ascii_letters + string.digits + "._-"
+            self._id = "".join(x for x in self._signature["pattern"] if x in chars)
+
+        return self._id
 
     def match(self, node: nodes.ASTNode) -> bool:
         return self.ctx.match(node, self._compiled)
 
     def apply(self, context: nodes.Context):
+        logger.debug(f"Applying AST pattern {self.id} at {context.node.line_no}")
+
         if "tags" in self._signature:
             context.node.tags |= set(self._signature["tags"])
 

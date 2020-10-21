@@ -148,7 +148,7 @@ class ScanLocation(KeepRefs):
             if self.metadata["mime"] in ("text/plain", "application/octet-stream", "text/none"):
                 self.metadata["mime"] = mimetypes.guess_type(self.__str_location)[0]
 
-            if self.metadata["mime"] == "text/x-python" and "no_imports" not in self.metadata:
+            if self.is_python_source_code and "no_imports" not in self.metadata:
                 try:
                     imports = find_imports.find_imports(self.location, metadata=self.metadata)
                     if imports:

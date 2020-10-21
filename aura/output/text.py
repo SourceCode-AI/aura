@@ -1,4 +1,5 @@
 import re
+import os
 import sys
 from shutil import get_terminal_size
 from dataclasses import dataclass
@@ -55,6 +56,8 @@ SEVERITY_COLORS = {
 OK = '\u2713'
 NOK = '\u2717'
 
+TTY_COLORS = bool(os.environ.get("AURA_FORCE_COLORS", False)) or None
+
 
 
 class PrettyReport:
@@ -81,7 +84,7 @@ class PrettyReport:
         return len(cls.ANSI_RE.sub("", line))
 
     def print_separator(self, sep="\u2504", left="\u251C", right="\u2524"):
-        secho(f"{left}{sep*(self.width-2)}{right}", file=self.fd)
+        secho(f"{left}{sep*(self.width-2)}{right}", file=self.fd, color=TTY_COLORS)
 
     def print_thick_separator(self):
         self.print_separator(left="\u255E", sep="\u2550", right="\u2561")
@@ -96,11 +99,11 @@ class PrettyReport:
         text_len = self.ansi_length(text)
         ljust = (self.width-4-text_len)//2
         rjust = self.width-4-text_len-ljust
-        secho(f"{left}{infill*ljust} {text} {infill*rjust}{right}", file=self.fd)
+        secho(f"{left}{infill*ljust} {text} {infill*rjust}{right}", file=self.fd, color=TTY_COLORS)
 
     def align(self, line, pos=-1, left="\u2502 ", right=" \u2502"):
         line = self._align_text(line, self.width - len(left) - len(right), pos=pos)
-        secho(f"{left}{line}{right}", file=self.fd)
+        secho(f"{left}{line}{right}", file=self.fd, color=TTY_COLORS)
 
     def wrap(self, text, left="\u2502 ", right=" \u2502"):
         remaining_len=self.width - len(left) - len(right)
@@ -271,7 +274,7 @@ class TextScanOutput(TextBase, ScanOutputBase):
         if score < self.min_score:
             return
 
-        secho("\n", file=self._fd)  # Empty line for readability
+        secho("\n", file=self._fd, color=TTY_COLORS)  # Empty line for readability
         self._formatter.print_top_separator()
         self._formatter.print_heading(style(f"Scan results for {scan_metadata.get('name', 'N/A')}", fg="bright_green"))
         score_color = "bright_green" if score == 0 else "bright_red"

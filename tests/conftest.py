@@ -15,6 +15,9 @@ import responses
 import pytest
 
 
+os.environ["AURA_NO_CACHE"] = "true"
+
+
 # Definition used to replicate the PyPI mirror file system structure
 MIRROR_FILES = {
     "wheel": (

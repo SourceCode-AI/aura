@@ -6,6 +6,9 @@ aura: &aura_config
   # https://docs.python.org/3.7/library/warnings.html#overriding-the-default-filter
   warnings: default
 
+  # Directory location for caching, unset to disable caching
+  cache_location: &cache_location ~/.aura_cache
+
   # Path to the location of the offline PyPI mirror
   # This option can be safely disabled if you don't have a local mirror, some advanced features require this
   mirror: /var/pypi_mirror/pypi/web/

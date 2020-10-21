@@ -7,7 +7,7 @@ import time
 import traceback
 from pathlib import Path
 from functools import partial
-from typing import Union, Optional, Tuple, Generator
+from typing import Union, Optional, Tuple, Generator, List
 
 import click
 from prettyprinter import pprint
@@ -42,8 +42,6 @@ def check_requirement(pkg):
             "format": "plain",
             "min_score": 0,
         }
-
-
         hits = []
 
         for location in handler.get_paths(metadata=metadata):
@@ -75,7 +73,7 @@ def scan_worker(item: ScanLocation) -> Generator[Detection, None, None]:
         yield from sandbox.run()
 
 
-def scan_uri(uri, metadata: Union[list, dict]=None) -> list:
+def scan_uri(uri, metadata: Union[list, dict]=None, download_only: bool=False) -> List[Detection]:
     with utils.enrich_exception(uri, metadata):
         start = time.time()
         handler = None
@@ -105,7 +103,10 @@ def scan_uri(uri, metadata: Union[list, dict]=None) -> list:
 
             # FIXME: metadata=metadata
             for x in handler.get_paths(metadata={"analyzers": metadata["analyzers"]}):  # type: ScanLocation
-                all_hits.extend(scan_worker(x))
+                if download_only:
+                    continue
+                else:
+                    all_hits.extend(scan_worker(x))
 
             for formatter in formatters:
                 try:

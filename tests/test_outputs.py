@@ -83,7 +83,6 @@ def test_text_scan_output(fixtures):
     # TODO: add more patterns to test for in text output
 
 
-
 def test_sqlite_scan_output(fixtures, tmp_path: Path):
     scan_path = str(fixtures.path("flask_app.py"))
     db_path = tmp_path / "aura_test_output.sqlite"

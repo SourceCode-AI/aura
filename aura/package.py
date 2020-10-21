@@ -21,6 +21,7 @@ from textdistance import jaccard
 
 from . import config
 from . import github
+from . import cache
 from .json_proxy import loads
 from . import utils
 from . import exceptions
@@ -109,7 +110,7 @@ class PypiPackage:
 
         for url in filtered:
             with open(dest / url["filename"], "wb") as fd:
-                utils.download_file(url["url"], fd)
+                cache.Cache.proxy_url(url=url["url"], fd=fd, cache_id=url["filename"])
             files.append(url)
 
         return files

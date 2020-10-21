@@ -69,6 +69,7 @@ def cli(ctx, **kwargs):
 )
 @click.option("--async", "fork_mode", flag_value=True)
 @click.option("--no-async", "fork_mode", flag_value=False)
+@click.option("--download-only", "download_only", flag_value=True)
 def scan(
     uri,
     verbose=None,
@@ -78,7 +79,8 @@ def scan(
     benchmark=False,
     benchmark_sort="cumtime",
     filter_tags=None,
-    fork_mode=False
+    fork_mode=False,
+    download_only=False,
 ):
     output_opts = {
         "tags": filter_tags
@@ -109,7 +111,7 @@ def scan(
         cProfile, pstats, pr, io = None, None, None, None
 
     try:
-        commands.scan_uri(uri, metadata=meta)
+        commands.scan_uri(uri, metadata=meta, download_only=download_only)
     except exceptions.FeatureDisabled as e:
         LOGGER.exception(e.args[0], exc_info=e)
         click.secho(e.args[0], err=True, fg="red")

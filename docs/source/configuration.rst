@@ -126,5 +126,9 @@ AURA_REVERSE_DEPENDENCIES   Overwrite the path to the aura `reverse_dependencies
 AURA_LOG_LEVEL              Output log level
 AURA_NO_BLOBS               Disable extraction of data blobs for further analysis
 AURA_NO_PROGRESS            Disable cli progress bar, useful when redirecting stderr and stdout
-AURA_DEBUG_LINES            List of line numbers separated by ``,``. Aura will then call ``breakpoint()`` when traversing AST tree and it visits a node located on those specific line numbers
+AURA_FORCE_COLORS           Force ANSI colors on text output
+AURA_CACHE_LOCATION         Override the cache location
+AURA_NO_CACHE               Disable the cache entirely for all operations
+AURA_DEBUG_LEAKS            Turn on the garbage collector ``DEBUG_LEAK`` flag on
+AURA_DEBUG_LINES            List of line numbers separated by a comma. Aura will then call ``breakpoint()`` when traversing AST tree and it visits a node located on those specific line numbers
 =========================== =============================================================

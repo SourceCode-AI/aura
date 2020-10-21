@@ -17,7 +17,7 @@ class ReadOnlyAnalyzer(Visitor):
     def __call__(self) -> typing.Generator[Detection, None, None]:
         if not self.hooks:
             return
-        elif self.location.is_python_source_code:
+        elif not self.location.is_python_source_code:
             return
         try:
             for x in self.hooks:

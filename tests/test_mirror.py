@@ -1,7 +1,6 @@
 import pytest
 
 from urllib.parse import urlparse
-from unittest.mock import patch
 
 from aura import mirror
 from aura import exceptions

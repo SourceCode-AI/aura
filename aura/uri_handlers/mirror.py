@@ -3,6 +3,7 @@ import typing
 from urllib.parse import urlparse, ParseResult, parse_qs
 
 from .base import URIHandler, ScanLocation
+from .. import cache
 from .. import mirror
 from ..package import PypiPackage
 
@@ -45,9 +46,10 @@ class MirrorHandler(URIHandler):
                 meta = {"depth": 0}
 
             meta.setdefault("package", {})["info"] = x
-
             pkg_path = self.mirror_path / urlparse(x["url"]).path.lstrip("/")
-            if pkg_path.exists():
+            target = cache.Cache.proxy_mirror(src=pkg_path, cache_id=x['filename'])
+
+            if target:
                 yield ScanLocation(
                     location=pkg_path,
                     metadata=meta
