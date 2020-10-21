@@ -17,17 +17,6 @@ def test_basic_ast(fixtures):
     assert len(data) == 9  # Top level lines with python code
 
 
-def test_interpreters():
-    args = ['-c', 'import sys; print(sys.version)']
-    py2 = config.CFG["interpreters"].get('python2')
-    py2_version = subprocess.check_output([py2] + args).decode().strip().split()[0]
-    assert re.match(r'^2\.7\.\d+$', py2_version)
-
-    py3 = config.CFG["interpreters"].get('python3')
-    py3_version = subprocess.check_output([py3] + args).decode().strip().split()[0]
-    assert re.match(r'^3\.(6|7|8)\.\d+$', py3_version)
-
-
 def test_py2k(fixtures):
     pth = fixtures.path('py2k.py')
 

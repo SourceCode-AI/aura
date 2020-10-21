@@ -1,14 +1,13 @@
 import os
 import shutil
 import hashlib
-import logging
 from pathlib import Path
 from typing import Optional
 
 from . import utils
 from . import config
 
-logger = logging.getLogger(__name__)
+logger = config.get_logger(__name__)
 
 
 class Cache:
@@ -79,12 +78,25 @@ class Cache:
         cache_pth: Path = cls.get_location() / cache_id
 
         try:
-            if not cache_pth.exists():
-                with cache_pth.open("wb") as cfd:
-                    with src.open("rb") as fd:
-                        shutil.copyfileobj(fd, cfd)
-                        cfd.flush()
+            shutil.copyfile(src, cache_pth, follow_symlinks=True)
             return cache_pth
         except Exception as exc:
             cache_pth.unlink(missing_ok=True)
+            raise exc
+
+    @classmethod
+    def proxy_mirror_json(cls, *, src: Path):
+        if not src.exists():
+            return src
+        elif cls.get_location() is None:
+            return src
+
+        cache_id = f"mirrorjson_{src.name}"
+        cache_path = cls.get_location()/cache_id
+
+        try:
+            shutil.copyfile(src=src, dst=cache_path, follow_symlinks=True)
+            return cache_path
+        except Exception as exc:
+            cache_path.unlink(missing_ok=True)
             raise exc

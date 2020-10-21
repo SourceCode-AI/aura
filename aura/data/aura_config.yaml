@@ -205,5 +205,6 @@ interpreters: &interpreters
   # `python3` must point to the py3.6+ or ideally py3.7+ due to compatibility
   # All other interpreters are optional, AST parsing will try them in the defined order
 
+  native: native
   python3: python3
   python2: python2

@@ -2,6 +2,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import List, Tuple, Optional
 
+from . import find_imports_inject
 from .. import python_executor
 from .. import utils
 
@@ -42,11 +43,23 @@ class TopologySort:
         return topology
 
 
+def native_find_imports(command):
+    src_path = command[-1]
+    with open(src_path, "r") as fd:
+        co = compile(fd.read() + "\n", src_path, "exec")
+
+    return list(find_imports_inject.find_imports(co))
+
+
 def get_imports(py_src, metadata=None) -> List:
     importer_path = Path(__file__).parent / "find_imports_inject.py"
     cmd = [utils.normalize_path(importer_path), utils.normalize_path(py_src)]
 
-    return python_executor.run_with_interpreters(command=cmd, metadata=metadata)
+    return python_executor.run_with_interpreters(
+        command=cmd,
+        metadata=metadata,
+        native_callback=native_find_imports
+    )
 
 
 # TODO: add support for other "pythonic" files, see modulefinder (pyc, dynlib etc.)

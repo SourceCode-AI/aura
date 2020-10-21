@@ -6,12 +6,13 @@ if [ "$#" -ne 1 ]; then
   exit 1;
 fi;
 
+export AURA_MIRROR_PATH=$1;
+
 if [ ! -d "${AURA_MIRROR_PATH}/json" ]; then
   echo "JSON directory not found at ${AURA_MIRROR_PATH}. You probably have not provided a correct path to the web mirror directory" >>2;
   exit 1;
 fi
 
-export AURA_MIRROR_PATH=$1;
 PKGS=$(cat aura_mirror_scan/package_cache)
 
 prefetch() {

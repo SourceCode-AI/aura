@@ -9,19 +9,22 @@ IMPORTANT NOTE:
 """
 
 import os
+import sys
 import subprocess
 from shutil import which
-from typing import List
+from typing import List, Optional, Callable
 
 from . import config
+from .analyzers import python_src_inspector
 from .json_proxy import loads, JSONDecodeError
 from .exceptions import PythonExecutorError
 
 
 LOGGER = config.get_logger(__name__)
+NATIVE_ENVIRONMENT_CACHE = None
 
 
-def run_with_interpreters(*, metadata=None, **kwargs):
+def run_with_interpreters(*, metadata=None, native_callback: Optional[Callable]=None, **kwargs):
     """
     Proxy to execute_interpreter
     Iterates over defined interpreter until one that runs the input/script is found
@@ -44,7 +47,7 @@ def run_with_interpreters(*, metadata=None, **kwargs):
 
     for name, interpreter in interpreters:
         # If interpreter is not directly an executable, find out it's location via `witch` lookup
-        if not os.path.isfile(interpreter):
+        if interpreter != "native" and not os.path.isfile(interpreter):
             interpreter = which(interpreter)
 
         try:
@@ -63,7 +66,7 @@ def run_with_interpreters(*, metadata=None, **kwargs):
         raise executor_exception
 
 
-def execute_interpreter(*, command: List[str], interpreter: str, stdin=None):
+def execute_interpreter(*, command: List[str], interpreter: str, stdin=None, native_callback: Optional[Callable]=None):
     """
     Run script/command inside the defined interpreter and retrieve the JSON encoded output
 
@@ -72,6 +75,11 @@ def execute_interpreter(*, command: List[str], interpreter: str, stdin=None):
     :param stdin: stdin to pass to the execute program
     :return: json decoded stdout
     """
+    if interpreter == "native":
+        try:
+            return native_callback(command)
+        except Exception as exc:
+            raise PythonExecutorError(f"Native interpreter failed") from exc
 
     full_args = [interpreter] + command
     proc = subprocess.run(
@@ -97,3 +105,19 @@ def execute_interpreter(*, command: List[str], interpreter: str, stdin=None):
         exc.stderr = proc.stderr
         exc.stdout = proc.stdout
         raise exc
+
+
+def get_native_source_code(command):
+    with open(command[-1], "r") as fd:
+        src_dump = python_src_inspector.collect(source_code=fd.read(), minimal=True)
+
+    src_dump.update(NATIVE_ENVIRONMENT_CACHE)
+    return src_dump
+
+
+def init_native_environment():
+    global NATIVE_ENVIRONMENT_CACHE
+    NATIVE_ENVIRONMENT_CACHE = execute_interpreter(command=[python_src_inspector.__file__, '--environment-only'], interpreter=sys.executable)
+
+
+init_native_environment()

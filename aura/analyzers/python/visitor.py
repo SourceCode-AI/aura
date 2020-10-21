@@ -62,7 +62,11 @@ def get_ast_tree(location: Union[ScanLocation, bytes], metadata=None):
         else:
             metadata = {}
 
-    tree = python_executor.run_with_interpreters(metadata=metadata, **kwargs)
+    tree = python_executor.run_with_interpreters(
+        metadata=metadata,
+        native_callback=python_executor.get_native_source_code,
+        **kwargs
+    )
 
     if tree is None:
         raise ASTParseError("Unable to parse the source code")

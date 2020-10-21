@@ -26,11 +26,6 @@ def test_local_mirror(simulate_mirror):
         assert local_path.is_file(), local_path
         assert local_path.name == pkg_release["filename"]
 
-    # Test explicit mirror path, should be the same
-    m2 = mirror.LocalMirror(simulate_mirror)
-    assert packages == set(x.name for x in m2.list_packages())
-
-
 def test_mirror_uri_handler(simulate_mirror):
     handler = umirror.MirrorHandler(urlparse("mirror://wheel"))
     assert handler.package_name == "wheel"

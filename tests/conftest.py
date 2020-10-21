@@ -244,7 +244,7 @@ def fuzzy_rule_match():
     return match_rule
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def simulate_mirror(fixtures):
     """
     Thjs fixture creates a file/directory structure that simulates an offline PyPI mirror
@@ -254,14 +254,14 @@ def simulate_mirror(fixtures):
 
     with tempfile.TemporaryDirectory(prefix="aura_test_mirror_") as mirror:
         pmirror = Path(mirror)
-        assert pmirror.is_dir()
-        os.mkdir(pmirror / "json")
+        json_path = pmirror / "json"
+        json_path.mkdir(parents=True)
 
         for pkg, pkg_files in MIRROR_FILES.items():
             # copy the package JSON metadata
             os.link(
                 fixtures.path(f"mirror/{pkg}.json"),
-                pmirror / "json" / pkg
+                json_path / pkg
             )
 
             for p in pkg_files:
@@ -273,6 +273,7 @@ def simulate_mirror(fixtures):
 
         with mock.patch.object(amirror.LocalMirror, "get_mirror_path", return_value=pmirror):
             assert pmirror.is_dir()
+            assert json_path.is_dir()
             yield mirror
 
 

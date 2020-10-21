@@ -16,7 +16,6 @@ def test_mirror_cache(fixtures, simulate_mirror, tmp_path):
     assert len(parsed_output["detections"]) == 0
 
     cache_content = list(x.name for x in tmp_path.iterdir())
-    print(cache_content)
     assert len(cache_content) > 0
     assert "mirror_wheel-0.34.2.tar.gz" in cache_content, cache_content
     assert "mirror_wheel-0.34.2-py2.py3-none-any.whl" in cache_content

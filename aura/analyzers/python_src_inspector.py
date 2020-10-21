@@ -116,13 +116,16 @@ def get_builtins():
 
     for k, v in b.items():
         if inspect.isclass(v):
-            t = {"type": "class", "cls": v.__name__}
+            t = {"type": "class"}
         elif inspect.isfunction(v):
-            t = {"type": "function", "cls": v.__name__}
+            t = {"type": "function"}
         else:
             t = {"type": "other", "repr": repr(v)}
-            if hasattr(v, "__name__"):
-                t["name"] = v.__name__
+
+        if hasattr(v, "__name__"):
+            name = v.__name__
+            if name != k:
+                t["name"] = name
         scope[k] = t
 
     return scope
@@ -158,6 +161,17 @@ def get_encoding(path):
         return "utf-8"
 
 
+def get_environment():
+    return {
+        "version": list(platform.python_version_tuple()),
+        "implementation": platform.python_implementation(),
+        "compiler": platform.python_compiler(),
+        "build": platform.python_build(),
+        "builtins": get_builtins(),
+        # TODO: 'comments': list(get_comments(source_code=source_code))
+    }
+
+
 def collect(source_code, encoding="utf-8", minimal=False):
     src = ast.parse(source_code)
     src_dump = {
@@ -166,19 +180,16 @@ def collect(source_code, encoding="utf-8", minimal=False):
     }
 
     if not minimal:
-        src_dump.update({
-            "version": list(platform.python_version_tuple()),
-            "implementation": platform.python_implementation(),
-            "compiler": platform.python_compiler(),
-            "build": platform.python_build(),
-            "builtins": get_builtins(),
-            # TODO: 'comments': list(get_comments(source_code=source_code))
-        })
+        src_dump.update(get_environment())
 
     return src_dump
 
 
 def main(pth=None, out=sys.stdout):
+    if "--environment-only" in sys.argv:
+        print(json.dumps(get_environment()), file=out)
+        return sys.exit(0)
+
     if pth is None:
         pth = sys.argv[1]
 
