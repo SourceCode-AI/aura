@@ -77,6 +77,10 @@ class Cache:
         cache_id = f"mirror_{cache_id}"
         cache_pth: Path = cls.get_location() / cache_id
 
+        if cache_pth.exists():
+            logger.debug(f"Retrieving mirror file path {cache_id} from cache")
+            return cache_pth
+
         try:
             shutil.copyfile(src, cache_pth, follow_symlinks=True)
             return cache_pth
@@ -93,6 +97,10 @@ class Cache:
 
         cache_id = f"mirrorjson_{src.name}"
         cache_path = cls.get_location()/cache_id
+
+        if cache_path.exists():
+            logger.debug(f"Retrieving package mirror JSON {cache_id} from cache")
+            return cache_path
 
         try:
             shutil.copyfile(src=src, dst=cache_path, follow_symlinks=True)
