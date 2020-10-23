@@ -12,7 +12,7 @@ from .exceptions import NoSuchPackage
 from .config import CFG
 
 
-class LocalMirror(object):
+class LocalMirror:
     @classmethod
     def get_mirror_path(cls) -> Path:
         env_path = os.environ.get('AURA_MIRROR_PATH', None)
@@ -24,23 +24,20 @@ class LocalMirror(object):
     def list_packages(self) -> typing.Generator[Path, None, None]:
         yield from (self.get_mirror_path() / "json").iterdir()
 
-    def get_json(self, package_name):
-        if package_name is None:
-            raise NoSuchPackage(f"Could not find package '{package_name}' json at the mirror location")
-
+    def get_json(self, package_name) -> dict:
+        assert package_name
         json_path = self.get_mirror_path() / "json" / package_name
-
-        if not json_path.is_file():
-            json_path = self.get_mirror_path() / "json" / canonicalize_name(package_name)
-            if not json_path.exists():
-                raise NoSuchPackage(package_name)
-
         target = cache.Cache.proxy_mirror_json(src=json_path)
 
-        with open(target, "r") as fd:
-            return json.loads(fd.read())
+        if not target.is_file():
+            json_path = self.get_mirror_path() / "json" / canonicalize_name(package_name)
+            target = cache.Cache.proxy_mirror_json(src=json_path)
+            if not target.exists():
+                raise NoSuchPackage(package_name)
 
-    def url2local(self, url):
+        return json.loads(target.read_text())
+
+    def url2local(self, url: typing.Union[ParseResult, str]) -> Path:
         if not isinstance(url, ParseResult):
             url = urlparse(url)
 

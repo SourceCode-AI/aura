@@ -12,6 +12,7 @@ from typing import Pattern
 
 from click.testing import CliRunner, Result
 import responses
+import tqdm
 import pytest
 
 
@@ -370,3 +371,10 @@ def reset_plugins():
 
     ReadOnlyAnalyzer.hooks = []
     plugins.PLUGIN_CACHE = {}
+
+
+@pytest.fixture(scope="module")
+def mock_tqdm_log_write():
+
+    with mock.patch.object(tqdm.tqdm, "write") as m:
+        yield m

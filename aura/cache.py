@@ -66,9 +66,7 @@ class Cache:
 
     @classmethod
     def proxy_mirror(cls, *, src: Path, cache_id=None):
-        if not src.exists():
-            return None
-        elif cls.get_location() is None:
+        if cls.get_location() is None:  # Caching is disabled
             return src
 
         if cache_id is None:
@@ -81,6 +79,9 @@ class Cache:
             logger.debug(f"Retrieving mirror file path {cache_id} from cache")
             return cache_pth
 
+        if not src.exists():
+            return src
+
         try:
             shutil.copyfile(src, cache_pth, follow_symlinks=True)
             return cache_pth
@@ -90,17 +91,18 @@ class Cache:
 
     @classmethod
     def proxy_mirror_json(cls, *, src: Path):
-        if not src.exists():
-            return src
-        elif cls.get_location() is None:
+        if cls.get_location() is None:  # Caching is disabled
             return src
 
         cache_id = f"mirrorjson_{src.name}"
-        cache_path = cls.get_location()/cache_id
+        cache_path = cls.get_location() / cache_id
 
         if cache_path.exists():
             logger.debug(f"Retrieving package mirror JSON {cache_id} from cache")
             return cache_path
+
+        if not src.exists():
+            return src
 
         try:
             shutil.copyfile(src=src, dst=cache_path, follow_symlinks=True)

@@ -44,7 +44,7 @@ class PatternMatcher(metaclass=ABCMeta):
         ...
 
     @property
-    def message(self):
+    def message(self) -> str:
         """
         return a message identifying the match
         """
@@ -121,7 +121,7 @@ class StringPatternMatcher(PatternMatcher, metaclass=ABCMeta):
         return False
 
     @abstractmethod
-    def match_string(self, value: str):
+    def match_string(self, value: str) -> bool:
         ...
 
 

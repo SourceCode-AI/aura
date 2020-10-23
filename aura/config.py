@@ -16,7 +16,7 @@ from typing import Optional, Generator
 import tqdm
 import pkg_resources
 import ruamel.yaml
-from ruamel.yaml import YAML, composer
+from ruamel.yaml import composer
 try:
     import rapidjson as json
 except ImportError:
@@ -33,8 +33,8 @@ LOG_ERR = None
 # This is used to trigger breakpoint during AST traversing of specific lines
 DEBUG_LINES = set()
 DEFAULT_AST_STAGES = ("convert", "rewrite", "ast_pattern_matching", "taint_analysis", "readonly")
-AST_PATTERNS_CACHE = None
-PROGRESSBAR_DISABLED = ("AURA_NO_PROGRESS" in os.environ)
+AST_PATTERNS_CACHE: Optional[tuple] = None
+PROGRESSBAR_DISABLED: bool = ("AURA_NO_PROGRESS" in os.environ)
 
 DEFAULT_CFG_PATH = "aura.data.aura_config.yaml"
 DEFAULT_SIGNATURE_PATH = "aura.data.signatures.yaml"
@@ -185,7 +185,7 @@ def get_file_content(location: str, base_path: Optional[str]=None) -> str:
             return fd.read()
 
 
-def parse_config(pth, default_pth):
+def parse_config(pth, default_pth) -> dict:
     logger.debug(f"Aura configuration located at {pth}")
 
     content = get_file_content(pth)
@@ -282,7 +282,7 @@ def get_ast_stages() -> typing.Tuple[str,...]:
     return [x for x in cfg_value if x]
 
 
-def get_ast_patterns():
+def get_ast_patterns() -> tuple:
     global AST_PATTERNS_CACHE
     from .pattern_matching import ASTPattern
 
@@ -293,8 +293,6 @@ def get_ast_patterns():
         elapsed = round(time.monotonic() - start, 5)
         logger.debug(f"AST Pattern compilation took {elapsed}s")
     return AST_PATTERNS_CACHE
-
-
 
 
 CFG_PATH = find_configuration()

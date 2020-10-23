@@ -4,13 +4,11 @@ This module contains Visitor class for traversing the parsed AST tree
 from __future__ import annotations
 
 import os
-import copy
 import time
 from functools import partial, wraps
 from collections import deque, OrderedDict
-from pathlib import Path
 from warnings import warn
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, Dict
 
 import pkg_resources
 
@@ -45,7 +43,7 @@ def ignore_error(func):
     return wrapper
 
 
-def get_ast_tree(location: Union[ScanLocation, bytes], metadata=None):
+def get_ast_tree(location: Union[ScanLocation, bytes], metadata=None) -> dict:
     if type(location) == bytes:
         kwargs = {
             "command": [INSPECTOR_PATH, "-"],
@@ -103,7 +101,7 @@ class Visitor:
         self.max_queue_size = int(config.get_settings("aura.max-ast-queue-size", 10000))
 
     @classmethod
-    def from_visitor(cls, visitor: Visitor):
+    def from_visitor(cls, visitor: Visitor) -> Visitor:
         obj = cls(location=visitor.location)
         obj.tree = visitor.tree
         obj.hits = visitor.hits
@@ -138,7 +136,7 @@ class Visitor:
         return v
 
     @classmethod
-    def get_visitors(cls):
+    def get_visitors(cls) -> Dict[str, Visitor]:
         global VISITORS
         if VISITORS is None:
             VISITORS = {
