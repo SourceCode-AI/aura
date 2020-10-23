@@ -70,6 +70,11 @@ Diff packages::
     docker run -ti --rm sourcecodeai/aura:dev diff pypi://requests pypi://requestes
 
 
+Find most popular typosquatted packages (you need to call ``aura update`` to download the dataset first)::
+
+    aura find-typosquatting --max-distance 2 --limit 10
+
+
 Authors & Contributors
 ======================
 
