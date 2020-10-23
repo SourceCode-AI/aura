@@ -67,7 +67,7 @@ Aura uses a so-called URIs to identify the protocol and location to scan, if no 
 
 Diff packages::
 
-    docker run -ti --rm sourcecodeai/aura:dev diff pypi://requests pypi://requestes
+    docker run -ti --rm sourcecodeai/aura:dev diff pypi://requests pypi://requests2
 
 
 Find most popular typosquatted packages (you need to call ``aura update`` to download the dataset first)::

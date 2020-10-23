@@ -47,7 +47,9 @@ RUN source $HOME/.poetry/env && \
     python -c "import aura;"  &&\
     find /analyzer -name '*.pyc' -delete -print &&\
     chmod +x /analyzer/entrypoint.sh &&\
-    chmod 777 -R /analyzer
+    chmod 777 -R /analyzer  &&\
+    cd /analyzer &&\
+    aura update
 
 ENTRYPOINT ["/analyzer/entrypoint.sh"]
 CMD ["--help"]
