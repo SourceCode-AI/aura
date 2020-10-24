@@ -2,6 +2,7 @@ import tempfile
 import pathlib
 import shutil
 from urllib.parse import ParseResult
+from typing import Optional
 
 from .. import config
 from ..exceptions import PluginDisabled
@@ -41,7 +42,7 @@ class GitRepoHandler(URIHandler):
         }
         return m
 
-    def get_paths(self, metadata: dict=None):
+    def get_paths(self, metadata: Optional[dict]=None):
         if self.opts.get('download_dir') is None:
             p = tempfile.mkdtemp(prefix="aura_git_repo_clone_")
             self.opts["download_dir"] = p

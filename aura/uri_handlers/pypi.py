@@ -4,7 +4,7 @@ import shutil
 import tempfile
 import pathlib
 import urllib.parse
-from typing import Generator, Tuple
+from typing import Generator, Tuple, Optional
 
 from .base import URIHandler, PackageProvider, ScanLocation
 from ..exceptions import UnsupportedDiffLocation
@@ -53,7 +53,7 @@ class PyPiHandler(URIHandler, PackageProvider):
         }
         return m
 
-    def get_paths(self, metadata: dict=None):
+    def get_paths(self, metadata: Optional[dict]=None):
         if self.opts.get("download_dir") is None:
             self.opts["download_dir"] = pathlib.Path(
                 tempfile.mkdtemp(prefix="aura_pypi_download_")

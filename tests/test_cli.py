@@ -158,23 +158,6 @@ def test_ast_parser(fixtures):
     assert "adalaraoawa aoalalaeaH" in result.stdout
 
 
-def test_r2c_integration():
-    f_name = 'r2c_test_output.json'
-    runner = CliRunner()
-    with runner.isolated_filesystem():
-        result = runner.invoke(cli.cli, ['r2c', 'scan', '--out', f_name])
-
-        if result.exception:
-            raise result.exception
-
-        assert result.exit_code == 0
-        with open(f_name, 'r') as fd:
-            data = json.loads(fd.read())
-
-    assert 'results' in data
-    assert 'errors' in data
-
-
 def test_async_cleanup(fixtures):
     from aura.uri_handlers import base
 

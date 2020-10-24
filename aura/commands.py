@@ -5,6 +5,7 @@ import os
 import json
 import time
 import traceback
+from concurrent import futures
 from pathlib import Path
 from functools import partial
 from typing import Union, Optional, Tuple, Generator, List
@@ -223,94 +224,10 @@ def generate_typosquatting(out, distance=2, limit=None):
         out.write(json.dumps({"original": x, "typosquatting": y}) + "\n")
 
 
-def generate_r2c_input(out_file):
-    inputs = []
+def prefetch(*uris):
+    with futures.ThreadPoolExecutor() as executor:
+        for uri in uris:
+            handler = URIHandler.from_uri(uri)
+            executor.submit(lambda :list(handler.get_paths()))
 
-    for pkg_name in PypiPackage.list_packages():
-        try:
-            pkg = PypiPackage.from_pypi(pkg_name)
-        except exceptions.NoSuchPackage:
-            continue
-        targets = []
-
-        input_definition = {
-            "metadata": {"package": pkg_name},
-            "input_type": "AuraInput",
-        }
-
-        for url in pkg.info["urls"]:
-            targets.append({"url": url["url"], "metadata": url})
-
-        input_definition["targets"] = json.dumps(targets)
-        inputs.append(input_definition)
-
-    out_file.write(
-        json.dumps(
-            {
-                "name": "aura",
-                "version": "0.0.1",
-                "description": "This is a set of all PyPI packages",
-                "inputs": inputs,
-            }
-        )
-    )
-
-
-def r2c_scan(source, out_file, mode="generic"):
-    out = {"results": [], "errors": []}
-
-    pkg_metadata = {}
-
-    metadata = {"format": "none"}
-
-    if mode == "pypi":
-        logger.info("R2C mode set to PyPI")
-        assert len(source) == 1
-        location = Path(source[0])
-
-        meta_loc = location / "metadata.json"
-        if meta_loc.is_file():
-            with open(location / "metadata.json", "r") as fd:
-                pkg_metadata = json.loads(fd.read())
-                metadata.update(
-                    {
-                        "package_type": pkg_metadata.get("packagetype"),
-                        "package_name": pkg_metadata.get("name"),
-                        "python_version": pkg_metadata.get("python_version"),
-                    }
-                )
-        source = [
-            os.fspath(x.absolute())
-            for x in location.iterdir()
-            if x.name != "metadata.json"
-        ]
-    else:
-        logger.info("R2C mode set to generic")
-
-    for src in source:
-        logger.info(f"Enumerating {src} with metadata: {metadata}")
-
-        try:
-            data = scan_uri(src, metadata=metadata)
-
-            for loc in data:
-                for hit in loc["hits"]:
-                    rhit = {"check_id": hit.pop("type"), "extra": hit}
-                    if "line_no" in hit:
-                        rhit["start"] = {"line": hit["line_no"]}
-                        rhit["path"] = os.path.relpath(hit["location"], source[0])
-
-                    out["results"].append(rhit)
-
-        except Exception as exc:
-            exc_tb = sys.exc_info()[-1]
-
-            out["errors"].append(
-                {
-                    "message": f"[{exc_tb.tb_lineno}] An exception occurred: {str(exc)}",
-                    "data": {"path": str(src)},
-                }
-            )
-
-    pprint(out)
-    out_file.write(json.dumps(out, default=utils.json_encoder))
+        executor.shutdown(wait=True)

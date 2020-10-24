@@ -94,7 +94,7 @@ class URIHandler(ABC):
         return True
 
     @abstractmethod
-    def get_paths(self, metadata: Optional[dict]) -> Generator[ScanLocation, None, None]:
+    def get_paths(self, metadata: Optional[dict]=None) -> Generator[ScanLocation, None, None]:
         ...
 
     def get_diff_paths(self, other: URIHandler) -> Generator[Tuple[ScanLocation, ScanLocation], None, None]:
@@ -156,7 +156,6 @@ class ScanLocation(KeepRefs):
                 except PythonExecutorError:
                     pass
 
-
     def __compute_hashes(self):
         tl = tlsh.Tlsh()
         md5 = hashlib.md5()
@@ -185,7 +184,6 @@ class ScanLocation(KeepRefs):
         self.metadata["sha1"] = sha1.hexdigest()
         self.metadata["sha256"] = sha256.hexdigest()
         self.metadata["sha512"] = sha512.hexdigest()
-
 
     def __str__(self):
         return self.strip(self.str_location)

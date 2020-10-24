@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-import typing
 from urllib.parse import urlparse, ParseResult, parse_qs
+from typing import Optional, Generator
 
 from .base import URIHandler, ScanLocation
 from .. import cache
@@ -30,7 +30,7 @@ class MirrorHandler(URIHandler):
     def metadata(self):
         return {"package": self.package_name, "package_opts": self.opts}
 
-    def get_paths(self, metadata: dict=None, package=None) -> typing.Generator[ScanLocation, None, None]:
+    def get_paths(self, metadata: Optional[dict]=None, package=None) -> Generator[ScanLocation, None, None]:
         if package is None:
             package = self.package
 

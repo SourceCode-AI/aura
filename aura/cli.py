@@ -231,23 +231,10 @@ def find_typosquatting(out, max_distance, limit=None):
     commands.generate_typosquatting(out=out, distance=max_distance, limit=limit)
 
 
-@cli.group("r2c")
-def r2c():
-    pass
-
-
-@r2c.command(name="generate_input")
-@click.argument("out_file", metavar="<OUTPUT FILE>", type=click.File("w"))
-def generate_input(out_file):
-    commands.generate_r2c_input(out_file)
-
-
-@r2c.command(name="scan")
-@click.option("--out", default="/analysis/output/output.json", type=click.File("w"))
-@click.option("--mode", default="generic")
-@click.argument("source", nargs=-1, type=click.Path())
-def run_r2c_analyzer(source, out, mode):
-    commands.r2c_scan(source=source, out_file=out, mode=mode)
+@cli.command()
+@click.argument("uris", nargs=-1, metavar="<URI 1>, <URI 2>, ...")
+def prefetch(uris):
+    commands.prefetch(*uris)
 
 
 @cli.command(name="check_requirement")
