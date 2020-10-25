@@ -151,10 +151,13 @@ def diff_distance(s1, s2, cutoff=0.8, cut_return=None):
 
 
 def generate_popular(
-        json_path: Path,
+        json_path: Optional[Path]=None,
         full_list: Optional[Iterable[str]]=None,
         download_threshold: Optional[int]=None
 ):
+    if json_path is None:
+        json_path = config.get_pypi_stats_path()
+
     if not json_path.exists():
         raise ValueError(f"PyPI stats file does not exists: {json_path}")
 

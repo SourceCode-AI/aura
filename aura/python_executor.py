@@ -24,7 +24,7 @@ LOGGER = config.get_logger(__name__)
 NATIVE_ENVIRONMENT_CACHE = None
 
 
-def run_with_interpreters(*, metadata=None, native_callback: Optional[Callable]=None, **kwargs):
+def run_with_interpreters(*, metadata=None, **kwargs):
     """
     Proxy to execute_interpreter
     Iterates over defined interpreter until one that runs the input/script is found

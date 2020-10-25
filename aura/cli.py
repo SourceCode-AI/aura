@@ -222,8 +222,8 @@ def update_aura():
 @cli.command()
 @click.option("-o", "--out", default="-", type=click.File("w"))
 @click.option("-m", "--max-distance", default=2, type=click.IntRange(min=0, max=10))
-@click.option("-l", "--limit", default=None, type=click.INT)
-def find_typosquatting(out, max_distance, limit=None):
+@click.option("-l", "--limit", default=100, type=click.INT)
+def find_typosquatting(out, max_distance, limit=100):
     if limit <= 0:
         click.secho("Invalid value for limit", file=sys.stderr)
         sys.exit(1)

@@ -206,5 +206,4 @@ interpreters: &interpreters
   # All other interpreters are optional, AST parsing will try them in the defined order
 
   native: native
-  python3: python3
   python2: python2
