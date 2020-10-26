@@ -8,7 +8,7 @@ import re
 import tempfile
 import shutil
 import pprint
-from typing import Union, Optional, List
+from typing import Union, Optional, List, Tuple
 from pathlib import Path
 from collections import defaultdict
 from dataclasses import dataclass
@@ -358,6 +358,8 @@ class DiffAnalyzer():
 
 
 class DiffDetections:
+    ANALYSIS_CACHE = {}
+
     def __init__(self, file_diffs: List[Diff], a_location: ScanLocation, b_location: ScanLocation):
         self.file_diffs: List[Diff] = file_diffs
         self.a_loc: ScanLocation = a_location
@@ -384,9 +386,12 @@ class DiffDetections:
             b_detections = b_pairs.get(d.b_ref, [])
             d.add_detections(a_detections, b_detections)
 
-    def scan_location(self, location):
-        sandbox = Analyzer(location=location)
-        return tuple(sandbox.run())
+    def scan_location(self, location) -> Tuple[Detection]:
+        if location.location not in self.ANALYSIS_CACHE:
+            sandbox = Analyzer(location=location)
+            detections = tuple(sandbox.run())
+            self.ANALYSIS_CACHE[location.location] = detections
+        return self.ANALYSIS_CACHE[location.location]
 
     def pair_hits(self, diff_refs, hits):
         orphans = []

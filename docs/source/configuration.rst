@@ -127,6 +127,7 @@ AURA_LOG_LEVEL              Output log level
 AURA_NO_BLOBS               Disable extraction of data blobs for further analysis
 AURA_NO_PROGRESS            Disable cli progress bar, useful when redirecting stderr and stdout
 AURA_FORCE_COLORS           Force ANSI colors on text output
+AURA_TERM_WIDTH             Force terminal width for text output rendering
 AURA_CACHE_LOCATION         Override the cache location
 AURA_NO_CACHE               Disable the cache entirely for all operations
 AURA_DEBUG_LEAKS            Turn on the garbage collector ``DEBUG_LEAK`` flag on

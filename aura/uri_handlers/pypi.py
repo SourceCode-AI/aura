@@ -83,9 +83,9 @@ class PyPiHandler(URIHandler, PackageProvider):
             other: URIHandler
     )-> Generator[Tuple[ScanLocation, ScanLocation], None, None]:
         if isinstance(other, PyPiHandler):
-            yield self.package._cmp_info(other.package)
             yield self.package.score.get_score_table()
             yield other.package.score.get_score_table()
+            yield self.package._cmp_info(other.package)
 
             yield from self.package._cmp_archives(other.package)
         else:

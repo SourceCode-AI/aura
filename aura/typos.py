@@ -9,6 +9,7 @@ from typing import Optional, Generator, Iterable, Tuple, Callable, List
 from packaging.utils import canonicalize_name
 
 from . import config
+from . import package
 
 
 logger = config.get_logger(__name__)
@@ -150,10 +151,9 @@ def diff_distance(s1, s2, cutoff=0.8, cut_return=None):
         return cut_return
 
 
-def generate_popular(
+def get_popular_packages(
         json_path: Optional[Path]=None,
-        full_list: Optional[Iterable[str]]=None,
-        download_threshold: Optional[int]=None
+        download_threshold: Optional[int]=10000
 ):
     if json_path is None:
         json_path = config.get_pypi_stats_path()
@@ -161,13 +161,8 @@ def generate_popular(
     if not json_path.exists():
         raise ValueError(f"PyPI stats file does not exists: {json_path}")
 
-    if full_list is None:
-        full_list = get_all_pypi_packages()
-
-    #  We need to convert generator to set because we run it in multiple loops
     download_threshold = threshold_or_default(download_threshold)
-    full_list = set(full_list)
-    popular = set()
+    popular = []
 
     with json_path.open("r") as fd:
         for line in fd:
@@ -176,12 +171,21 @@ def generate_popular(
             if int(x.get("downloads", 0)) < download_threshold:
                 break
 
-            pkg1 = canonicalize_name(x["package_name"])
-            popular.add(pkg1)
+            popular.append(canonicalize_name(x["package_name"]))
 
-    full_list -= popular
+    return popular
 
-    yield from itertools.product(popular, full_list)
+
+def generate_combinations(
+        left: Iterable[str],
+        right: Optional[Iterable[str]] = None
+) -> Generator[Tuple[str, str], None, None]:
+    if right is None:
+        right = get_all_pypi_packages()
+
+    set_left = set(left)
+
+    yield from itertools.product(left, itertools.filterfalse(lambda x: x not in set_left, right))
 
 
 def enumerator(
@@ -193,10 +197,48 @@ def enumerator(
     These package pairs are usually combinations/product of a list of packages
     A given `method` is then applied to package pair that acts as a filter, usually a levenshtein distance or similar metric
     """
-    for (pkg1, pkg2) in generator:
-        res = method(pkg1, pkg2)
+
+    pkg_cache = {}
+    pkg_score_cache = {}
+
+    for num, (orig, typo) in enumerate(generator):
+        res = method(orig, typo)
         if res and res < 2:
-            yield (pkg1, pkg2)
+
+            if orig not in pkg_cache:
+                orig_pkg = package.PypiPackage.from_pypi(orig)
+                pkg_cache[orig] = orig_pkg
+            else:
+                orig_pkg = pkg_cache[orig]
+
+            if orig not in pkg_score_cache:
+                orig_score = package.PackageScore(orig, orig_pkg, fetch_github=False)
+                pkg_score_cache[orig] = orig_score
+            else:
+                orig_score = pkg_score_cache[orig]
+
+            if typo not in pkg_cache:
+                typo_pkg = package.PypiPackage.from_pypi(typo)
+                pkg_cache[typo] = typo_pkg
+            else:
+                typo_pkg = pkg_cache[typo]
+
+            if typo not in pkg_score_cache:
+                typo_score = package.PackageScore(typo, typo_pkg, fetch_github=False)
+                pkg_score_cache[typo] = typo_score
+            else:
+                typo_score = pkg_score_cache[typo]
+
+            data = {
+                "original": orig,
+                "typo": typo,
+                "orig_pkg": orig_pkg,
+                "orig_score": orig_score,
+                "typo_pkg": typo_pkg,
+                "typo_score": typo_score,
+            }
+
+            yield data
 
 
 def check_name(name: str, full_list: bool=False, download_threshold: Optional[int]=None) -> List[str]:

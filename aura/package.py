@@ -2,6 +2,7 @@
 from __future__ import annotations
 import math
 import datetime
+import dataclasses
 import tempfile
 import shutil
 import xmlrpc.client
@@ -10,7 +11,7 @@ from urllib.parse import urlparse, ParseResult
 from pathlib import Path
 from itertools import product, chain
 from contextlib import contextmanager
-from typing import Optional, Generator, Tuple, List, NewType
+from typing import Optional, Generator, Tuple, List, Union
 
 import pytz
 import requests
@@ -46,6 +47,10 @@ class PypiPackage:
         self.filename: Optional[str] = None
         self.md5: Optional[str] = None
         self.opts: dict = opts or {}
+        # normalize missing data
+        self.info["info"].setdefault("project_urls", {})
+        if self.info["info"]["project_urls"] is None:
+            self.info["info"]["project_urls"] = {}
 
     @classmethod
     def from_pypi(cls, name: str, *args, **kwargs):
@@ -243,36 +248,30 @@ class PypiPackage:
 
     def _cmp_archives(self, other: PypiPackage) -> Generator[Tuple[ScanLocation, ScanLocation], None, None]:
         temp_dir = Path(tempfile.mkdtemp(prefix="aura_pkg_diff_"))
+        location_cache = {}
+        # Inline cache function as we want this to be temporary within the function scope only
+        def get_cached_location(pkg: ReleaseInfo) -> ScanLocation:
+            if pkg["url"] not in location_cache:
+                pkg_path = temp_dir / pkg["md5_digest"]
+                pkg_path.mkdir()
+                pkg_path /= pkg["filename"]
+
+                with pkg_path.open("wb") as fd:
+                    cache.Cache.proxy_url(url=pkg["url"], fd=fd)
+
+                location_cache[pkg["url"]] = ScanLocation(
+                    location=pkg_path,
+                    strip_path=str(pkg_path.parent),
+                    metadata={"release": pkg}
+                )
+            return location_cache[pkg["url"]]
 
         try:
             for (x, y) in self.get_diff_candidates(other):
                 LOGGER.info(f"Diffing `{x['filename']}` and `{y['filename']}`")
 
-                x_path = temp_dir / x["md5_digest"]
-                x_path.mkdir()
-                x_path /= x["filename"]
-
-                with x_path.open("wb") as fd:
-                    utils.download_file(x["url"], fd)
-
-                x_loc = ScanLocation(
-                    location=x_path,
-                    strip_path=str(x_path.parent),
-                    metadata={"release": x}
-                )
-
-                y_path = temp_dir / y["md5_digest"]
-                y_path.mkdir()
-                y_path /= y["filename"]
-
-                with y_path.open("wb") as fd:
-                    utils.download_file(y["url"], fd)
-
-                y_loc = ScanLocation(
-                    location=y_path,
-                    strip_path=str(y_path.parent),
-                    metadata={"release": y}
-                )
+                x_loc = get_cached_location(x)
+                y_loc = get_cached_location(y)
                 yield x_loc, y_loc
 
         finally:
@@ -281,7 +280,47 @@ class PypiPackage:
 
 
 class PackageScore:
-    def __init__(self, package_name: str, package: Optional[PypiPackage]=None):
+    @dataclasses.dataclass
+    class Value:  # Scoped class specific to package score
+        value: int
+        normalized: int
+        label: str
+        explanation: str
+        slug: Optional[str] = None
+
+        def __post_init__(self):
+            if self.slug is None:
+                self.slug = self.label.lower().replace(" ", "_")
+
+        def __int__(self):
+            return self.normalized
+
+        def __str__(self):
+            return self.label
+
+        def as_row(self) -> Tuple[table.Column, table.Column]:
+            s = {"fg": ("green" if self.normalized else "red")}
+            return (table.Column(self.label, {"style": s}), table.Column(self.explanation, {"style": s}))
+
+    @dataclasses.dataclass
+    class NA:
+        label: str
+        explanation: str = "N/A"
+
+        def __int__(self):
+            return 0
+
+        def as_row(self) -> Tuple[table.Column, table.Column]:
+            s = {"style": {"fg": "bright_black"}}
+            return (table.Column(self.label, s), table.Column(self.explanation, s))
+
+
+    def __init__(
+            self,
+            package_name: str,
+            package: Optional[PypiPackage]=None,
+            fetch_github: bool=True
+    ):
         self.package_name = package_name
 
         if package is None:
@@ -292,138 +331,173 @@ class PackageScore:
         self.now = pytz.UTC.localize(datetime.datetime.utcnow())
         self.github = None
 
-        self.__load_github()
+        if fetch_github:
+            self.__load_github()
 
     def __load_github(self):
-        self.repo_url = self.pkg.info["info"]["project_urls"].get("Source")
+        self.repo_url = self.pkg.info["info"].get("project_urls", {}).get("Source")
         if self.repo_url is None:
             return
 
         self.github = github.GitHub.from_url(self.repo_url)
 
-    def score_pypi_downloads(self) -> int:
+    def score_pypi_downloads(self) -> Union[Value, NA]:
         try:
             for line in config.iter_pypi_stats():
                 pkg_name = canonicalize_name(line["package_name"])
                 if pkg_name == self.package_name:
-                    return math.ceil(math.log(int(line.get("downloads", 0)), 10))
+                    downloads = int(line.get("downloads", 0))
+                    normalized = math.ceil(math.log(downloads, 10))
+                    explanation = f"{downloads} (+{normalized})"
+                    return self.Value(downloads, normalized, "PyPI downloads", explanation)
         except ValueError:
             pass
-        return 0
+        return PackageScore.NA("PyPI downloads")
 
-    def score_reverse_dependencies(self) -> int:
+    def score_reverse_dependencies(self) -> Union[Value, NA]:
         dependencies = get_reverse_dependencies(self.package_name)
         if not dependencies:
-            return 0
+            return PackageScore.NA("Reverse dependencies")
 
-        return math.ceil(math.log(len(dependencies), 10))
+        dependencies = len(dependencies)
+        normalized = math.ceil(math.log(dependencies, 10))
+        explanation = f"{dependencies} (+{normalized})"
 
-    def score_github_stars(self) -> int:
+        return self.Value(dependencies, normalized, "Reverse dependencies", explanation)
+
+    def score_github_stars(self) -> Union[Value, NA]:
         if self.github is None:
-            return 0
+            return self.NA("GitHub stars")
 
-        return math.ceil(math.log(self.github.repo["stargazers_count"], 10))
+        stars = self.github.repo["stargazers_count"]
+        normalized = math.ceil(math.log(stars, 10))
+        explanation = f"{stars} (+{normalized})"
+        return self.Value(stars, normalized, "GitHub stars", explanation)
 
-    def score_github_forks(self) ->int:
+    def score_github_forks(self) -> Union[Value, NA]:
         if self.github is None:
-            return 0
+            return self.NA("GitHub forks")
 
-        return math.ceil(math.log(self.github.repo["forks"], 10))
+        forks = self.github.repo["forks"]
+        normalized = math.ceil(math.log(forks, 10))
+        explanation = f"{forks} (+{normalized})"
+        return self.Value(forks, normalized, "GitHub forks", explanation)
 
-    def score_github_contributors(self) -> int:
+    def score_github_contributors(self) -> Union[Value, NA]:
         if self.github is None:
-            return 0
+            return self.NA("GitHub contributors")
 
-        return math.ceil(math.log(len(self.github.contributors), 10))
+        contributors = len(self.github.contributors)
+        normalized = math.ceil(math.log(contributors, 10))
+        explanation = f"{contributors} (+{normalized})"
+        return self.Value(contributors, normalized, "GitHub contributors", explanation)
 
-    def score_last_commit(self) -> bool:
+    def score_last_commit(self) -> Union[Value, NA]:
         if self.github is None:
-            return False
+            return self.NA("Recent commit")
 
         last_commit = utils.parse_iso_8601(self.github.repo["pushed_at"])
 
         if last_commit + datetime.timedelta(days=31*3) >= self.now:
-            return True
+            val = 1
+            note = "< 3m"
         else:
-            return False
+            val = 0
+            note = "> 3m"
 
-    def score_is_new_on_github(self) -> bool:
+        return self.Value(val, val, "Recent commit", f"{note} (+{val})")
+
+    def score_is_new_on_github(self) -> Union[Value, NA]:
         if self.github is None:
-            return False
+            return self.NA("New on GitHub")
 
         created = utils.parse_iso_8601(self.github.repo["created_at"])
 
         if created + datetime.timedelta(days=31*6) <= self.now:
-            return True
+            val = 1
+            note = "older than 6m"
         else:
-            return False
+            val = 0
+            note = "newer than 6m"
 
-    def has_multiple_releases(self) -> bool:
-        if len(self.pkg["releases"]) > 1:
-            return True
+        return self.Value(val, val, "New on GitHub", f"{note} (+{val})")
+
+    def has_multiple_releases(self) -> Value:
+        releases = len(self.pkg["releases"])
+        if releases:
+            normalized = math.ceil(math.log(releases, 10))
         else:
-            return False
+            normalized = 0
+        return self.Value(releases, normalized, "Multiple releases", f"{releases} (+{normalized})")
 
-    def has_source_repository(self) -> bool:
-        if self.pkg["info"]["project_urls"].get("Source"):
-            return True
-        else:
-            return False
+    def has_source_repository(self) -> Value:
+        source = 1 if self.pkg["info"]["project_urls"].get("Source") else 0
+        return self.Value(source, source, "Has source repository", f"+{source}")
 
-    def has_documentation(self) -> bool:
-        if self.pkg["info"]["project_urls"].get("Documentation"):
-            return True
-        else:
-            return False
+    def has_documentation(self) -> Value:
+        doc = 1 if self.pkg["info"]["project_urls"].get("Documentation") else 0
+        return self.Value(doc, doc, "Has documentation", f"+{doc}")
 
-    def has_homepage(self) -> bool:
-        if self.pkg["info"]["project_urls"].get("Homepage"):
-            return True
-        else:
-            return False
+    def has_homepage(self) -> Value:
+        homepage = 1 if self.pkg["info"]["project_urls"].get("Homepage") else 0
+        return self.Value(homepage, homepage, "Has homepage", f"+{homepage}")
 
-    def has_wheel(self) -> bool:
+    def has_wheel(self) -> Value:
+        wheel = 0
         for r in self.pkg["urls"]:
             if r["packagetype"] == "bdist_wheel":
-                return True
-        return False
+                wheel = 1
+                break
 
-    def has_sdist_source(self) -> bool:
+        return self.Value(wheel, wheel, "Has wheel", f"+{wheel}")
+
+    def has_sdist_source(self) -> Value:
+        sdist = 0
         for r in self.pkg["urls"]:
             if r["packagetype"] == "sdist" and r.get("python_version") == "source":
-                return True
-        return False
+                sdist = 1
+                break
+        return self.Value(sdist, sdist, "Has sdist", f"+{sdist}")
+
+    def get_score_entries(self) -> List[Value]:
+        entries = [
+            self.score_pypi_downloads(),
+            self.score_reverse_dependencies(),
+            self.score_github_stars(),
+            self.score_github_forks(),
+            self.score_github_contributors(),
+            self.score_last_commit(),
+            self.score_is_new_on_github(),
+            self.has_multiple_releases(),
+            self.has_source_repository(),
+            self.has_documentation(),
+            self.has_homepage(),
+            self.has_wheel(),
+            self.has_sdist_source()
+        ]
+        return entries
 
     def get_score_matrix(self) -> dict:
+        score_entries = self.get_score_entries()
+        total_score = sum(int(x) for x in score_entries)
         score_matrix = {
-            "pypi_downloads": self.score_pypi_downloads(),
-            "reverse_dependencies": self.score_reverse_dependencies(),
-            "github_stars": self.score_github_stars(),
-            "forks": self.score_github_forks(),
-            "contributors": self.score_github_contributors(),
-            "last_commit": self.score_last_commit(),
-            "is_new": self.score_is_new_on_github(),
-            "multiple_releases": self.has_multiple_releases(),
-            "has_source_repository": self.has_source_repository(),
-            "has_documentation": self.has_documentation(),
-            "has_homepage": self.has_homepage(),
-            "has_wheel": self.has_wheel(),
-            "has_sdist_source": self.has_sdist_source(),
+            "total": total_score,
+            "entries": [dataclasses.asdict(x) for x in score_entries]
         }
-        total = sum(score_matrix.values())
-        score_matrix["total"] = total
         return score_matrix
 
     def get_score_table(self) -> table.Table:
         score_table = table.Table(metadata={"title": f"Package score for '{self.package_name}'"})
 
-        for k, v in self.get_score_matrix().items():
-            row = (table.Column(k), table.Column(v))
+        score_entries = self.get_score_entries()
+        total_score = sum(int(x) for x in score_entries)
 
-            if k == "total":
-                row[0].metadata["style"] = row[1].metadata["style"] = {"fg": "blue", "bold": True}
+        for x in score_entries:
+            score_table += x.as_row()
 
-            score_table += row  # TODO: convert k/id to human text
+        total_row = (table.Column("Total score"), table.Column(str(total_score)))
+        total_row[0].metadata["style"] = total_row[1].metadata["style"] = {"fg": "blue", "bold": True}
+        score_table += total_row
 
         return score_table
 

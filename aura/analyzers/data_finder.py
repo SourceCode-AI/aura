@@ -32,11 +32,10 @@ class DataFinder(NodeAnalyzerV2):
 
         self._no_blobs = False
 
-        if "AURA_NO_BLOB" in os.environ:
+        if "AURA_NO_BLOBS" in os.environ:
             self._no_blobs = True
 
         self.__min_blob_size = self.get_min_size()
-        pass
 
     @classmethod
     def get_min_size(cls) -> int:

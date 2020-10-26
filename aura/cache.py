@@ -43,7 +43,12 @@ class Cache:
             return utils.download_file(url, fd=fd)
 
         if cache_id is None:
-            cache_id = hashlib.md5(url).hexdigest()
+            if isinstance(url, str):
+                burl = url.encode()
+            else:
+                burl = url
+
+            cache_id = hashlib.md5(burl).hexdigest()
 
         cache_id = f"url_{cache_id}"
         cache_pth: Path = cls.get_location()/cache_id

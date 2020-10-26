@@ -1,3 +1,5 @@
+from click import style
+
 from dataclasses import dataclass, field
 from typing import Any, List, Iterable, Optional
 
@@ -32,6 +34,10 @@ class Column:
             s = {"fg": "red"}
 
         return s
+
+    @property
+    def pretty(self) -> str:
+        return style(str(self), **self.style)
 
     def asdict(self) -> dict:
         data = {
@@ -81,6 +87,11 @@ class Table:
     def __iter__(self):
         yield from self.rows
 
+    @property
+    def width(self) -> int:
+        title_width = len(self.metadata.get("title", ""))
+        return max(sum(self.col_len)+3, title_width)
+
     def asdict(self) -> dict:
         d = {"rows": [
             [c.asdict() for c in row] for row in self.rows
@@ -89,3 +100,27 @@ class Table:
             d["metadata"] = self.metadata
 
         return d
+
+    def pprint(self, preport=None):
+        from .text import PrettyReport
+
+        if preport is None:
+            preport = PrettyReport()
+
+        preport.print_tables(self, self)
+
+        preport.print_top_separator()
+
+        if self.metadata.get("title"):
+            preport.print_heading(self.metadata["title"])
+
+        for row in self:
+            cols = []
+            for idx, col in enumerate(row):
+                text = preport._align_text(style(str(col), **col.style), width=self.col_len[idx])
+                cols.append(text)
+
+            preport.align(" \u2502 ".join(cols))
+
+        preport.print_bottom_separator()
+

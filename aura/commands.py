@@ -214,13 +214,28 @@ def show_info():
     formatter.output_info_data(info_data)
 
 
-def generate_typosquatting(out, distance=2, limit=None):
+def generate_typosquatting(out, distance=2, limit=None, pkgs=None):
+    from .output.text import PrettyReport
+
+    p = PrettyReport()  # TODO: convert into plugin system
+
+    if not pkgs:
+        pkgs = typos.get_popular_packages()
+
     f = partial(typos.damerau_levenshtein, max_distance=distance)
-    for num, (x, y) in enumerate(typos.enumerator(typos.generate_popular(), f)):
-        if limit and num >= limit:
+    combinations = typos.generate_combinations(left=pkgs)
+
+    for idx, data in enumerate(typos.enumerator(combinations, f)):
+        if limit and idx >= limit:
             break
 
-        out.write(json.dumps({"original": x, "typosquatting": y}) + "\n")
+        try:
+            diff_table = data["orig_pkg"]._cmp_info(data["typo_pkg"])
+            t1 = data["orig_score"].get_score_table()
+            t2 = data["typo_score"].get_score_table()
+            p.print_tables(t1, t2, diff_table)
+        except exceptions.NoSuchPackage:
+            continue
 
 
 def prefetch(*uris):

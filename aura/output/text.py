@@ -1,6 +1,7 @@
 import re
 import os
 import sys
+import itertools
 from shutil import get_terminal_size
 from dataclasses import dataclass
 from textwrap import wrap
@@ -69,13 +70,16 @@ class PrettyReport:
     """, re.VERBOSE)
 
     def __init__(self, fd=None):
-        width = config.get_settings("aura.text-output-width", "auto")
         self.term_width = get_terminal_size(fallback=(120, 24))[0]
 
-        if width == "auto":
-            self.width = self.term_width
+        if "AURA_TERM_WIDTH" in os.environ:
+            self.width = int(os.environ["AURA_TERM_WIDTH"])
         else:
-            self.width = int(width or 120)
+            width = config.get_settings("aura.text-output-width", "auto")
+            if width == "auto":
+                self.width = self.term_width
+            else:
+                self.width = int(width or 120)
 
         self.fd = fd
 
@@ -83,26 +87,37 @@ class PrettyReport:
     def ansi_length(cls, line:str):
         return len(cls.ANSI_RE.sub("", line))
 
-    def print_separator(self, sep="\u2504", left="\u251C", right="\u2524"):
-        secho(f"{left}{sep*(self.width-2)}{right}", file=self.fd, color=TTY_COLORS)
+    def print_separator(self, sep="\u2504", left="\u251C", right="\u2524", width=None):
+        if width is None:
+            width = self.width
+
+        secho(f"{left}{sep*(width-2)}{right}", file=self.fd, color=TTY_COLORS)
 
     def print_thick_separator(self):
         self.print_separator(left="\u255E", sep="\u2550", right="\u2561")
 
-    def print_top_separator(self):
-        self.print_separator(left="\u2552", sep="\u2550", right="\u2555")
+    def print_top_separator(self, **kwargs):
+        self.print_separator(left="\u2552", sep="\u2550", right="\u2555", **kwargs)
 
-    def print_bottom_separator(self):
-        self.print_separator(left="\u2558", sep="\u2550", right="\u255B")
+    def print_bottom_separator(self, **kwargs):
+        self.print_separator(left="\u2558", sep="\u2550", right="\u255B", **kwargs)
 
-    def print_heading(self, text, left="\u251C", right="\u2524", infill="\u2591"):
+    def generate_heading(self, text, left="\u251C", right="\u2524", infill="\u2591", width=None):
+        if width is None:
+            width = self.width - len(left) - len(right) - 2
+
         text_len = self.ansi_length(text)
-        ljust = (self.width-4-text_len)//2
-        rjust = self.width-4-text_len-ljust
-        secho(f"{left}{infill*ljust} {text} {infill*rjust}{right}", file=self.fd, color=TTY_COLORS)
+        ljust = (width - text_len) // 2
+        rjust = width - text_len - ljust
+        return f"{left}{infill*ljust} {text} {infill*rjust}{right}"
 
-    def align(self, line, pos=-1, left="\u2502 ", right=" \u2502"):
-        line = self._align_text(line, self.width - len(left) - len(right), pos=pos)
+    def print_heading(self, *args, **kwargs):
+        secho(self.generate_heading(*args, **kwargs), file=self.fd, color=TTY_COLORS)
+
+    def align(self, line, pos=-1, left="\u2502 ", right=" \u2502", width=None):
+        if width is None:
+            width = self.width
+        line = self._align_text(line, width - len(left) - len(right), pos=pos)
         secho(f"{left}{line}{right}", file=self.fd, color=TTY_COLORS)
 
     def wrap(self, text, left="\u2502 ", right=" \u2502"):
@@ -135,6 +150,34 @@ class PrettyReport:
             return text + " " * (remaining_len - content_len)
         else:
             return " " * (remaining_len - content_len) + text
+
+    def print_tables(self, *tables):
+        table_widths = [t.width+2 for t in tables]
+
+        self.print_top_separator()
+
+        titles = [t.metadata.get("title", "N/A") for t in tables]
+        tparts = [tuple(self.generate_heading(title, width=w, left="", right="") for w, title in zip(table_widths, titles))]
+
+        for idx, rows in enumerate(itertools.zip_longest(*tables, fillvalue="")):
+
+            full_row = []
+
+            for ridx, row in enumerate(rows):
+                text = " \u2506 ".join(self._align_text(c.pretty, width=tables[ridx].col_len[cidx]) for cidx, c in enumerate(row))
+                text = self._align_text(text, width=table_widths[ridx]+2)
+
+                full_row.append(text)
+
+            tparts.append(full_row)
+
+        for idx, tpart in enumerate(tparts):
+            self.align(" \u2551 ".join(tpart))
+            if idx == 0:
+                self.print_thick_separator()
+
+        self.print_bottom_separator()
+
 
 
 @dataclass()
@@ -224,7 +267,7 @@ class TextBase:
 
         return root
 
-    def output_table(self, table):
+    def output_table(self, table: Table):
         out = PrettyReport(fd=self._fd)
         out.print_top_separator()
 
@@ -405,8 +448,8 @@ class TextDiffOutput(TextBase, DiffOutputBase):
     def output_diff(self, diff_analyzer):
         out = PrettyReport(fd=self._fd)
 
-        for table in diff_analyzer.tables:
-            self.output_table(table)
+        if diff_analyzer.tables:
+            out.print_tables(*diff_analyzer.tables)
 
         for diff in self.filtered(diff_analyzer.diffs):
             out.print_separator(left="\u2552", sep="\u2550", right="\u2555")

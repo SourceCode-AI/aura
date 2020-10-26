@@ -72,17 +72,20 @@ def test_package_score(mock1, mock_github, mock_pypi_rest_api, mock_pypi_stats):
     assert pkg.github.name == "requests"
 
     matrix = pkg.get_score_matrix()
-    assert matrix["contributors"] == 2
-    assert matrix["forks"] == 4
-    assert matrix["github_stars"] == 5
-    assert matrix["has_documentation"] == 1
-    assert matrix["has_homepage"] == 1
-    assert matrix["has_sdist_source"] == 1
-    assert matrix["has_source_repository"] == 1
-    assert matrix["has_wheel"] == 1
-    assert matrix["is_new"] == 1
-    assert matrix["last_commit"] == 1
-    assert matrix["multiple_releases"] == 1
+
+    scores = {x["slug"]: x["normalized"] for x in matrix["entries"]}
+
+    assert scores["github_contributors"] == 2
+    assert scores["github_forks"] == 4
+    assert scores["github_stars"] == 5
+    assert scores["has_documentation"] == 1
+    assert scores["has_homepage"] == 1
+    assert scores["has_sdist"] == 1
+    assert scores["has_source_repository"] == 1
+    assert scores["has_wheel"] == 1
+    assert scores["new_on_github"] == 1
+    assert scores["recent_commit"] == 1
+    assert scores["multiple_releases"] == 3
     assert matrix["total"] >= 19
 
     # Make the package seem outdated
@@ -90,7 +93,8 @@ def test_package_score(mock1, mock_github, mock_pypi_rest_api, mock_pypi_stats):
         datetime.datetime.utcnow() + datetime.timedelta(365)
     )
     matrix = pkg.get_score_matrix()
-    assert matrix["last_commit"] == 0
+    scores = {x["slug"]: x["normalized"] for x in matrix["entries"]}
+    assert scores["recent_commit"] == 0
 
 
 @responses.activate
@@ -100,7 +104,6 @@ def test_bad_package_score(mock1, mock_github, mock_pypi_rest_api, mock_pypi_sta
     mock_github(responses)
 
     pkg = package.PackageScore("badboy")
-
     matrix = pkg.get_score_matrix()
     assert matrix["total"] == 0
 
