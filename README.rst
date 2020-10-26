@@ -75,6 +75,9 @@ Find most popular typosquatted packages (you need to call ``aura update`` to dow
     aura find-typosquatting --max-distance 2 --limit 10
 
 
+.. image:: https://asciinema.org/a/367999.svg
+   :target: https://asciinema.org/a/367999
+
 Authors & Contributors
 ======================
 
