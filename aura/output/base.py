@@ -55,7 +55,7 @@ class OutputBase(metaclass=ABCMeta):
             elif fmt.is_supported(parsed_uri=parsed):
                 return fmt
 
-        raise exceptions.InvalidOutput("No such output format")
+        raise exceptions.InvalidOutput(f"No such output format `{uri}`")
 
 
 @dataclass()
@@ -163,6 +163,21 @@ class ScanOutputBase(OutputBase, metaclass=ABCMeta):
             raise exceptions.MinimumScoreNotReached(f"Score of {total_score} did not meet the minimum {self.min_score}")
 
         return processed
+
+
+@dataclass()
+class TyposquattingOutputBase(OutputBase, metaclass=ABCMeta):
+    @classmethod
+    def entrypoint(cls) -> str:
+        return "aura.typosquatting_output_handlers"
+
+    @classmethod
+    def from_uri(cls, uri: str) -> TyposquattingOutputBase:
+        return cls.get_format(uri)()
+
+    @abstractmethod
+    def output_typosquatting(self, entries):
+        ...
 
 
 @dataclass()

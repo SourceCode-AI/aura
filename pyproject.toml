@@ -109,6 +109,10 @@ sqlite = "aura.output.sqlite:SQLiteDiffOutput"
 [tool.poetry.plugins."aura.info_output_handlers"]
 text = "aura.output.text:TextInfoOutput"
 
+[tool.poetry.plugins."aura.typosquatting_output_handlers"]
+text = "aura.output.text:TextTyposquattingOutput"
+json = "aura.output.json:JSONTyposquattingOutput"
+
 [tool.poetry.plugins."aura.diff_hooks"]
 diff_archive = "aura.analyzers.archive:diff_archive"
 

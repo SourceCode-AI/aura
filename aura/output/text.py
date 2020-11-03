@@ -6,7 +6,7 @@ from shutil import get_terminal_size
 from dataclasses import dataclass
 from textwrap import wrap
 from prettyprinter import pformat
-from typing import Optional, Any
+from typing import Optional, Any, Generator
 from collections import Counter
 
 from click import secho, style
@@ -14,7 +14,7 @@ from click import secho, style
 from .. import utils
 from .. import config
 from ..analyzers.detections import get_severity
-from .base import ScanOutputBase, DiffOutputBase, InfoOutputBase
+from .base import ScanOutputBase, DiffOutputBase, InfoOutputBase, TyposquattingOutputBase
 from .table import Table
 
 
@@ -427,6 +427,20 @@ class TextInfoOutput(InfoOutputBase):
                 out.align(f"{lhs} \u2502 {rhs}")
 
         out.print_bottom_separator()
+
+
+class TextTyposquattingOutput(TyposquattingOutputBase):
+    @classmethod
+    def protocol(cls) -> str:
+        return "text"
+
+    def output_typosquatting(self, entries):
+        out = PrettyReport()
+        for x in entries:
+            diff_table = x["orig_pkg"]._cmp_info(x["typo_pkg"])
+            orig_table = x["orig_score"].get_score_table()
+            typo_table = x["typo_score"].get_score_table()
+            out.print_tables(orig_table, typo_table, diff_table)
 
 
 @dataclass()

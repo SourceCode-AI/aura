@@ -8,6 +8,7 @@ import traceback
 from concurrent import futures
 from pathlib import Path
 from functools import partial
+from itertools import islice
 from typing import Union, Optional, Tuple, Generator, List
 
 import click
@@ -21,9 +22,8 @@ from . import exceptions
 from . import utils
 from . import mirror
 from . import typos
-from .package import PypiPackage
 from .analyzers.detections import Detection
-from .output.base import ScanOutputBase, DiffOutputBase, InfoOutputBase
+from .output.base import ScanOutputBase, DiffOutputBase, InfoOutputBase, TyposquattingOutputBase
 
 
 logger = config.get_logger(__name__)
@@ -214,28 +214,15 @@ def show_info():
     formatter.output_info_data(info_data)
 
 
-def generate_typosquatting(out, distance=2, limit=None, pkgs=None):
-    from .output.text import PrettyReport
-
-    p = PrettyReport()  # TODO: convert into plugin system
-
+def generate_typosquatting(distance=2, limit=None, pkgs=None, format_uri="text"):
     if not pkgs:
         pkgs = typos.get_popular_packages()
 
     f = partial(typos.damerau_levenshtein, max_distance=distance)
     combinations = typos.generate_combinations(left=pkgs)
 
-    for idx, data in enumerate(typos.enumerator(combinations, f)):
-        if limit and idx >= limit:
-            break
-
-        try:
-            diff_table = data["orig_pkg"]._cmp_info(data["typo_pkg"])
-            t1 = data["orig_score"].get_score_table()
-            t2 = data["typo_score"].get_score_table()
-            p.print_tables(t1, t2, diff_table)
-        except exceptions.NoSuchPackage:
-            continue
+    formatter = TyposquattingOutputBase.from_uri(format_uri)
+    formatter.output_typosquatting(islice(typos.enumerator(combinations, f), 0, limit))
 
 
 def prefetch(*uris):

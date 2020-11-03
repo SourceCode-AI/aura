@@ -220,16 +220,16 @@ def update_aura():
 
 
 @cli.command()
-@click.option("-o", "--out", default="-", type=click.File("w"))
 @click.option("-m", "--max-distance", default=2, type=click.IntRange(min=0, max=10))
 @click.option("-l", "--limit", default=100, type=click.INT)
+@click.option("-f", "--format", default="text")
 @click.argument("pkg", nargs=-1)
-def find_typosquatting(out, max_distance, limit=100, pkg=None):
+def find_typosquatting(max_distance, limit=100, pkg=None, format="text"):
     if limit <= 0:
         click.secho("Invalid value for limit", file=sys.stderr)
         sys.exit(1)
 
-    commands.generate_typosquatting(out=out, distance=max_distance, limit=limit, pkgs=pkg)
+    commands.generate_typosquatting(distance=max_distance, limit=limit, pkgs=pkg, format_uri=format)
 
 
 @cli.command()

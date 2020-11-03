@@ -201,10 +201,9 @@ def enumerator(
     pkg_cache = {}
     pkg_score_cache = {}
 
-    for num, (orig, typo) in enumerate(generator):
+    for (orig, typo) in generator:
         res = method(orig, typo)
         if res and res < 2:
-
             if orig not in pkg_cache:
                 orig_pkg = package.PypiPackage.from_pypi(orig)
                 pkg_cache[orig] = orig_pkg

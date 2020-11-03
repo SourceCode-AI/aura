@@ -83,3 +83,22 @@ Authors & Contributors
 
 * **Martin Carnogursky** - *Initial work and project lead* - https://is.muni.cz/person/410345
 * **Mirza Zulfan** - *Logo Design* - https://github.com/mirzazulfan
+
+
+LICENSE
+=======
+Aura framework is licensed under the **GPL-3.0**.
+Datasets produced from global scans using Aura are released under the **CC BY-NC 4.0** license.
+Use the following citation when using Aura or data produced by Aura in research:
+
+::
+
+    @misc{Carnogursky2019thesis,
+    AUTHOR = "CARNOGURSKY, Martin",
+    TITLE = "Attacks on package managers [online]",
+    YEAR = "2019 [cit. 2020-11-02]",
+    TYPE = "Bachelor Thesis",
+    SCHOOL = "Masaryk University, Faculty of Informatics, Brno",
+    SUPERVISOR = "Vit Bukac",
+    URL = "Available at WWW <https://is.muni.cz/th/y41ft/>",
+    }

@@ -21,7 +21,7 @@ def test_distance():
 
 
 @patch("aura.typos.get_all_pypi_packages")
-def disabled_test_typosquatting_generator(mock, tmp_path, mock_pypi_stats):  # FIXME
+def disable_test_typosquatting_generator(mock, tmp_path, mock_pypi_stats):  # FIXME
     stats: Path = tmp_path / "pypi_stats.json"
     stats.write_text("\n".join(json.dumps(x) for x in config.iter_pypi_stats()))
     os.environ["AURA_PYPI_STATS"] = str(stats)
@@ -35,10 +35,10 @@ def disabled_test_typosquatting_generator(mock, tmp_path, mock_pypi_stats):  # F
             'grequest',
         ]
 
-        runner = CliRunner()
+        runner = CliRunner(mix_stderr=False)
         result = runner.invoke(
             cli.cli,
-            ['find-typosquatting', '--max-distance', '1', '--limit', '10' ]
+            ['find-typosquatting', '--limit', '10', '-f', 'json'],
         )
         if result.exception:
             raise result.exception

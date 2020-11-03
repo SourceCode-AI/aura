@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Any
 
-from .base import ScanOutputBase, DiffOutputBase
+from .base import ScanOutputBase, DiffOutputBase, TyposquattingOutputBase
 from ..type_definitions import DiffType, DiffAnalyzerType
 from ..json_proxy import dumps
 
@@ -97,3 +97,19 @@ class JSONDiffOutput(JSONOutputBase, DiffOutputBase):
             payload["diffs"].append(diff)
 
         print(dumps(payload), file=self._fd)
+
+
+class JSONTyposquattingOutput(TyposquattingOutputBase):
+    @classmethod
+    def protocol(cls) -> str:
+        return "json"
+
+    def output_typosquatting(self, entries):
+        for x in entries:
+            data = {
+                "original": x["original"],
+                "typosquatting": x["typo"],
+                "original_score": x["orig_score"].get_score_matrix(),
+                "typosquatting_score": x["typo_score"].get_score_matrix(),
+            }
+            print(dumps(data))
