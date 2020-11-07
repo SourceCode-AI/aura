@@ -1,3 +1,6 @@
+image:
+  file: .gitpod.Dockerfile
+
 tasks:
   - init: source $HOME/.poetry/env && poetry install -E full
     command: poetry shell
