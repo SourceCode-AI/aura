@@ -2,4 +2,4 @@ image:
   file: .gitpod.Dockerfile
 
 tasks:
-  - init: source $HOME/.poetry/env && poetry config virtualenvs.create false && poetry install -E full
+  - init: (curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python -)&& source $HOME/.poetry/env && poetry config virtualenvs.create false && poetry install -E full
