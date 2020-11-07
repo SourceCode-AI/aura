@@ -1,7 +1,7 @@
 FROM python:3.9-buster
 
 
-RUN addgroup gitpod && adduser -S -G gitpod gitpod
+RUN useradd -ms /bin/bash gitpod
 
 
 USER gitpod
