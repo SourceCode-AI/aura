@@ -1,17 +1,5 @@
-ARG pythonver=3.8.3
-ARG alpinever=3.12
-FROM python:${pythonver}-alpine${alpinever}
+FROM python:3.9-buster
 
-RUN apk add --no-cache \
-    python2 \
-    curl \
-    automake \
-    file-dev \
-    openssl-dev \
-    autoconf \
-    libtool \
-    build-base \
-    git
 
 RUN addgroup gitpod && adduser -S -G gitpod gitpod
 

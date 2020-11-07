@@ -3,4 +3,3 @@ image:
 
 tasks:
   - init: source $HOME/.poetry/env && poetry install -E full
-    command: poetry shell
