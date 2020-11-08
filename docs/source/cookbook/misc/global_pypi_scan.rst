@@ -45,6 +45,7 @@ Data produced from global scans are distributed via magnet (torrent) links with 
 You may have noted that there is a difference between the file ``input_packages.txt`` and ``package_list.txt``. The input file is generally larger and is of all packages contained in our offline PyPI mirror at the start of a global scan. However, some packages may have not any releases published and so they would be skipped by Aura during the actual scan. Other reasons may include that the package has a corrupted archive, timeout for a scan has been reached or Aura crashed during the scan of a package. This is the reason why the input package list is always larger than the actual list produced by Aura during/after the scan.
 
 To quickly process or glance at the data, we highly recommend to use the `jq data processor <https://stedolan.github.io/jq/>`_ .
+Description of the dataset format can be found in the following documentation :ref:`detections`.
 
 The dataset is released under the `CC BY-NC 4.0 license <https://creativecommons.org/licenses/by-nc/4.0/>`_ .
 Use the following citation to give attribution to the original research paper:

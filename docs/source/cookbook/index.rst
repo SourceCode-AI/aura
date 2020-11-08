@@ -25,6 +25,7 @@ Misc
 .. toctree::
     misc/global_pypi_scan.rst
     misc/datasets.rst
+    misc/detections.rst
     python_2.rst
     misc/visitors.rst
     misc/plugin_templates.rst
