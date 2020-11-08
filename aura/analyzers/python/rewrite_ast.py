@@ -222,6 +222,26 @@ class ASTRewrite(Visitor):
         except (TypeError, KeyError, AttributeError):
             pass
 
+        # Rewrite the `ord('x')` function call
+        if context.node.full_name == "ord" and type(context.node.args[0]) in (String, str) and len(context.node.args[0]) == 1:
+                ord_val = ord(str(context.node.args[0]))
+                new_node = Number(value=ord_val)
+                new_node.enrich_from_previous(context.node)
+                context.replace(new_node)
+                return True
+
+        # Rewrite the `chr(x)` function call
+        if context.node.full_name == "chr" and type(context.node.args[0]) in (Number, int):
+            ord_val = int(context.node.args[0])
+            try:
+                chr_val = chr(ord_val)
+                new_node = String(value=chr_val)
+                new_node.enrich_from_previous(context.node)
+                context.replace(new_node)
+                return True
+            except ValueError:
+                pass
+
         # Rewrite call var arguments
         # x(Var(c=10)) -> x(10)
         for idx, arg in enumerate(context.node.args):

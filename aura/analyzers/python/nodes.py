@@ -453,6 +453,9 @@ class String(ASTNode):
     def __bytes__(self):
         return self.value.encode("utf-8")
 
+    def __len__(self):
+        return len(str(self))
+
     def __hash__(self):
         return hash(self.value)
 

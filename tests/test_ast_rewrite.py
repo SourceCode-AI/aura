@@ -149,3 +149,22 @@ def test_variable_propagation():
     tree = process_source_code(src)
     assert isinstance(tree, Number)
     assert int(tree) == 42
+
+
+def test_ord_rewrite():
+    src = """
+    a = ord('@')
+    a + 0
+    """
+    tree = process_source_code(src)
+    assert isinstance(tree, Number)
+    assert int(tree) == 64
+
+
+def test_chr_rewrite():
+    src = """
+    chr(104) + chr(105)
+    """
+    tree = process_source_code(src)
+    assert isinstance(tree, String)
+    assert str(tree) == "hi"
