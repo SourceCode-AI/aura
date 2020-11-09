@@ -32,7 +32,7 @@ LOG_FMT = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)
 LOG_ERR = None
 # This is used to trigger breakpoint during AST traversing of specific lines
 DEBUG_LINES = set()
-DEFAULT_AST_STAGES = ("convert", "rewrite", "ast_pattern_matching", "taint_analysis", "readonly")
+DEFAULT_AST_STAGES = ("ml", "convert", "rewrite", "ast_pattern_matching", "taint_analysis", "readonly")
 AST_PATTERNS_CACHE: Optional[tuple] = None
 PROGRESSBAR_DISABLED: bool = ("AURA_NO_PROGRESS" in os.environ)
 

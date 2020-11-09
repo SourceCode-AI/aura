@@ -65,6 +65,7 @@ aura: &aura_config
 
   # Order of AST analysis stages to run on python source code
   ast-stages: &ast_stages
+    - ml
     - convert
     - rewrite
     - ast_pattern_matching

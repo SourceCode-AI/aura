@@ -88,6 +88,7 @@ git = "aura.uri_handlers.git:GitRepoHandler"
 local = "aura.uri_handlers.local:LocalFileHandler"
 
 [tool.poetry.plugins."aura.ast_visitors"]
+ml = "aura.analyzers.python.ml:MLVisitor"
 convert = "aura.analyzers.python.convert_ast:ASTVisitor"
 rewrite = "aura.analyzers.python.rewrite_ast:ASTRewrite"
 ast_pattern_matching = "aura.analyzers.python.pattern_matching_visitor:ASTPatternMatcherVisitor"

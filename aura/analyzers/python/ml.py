@@ -1,14 +1,59 @@
-import os
-import pprint
+"""
+Aura plugin for generating data suitable for ML applications and data mining on top of the source code
+
+Implementation of the pq Gram Index
+    Iterates over node identifier tuples producing n-grams of size p+q
+    p is the stem size (left fill)
+    q is the base size (right fill)
+    for the algorithm explanation, refer to the research paper below
+
+                   ┌────────────┐
+        stem       │  PQ grams  │
+         ╔═╗       ├────────────┤
+         ║*║       │*a **a      │
+         ║a║       │   aa **e   │
+         ╚═╝       │      ae ***│
+base    ╱ │ ╲      │   aa *eb   │
+ ╔═════╗  b  c     │      ab ***│
+ ║* * a║           │   aa eb*   │
+ ╚═════╝   ┌─────┐ │   aa b**   │
+     ╱ ╲   │p = 2│ │*a *ab      │
+    e   b  │q = 3│ │   ab ***   │
+           └─────┘ │*a abc      │
+                   │   ac ***   │
+                   │*a bc*      │
+                   │*a c**      │
+                   └────────────┘
+
+Image source https://files.ifi.uzh.ch/boehlen/Papers/ABG10.pdf p.24
+"""
+import re
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Union, List, Any, Tuple
+from collections import deque
+from itertools import combinations
+from typing import Union, List, Any, Tuple, Optional
 
-from aura.utils import Analyzer
-from aura import python_executor
-from aura.analyzers import python_src_inspector
+from .visitor import Visitor
+from ..detections import Detection
 
-INSPECTOR_PATH = os.path.abspath(python_src_inspector.__file__)
+
+TOKEN_REGEX = re.compile(r"([A-Z]{2,}|[A-Z][a-z]{1,}|[a-z]+|\d+)")
+TERMINALS = {
+    "str", "constant_value", "import_name_asname", "import_name", "name", "attribute_name"
+}
+
+
+class IDGen:
+    """
+    Generates incremental IDS for nodes in a tree
+    """
+    current = 0
+
+    @classmethod
+    def id(cls) -> int:
+        prev = cls.current
+        cls.current += 1
+        return prev
 
 
 @dataclass
@@ -16,66 +61,118 @@ class ASTNodeIdentifier:
     label: Union[str, None] = None
     node_type: Union[str, None] = ''
     children: List[Any] = field(default_factory=list)
+    id: int = field(default_factory=IDGen.id)
+
+    @property
+    def is_terminal(self) -> bool:
+        if self.node_type in TERMINALS:
+            return True
+        else:
+            return False
 
     def __iadd__(self, other):
         if other:
             self.children.append(other)
         return self
 
-    def to_tuple(self):
-        return (self.label, self.node_type, tuple(x.to_tuple() for x in self.children))
+    def to_tuple(self) -> Tuple[int, Optional[str], str, Tuple]:
+        return (self.id, self.label, self.node_type, tuple(x.to_tuple() for x in self.children))
 
 
-@Analyzer.ID("ast_ngrams")
-def extract(pth: Path, mime: str, metadata, **kwargs):
-    if pth.suffix == '.py':
-        pass
-    elif mime != 'text/x-python':
-        return
+class MLVisitor(Visitor):
+    stage_name = "ml"
 
-    spth = os.fspath(pth.absolute())
+    def traverse(self, _id=id):
+        root = self.tree
+        if type(root) == dict and "ast_tree" in root:
+            root = root["ast_tree"]
 
-    ast_tree = python_executor.run_with_interpreters(command=[INSPECTOR_PATH, spth], metadata=metadata)
+        # Extract the pq-grams from the tree
+        identifier_tree = extract_identifier(root)
+        #self.extract_code_paths(identifier_tree)
+        #tuple_identifiers = identifier_tree.to_tuple()
 
-    pprint.pprint(ast_tree['ast_tree'])
 
-    identifier_tree = extract_identifier(ast_tree['ast_tree'])
-    tuple_identifiers = identifier_tree.to_tuple()
 
-    pprint.pprint(tuple_identifiers)
-    print('---')
-    for x in filter_pq_gram_duplicates(tuple_identifiers, 2, 3):
-        print(x)
+        #ngrams = tuple(pq_gram_index(tuple_identifiers, 2, 3))
 
-    yield from []
+        # self.hits.append(
+        #     Detection(
+        #         detection_type="PQGrams",
+        #         score=0,
+        #         extra={
+        #             "pqgrams": ngrams
+        #         },
+        #         message="Extracted PQ grams from the source code",
+        #         signature=f"pq_grams#{self.normalized_path}",
+        #         tags={"pq_grams"},
+        #         informational=True,
+        #     )
+        # )
+
+        return self.tree
+
+    def extract_code_paths(self, tree: ASTNodeIdentifier):
+        code_paths = []
+
+        terminals = list(get_terminals(tree))
+
+        for lnode, rnode in combinations(terminals, r=2):
+            node_path = extract_node_path(lnode[0], rnode[0])
+            if node_path is not None:
+                print(lnode[1].label, [(x.id, (x.label or x.node_type)) for x in node_path], rnode[1].label)
+
+
+def extract_node_path(lpath, rpath):
+    lsize, rsize, i = len(lpath), len(rpath), 0
+
+    while i < min(lsize, rsize) and lpath[i].id == rpath[i].id:
+        i += 1
+
+    return lpath[i:][::-1] + (lpath[i-1],) + rpath[i:]
 
 
 def pq_gram_index(node: tuple, p: int, q: int, stem=None):
-    """
-    Implementation of the pq Gram Index
-    Iterates over node identifier tuples producing n-grams of size p+q
-    p is the stem size (left fill)
-    q is the base size (right fill)
-    for the algorithm explanation, refer to the research paper below:
-    https://files.ifi.uzh.ch/boehlen/Papers/ABG10.pdf
-    """
     if stem is None:
-        stem = ((None, '*'),) * p
+        stem = ((None, None, None),) * p
 
-    base = ((None, '*'),) * q
-    stem = stem[1:] + ((node[0], node[1]),)
+    base = ((None, None, None),) * q
+    stem = stem[1:] + ((node[0], node[1], node[2]),)
 
-    if len(node[2]) == 0: # Leaf node
+    if len(node[3]) == 0: # Leaf node
         yield stem + base
     else:
-        for child in node[2]:
-            base = base[1:] + ((child[0], child[1]),)
+        for child in node[3]:
+            base = base[1:] + ((child[0], child[1], child[2]),)
             yield stem + base
             yield from pq_gram_index(node=child, p=p, q=q, stem=stem)
 
         for i in range(1, q):
-            base = base[1:] + ((None, '*'),)
+            base = base[1:] + ((None, None, None),)
             yield stem + base
+
+
+def get_terminals(root: ASTNodeIdentifier):
+    """
+    Traverse the AST tree and yield back all terminal nodes + their path up to the root node
+    This can be done recursively but we risk hitting the RecursionError for more complex code so we do it via LIFO queue instead
+    """
+
+    q = deque()
+    # Queue items structure:
+    # (<tuple that is a path of nodes from root to this element>, <AST node>)
+    q.append(((), root))
+
+    while len(q):
+        node_pth, node = q.pop()
+        child_pth = node_pth + (node,)
+
+        if node.is_terminal:
+            yield (node_pth, node)
+            continue
+
+        for idx, child in enumerate(node.children):
+            q.append((child_pth, child))
 
 
 def filter_pq_gram_duplicates(*args, **kwargs):
@@ -97,7 +194,7 @@ def extract_identifier(node):
     :return:
     """
     # We want to only process raw ast node which must be dict types and have a `_type` key
-    if isinstance(node, dict):
+    if type(node) == dict:
         t = node.get('_type')
         if t in AST_NODE_TYPES: # Process the AST node via a specific node converter
             return AST_NODE_TYPES[t](node)
@@ -121,7 +218,6 @@ def node_function_def(node: dict) -> ASTNodeIdentifier:
 
 def node_call(node: dict) -> ASTNodeIdentifier:
     stmt = ASTNodeIdentifier(label=None, node_type='call')
-
     func = ASTNodeIdentifier(node_type='call_func')
     func += extract_identifier(node['func'])
     stmt += func
@@ -162,12 +258,12 @@ def node_class_def(node: dict) -> ASTNodeIdentifier:
 
 
 def node_attribute(node: dict) -> ASTNodeIdentifier:
-    stmt = ASTNodeIdentifier(label=node['attr'], node_type='attribute')
+    stmt = ASTNodeIdentifier(node_type='attribute')
     # TODO: ctx
-
     value = ASTNodeIdentifier(node_type='attribute_value')
     value += extract_identifier(node['value'])
     stmt += value
+    stmt += ASTNodeIdentifier(label=node["attr"], node_type="attribute_name")
     return stmt
 
 
@@ -286,6 +382,15 @@ def node_compare(node: dict) -> ASTNodeIdentifier:
     return stmt
 
 
+def node_constant(node: dict) -> ASTNodeIdentifier:
+    stmt = ASTNodeIdentifier(node_type="constant")
+    v = node["value"]
+    ctype = ASTNodeIdentifier(label=v.__class__.__name__, node_type="constant_type")
+    ctype += ASTNodeIdentifier(label=str(v), node_type="constant_value")
+    stmt += ctype
+    return stmt
+
+
 AST_NODE_TYPES = {
     'FunctionDef': node_function_def,
     'Call': node_call,
@@ -300,5 +405,17 @@ AST_NODE_TYPES = {
     'ImportFrom': node_import_from,
     'Print': node_print,
     'If': node_if,
-    'Compare': node_compare
+    'Compare': node_compare,
+    "Constant": node_constant,
 }
+
+
+def split_token(token: str) -> List[str]:
+    """
+    Split the identifier token into separate components
+    Example:
+    "getMatch" -> ["get", "Match"]
+    "get_match" -> ["get", "match"]
+    "find666" -> ["find", "666"]
+    """
+    return [x.groups()[0] for x in TOKEN_REGEX.finditer(token)]
