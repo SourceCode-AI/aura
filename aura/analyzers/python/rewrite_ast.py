@@ -74,6 +74,16 @@ class ASTRewrite(Visitor):
                 new_node.enrich_from_previous(node)
                 context.replace(new_node)
                 return True
+        elif node.op == "mod":
+            try:
+                if type(node.left) == String and type(node.right) == String:
+                    new_str = str(node.right) % str(node.left)
+                    new_node = String(value=new_str)
+                    new_node.enrich_from_previous(node)
+                    context.replace(new_node)
+                    return True
+            except TypeError as exc:
+                pass
         # TODO cover other cases
 
     def string_slice(self, context):

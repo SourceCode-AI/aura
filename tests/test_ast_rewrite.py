@@ -168,3 +168,12 @@ def test_chr_rewrite():
     tree = process_source_code(src)
     assert isinstance(tree, String)
     assert str(tree) == "hi"
+
+
+def test_string_format_via_mod():
+    src = """
+    "Hello %s" % "world"
+    """
+    tree = process_source_code(src)
+    assert isinstance(tree, String)
+    assert str(tree) == "Hello world"
