@@ -82,7 +82,7 @@ class ASTRewrite(Visitor):
                     new_node.enrich_from_previous(node)
                     context.replace(new_node)
                     return True
-            except TypeError as exc:
+            except TypeError:
                 pass
         # TODO cover other cases
 

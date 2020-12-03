@@ -5,7 +5,9 @@ description = "Security auditing and static analysis for python"
 authors = [
     "Martin Carnogursky <admin@sourcecode.ai>"
 ]
-repository = "https://github.com/RootLUG/aura"
+repository = "https://github.com/SourceCode-AI/aura"
+homepage = "https://aura.sourcecode.ai/"
+documentation = "https://docs.aura.sourcecode.ai/"
 readme = "README.rst"
 license = "GPL-3.0-or-later"
 classifiers = [
@@ -13,7 +15,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "Intended Audience :: System Administrators",
     "Operating System :: POSIX :: Linux",
-    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3 :: Only",
     "Topic :: Security",
@@ -58,7 +60,7 @@ yara-python = {version = "~4.0.2", optional = true}
 networkx = {version = "~2.5", optional = true}
 python-rapidjson = { version = "~0.9.1", optional = true }
 # Temporary forked repo fix until https://github.com/ReFirmLabs/binwalk/pull/478 is accepted
-binwalk = {git = "https://github.com/RootLUG/binwalk.git", optional = true}
+binwalk = {git = "https://github.com/ReFirmLabs/binwalk.git", optional = true}
 
 [tool.poetry.extras]
 full = ["yara-python", "networkx", "cssselect", "binwalk", "GitPython", "python-rapidjson", "defusedxml", "jsonschema", "tomlkit"]
@@ -71,10 +73,9 @@ pytest = "~6.0"
 pytest-cov = "~2.10"
 pytest-randomly = "~3.4"
 sphinx = "~3.2"
-recommonmark = "~0.6.0"
 
 [tool.poetry.urls]
-"Bug Tracker" = "https://github.com/RootLUG/aura/issues"
+"Bug Tracker" = "https://github.com/SourceCode-AI/aura/issues"
 
 [tool.poetry.scripts]
 aura = "aura.cli:main"
