@@ -108,7 +108,9 @@ def test_bad_package_score(mock1, mock_github, mock_pypi_rest_api, mock_pypi_sta
     assert matrix["total"] == 0
 
 
+@responses.activate
 def test_package_diff_candidates(mock_pypi_rest_api):
+    mock_pypi_rest_api(responses)
     convert = lambda x: (x[0]["filename"], x[1]["filename"])
     requests = package.PypiPackage.from_pypi("requests")
     requests2 = package.PypiPackage.from_pypi("requests2")
