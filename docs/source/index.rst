@@ -11,6 +11,7 @@ Aura is a static analysis tool for a python source code
    installation
    configuration
    running_aura
+   development
    apip
    scan_examples
    analyzers

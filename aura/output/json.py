@@ -72,27 +72,9 @@ class JSONDiffOutput(JSONOutputBase, DiffOutputBase):
             payload["tables"].append(table.asdict())
 
         for d in self.filtered(diff_analyzer.diffs):  # type: DiffType
-            diff = {
-                "operation": d.operation,
-                "a_ref": d.a_ref,
-                "b_ref": d.b_ref,
-                "a_size": d.a_size,
-                "b_size": d.b_size,
-                "a_mime": d.a_mime,
-                "b_mime": d.b_mime,
-                "a_md5": d.a_md5,
-                "b_md5": d.b_md5,
-                "similarity": d.similarity
-            }
-
-            if d.new_detections:
-                diff["new_detections"] = [x._asdict() for x in d.new_detections]
-
-            if d.removed_detections:
-                diff["removed_detections"] = [x._asdict() for x in d.removed_detections]
-
-            if d.diff and self.patch:
-                diff["diff"] = d.diff
+            diff = d.as_dict()
+            if not self.patch:
+                diff.pop("diff", None)
 
             payload["diffs"].append(diff)
 

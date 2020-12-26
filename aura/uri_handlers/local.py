@@ -41,9 +41,13 @@ class LocalFileHandler(URIHandler):
             for loc1, loc2 in product(self.get_paths(), other.get_paths()):
                 if loc1.location.is_dir():
                     loc1.strip_path = str(loc1.location.absolute())
+                else:
+                    loc1.strip_path = str(loc1.location.parent)
 
                 if loc2.location.is_dir():
                     loc2.strip_path = str(loc2.location.absolute())
+                else:
+                    loc2.strip_path = str(loc2.location.parent)
 
                 yield loc1, loc2
         else:

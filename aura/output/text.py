@@ -225,8 +225,11 @@ class TextBase:
         out.align(score)
 
         out.align(f"Tags: {', '.join(hit.get('tags', []))}")
-        out.align("Extra:")
-        out.pformat(hit.get('extra', {}))
+
+        if hit.get("extra"):
+            out.align("Extra data:")
+            out.pformat(hit.get('extra', {}))
+
         if bottom_separator:
             out.print_bottom_separator()
 
@@ -471,19 +474,21 @@ class TextDiffOutput(TextBase, DiffOutputBase):
             if diff.operation in ("M", "R"):
                 op = "Modified" if diff.operation == "M" else "Renamed"
                 out.align(style(f"{op} file. Similarity: {int(diff.similarity * 100)}%", fg="bright_red", bold=True))
-                out.align(f"A Path: {style(diff.a_ref, fg='bright_blue')}")
-                out.align(f"B Path: {style(diff.b_ref, fg='bright_blue')}")
+                out.align(f"A Path: {style(str(diff.a_scan), fg='bright_blue')}")
+                out.align(f"B Path: {style(str(diff.b_scan), fg='bright_blue')}")
             elif diff.operation == "A":
                 out.align(style(f"File added.", fg="bright_yellow"))
-                out.align(f"Path: {style(diff.b_ref, fg='bright_blue')}")
+                out.align(f"Path: {style(str(diff.b_scan), fg='bright_blue')}")
             elif diff.operation == "D":
                 out.align(style(f"File removed", fg="green"))
-                out.align(f"Path: {style(diff.a_ref, fg='bright_blue')}")
+                out.align(f"Path: {style(str(diff.a_scan), fg='bright_blue')}")
 
             if diff.diff and self.patch:
                 out.print_heading("START OF DIFF")
 
                 for diff_line in diff.diff.splitlines():
+                    diff_line = diff_line.rstrip()
+
                     if diff_line.startswith("@@"):
                         opts = {"fg": "bright_blue"}
                     elif diff_line.startswith("+"):

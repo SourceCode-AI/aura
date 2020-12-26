@@ -123,6 +123,7 @@ AURA_SIGNATURES             Overwrite the path to the configuration file for sig
 AURA_MIRROR_PATH            Location to the local pypi mirror repository
 AURA_PYPI_STATS             Overwrite the path to the aura `pypi_stats` dataset
 AURA_REVERSE_DEPENDENCIES   Overwrite the path to the aura `reverse_dependencies` dataset
+AURA_NO_FORK                Disable forking for async processing in the analysis pipeline
 AURA_LOG_LEVEL              Output log level
 AURA_NO_BLOBS               Disable extraction of data blobs for further analysis
 AURA_NO_PROGRESS            Disable cli progress bar, useful when redirecting stderr and stdout

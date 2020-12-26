@@ -5,10 +5,8 @@ Utilities for computing diffs
 
 import os
 import re
-import tempfile
-import shutil
-import pprint
-from typing import Union, Optional, List, Tuple
+import difflib
+from typing import Union, Optional, List, Tuple, Iterable
 from pathlib import Path
 from collections import defaultdict
 from dataclasses import dataclass
@@ -30,7 +28,7 @@ from .output.table import Table
 
 from .analyzers.detections import Detection
 from .package_analyzer import Analyzer
-from .uri_handlers.base import ScanLocation, URIHandler
+from .uri_handlers.base import ScanLocation, URIHandler, IdenticalName
 
 
 DIFF_EXCLUDE = re.compile(r"^Binary files .+ differ$")
@@ -39,17 +37,11 @@ DIFF_EXCLUDE = re.compile(r"^Binary files .+ differ$")
 @dataclass()
 class Diff():
     operation: str
-    a_size: Optional[int]
-    b_size: Optional[int]
-    a_scan: ScanLocation
-    b_scan: ScanLocation
-    a_ref: Optional[str] = None
+    a_scan: Optional[ScanLocation]
+    b_scan: Optional[ScanLocation]
+    a_ref: Optional[str] = None  # TODO: remove the ref pointers
     b_ref: Optional[str] = None
-    a_md5: Optional[str] = None
-    b_md5: Optional[str] = None
-    a_mime: Optional[str] = None
-    b_mime: Optional[str] = None
-    diff: str = ''
+    diff: Optional[str] = None
     similarity: float = 0.0
 
     new_detections: Optional[List[Detection]] = None
@@ -57,103 +49,89 @@ class Diff():
 
     def __post_init__(self):
         assert self.operation in ("A", "D", "M", "R")
-
-        if self.a_mime == "text/x-script.python":
-            self.a_mime = "text/x-python"
-
-        if self.b_mime == "text/x-script.python":
-            self.b_mime = "text/x-python"
-
-        # a_path, b_path = self.a_path, self.b_path
-        #
-        # if a_path and b_path:
-        #     a_content = self.a_path.read_bytes()
-        #     b_content = self.b_path.read_bytes()
-        #     self.similarity = sim_hash.normalized_similarity(a_content, b_content)
-
-    @property
-    def a_path(self) -> Optional[Path]:
-        if self.a_scan.location.is_file():
-            return self.a_scan.location
-        elif self.a_ref is None:
-            return None
-        else:
-            return self.a_scan.location / self.a_ref
-
-    @property
-    def b_path(self) -> Optional[Path]:
-        if self.b_scan.location.is_file():
-            return self.b_scan.location
-        elif self.b_ref is None:
-            return None
-        else:
-            return self.b_scan.location / self.b_ref
+        assert 0.0 <= self.similarity <= 1.0
 
     @classmethod
-    def from_git_diff(cls, git_diff: GitDiff, a_path: ScanLocation, b_path: ScanLocation):
-        if git_diff.a_path is None or git_diff.new_file:
-            operation = "A"  #  Added
-        elif git_diff.b_path is None or git_diff.deleted_file:
-            operation = "D"  #  Deleted
-        elif not git_diff.diff:
-            operation = "R"  #  Renamed
-        else:
-            operation = "M"  # Modified
-
+    def from_added(cls, loc: ScanLocation):
         data = {
-            "operation": operation,
-            # Relative paths to the repository
-            "a_scan": a_path,
-            "b_scan": b_path,
+            "operation": "A",
+            "a_scan": None,
+            "b_scan": loc,
+        }
+        return cls(**data)
+
+    @classmethod
+    def from_removed(cls, loc: ScanLocation):
+        data = {
+            "operation": "D",
+            "a_scan": loc,
+            "b_scan": None,
+        }
+        return cls(**data)
+
+    @classmethod
+    def from_modified(cls, a_loc: ScanLocation, b_loc: ScanLocation, similarity: Optional[float]=None, content_diff: Optional[str]=None):
+        data = {
+            "operation": "M",
+            "a_scan": a_loc,
+            "b_scan": b_loc
         }
 
-        if git_diff.diff and operation in "MR":
-            data["diff"] = git_diff.diff.decode().strip()
-            if DIFF_EXCLUDE.match(data["diff"]):
-                data.pop("diff")
-
-        if git_diff.a_path is not None and operation != "A":
-            if a_path.location.is_file():
-                a_fs_path = a_path.location
+        if content_diff is None and a_loc.metadata["md5"] != b_loc.metadata["md5"]:
+            # FIXME: add handling for binary and empty files
+            try:
+                a_content = a_loc.location.read_text().splitlines(keepends=True)
+                b_content = b_loc.location.read_text().splitlines(keepends=True)
+                content_diff = difflib.unified_diff(a_content, b_content, fromfile=str(a_loc), tofile=str(b_loc))
+            except UnicodeDecodeError:  # FIXME: thrown when file is a binary file
+                pass
             else:
-                a_fs_path = a_path.location / git_diff.a_path
+                if similarity is None:
+                    similarity = difflib.SequenceMatcher(None, a_content, b_content).ratio()
 
-            data["a_ref"] = a_path.strip(git_diff.a_path)
-            data["a_md5"] = utils.md5(a_fs_path)
-            data["a_mime"] = magic.from_file(os.path.realpath(a_fs_path), mime=True)
-            data["a_size"] = a_fs_path.stat().st_size
+                # TODO: Use OS line ending instead of hardcoded unix '\n'
+                data["diff"] = "".join(content_diff)
         else:
-            data["a_size"] = 0
+            data["diff"] = content_diff
 
-        if git_diff.b_path is not None and operation != "D":
-            if b_path.location.is_file():
-                b_fs_path = b_path.location
-            else:
-                b_fs_path = b_path.location / git_diff.b_path
-
-            data["b_ref"] = b_path.strip(git_diff.b_path)
-            data["b_md5"] = utils.md5(b_fs_path)
-            data["b_mime"] = magic.from_file(os.path.realpath(b_fs_path), mime=True)
-            data["b_size"] = b_fs_path.stat().st_size
-        else:
-            data["b_size"] = 0
-
-        if data.get("a_md5") and data["a_md5"] == data.get("b_md5"):
-            data["similarity"] = 1.0
-        elif git_diff.a_blob and git_diff.b_blob:
-            a_content = git_diff.a_blob.data_stream.read()
-            b_content = git_diff.b_blob.data_stream.read()
-            h1 = tlsh.hash(a_content)
-            h2 = tlsh.hash(b_content)
-            if h1 and h2:
-                data["similarity"] = (300.0 - tlsh.diffxlen(h1, h2)) / 300
-
+        data["similarity"] = similarity or 0.0
         return cls(**data)
 
     def add_detections(self, a_detections: List[Detection], b_detections: List[Detection]):
         duplicates = set(x.diff_hash for x in a_detections) & set(x.diff_hash for x in b_detections)
         self.new_detections = [x for x in b_detections if x.diff_hash not in duplicates]
         self.removed_detections = [x for x in a_detections if x.diff_hash not in duplicates]
+
+    def as_dict(self) -> dict:
+        d = {
+            "operation": self.operation,
+            "diff": self.diff,
+            "similarity": self.similarity
+        }
+
+        if self.a_scan is not None:
+            d.update({
+                "a_ref": str(self.a_scan),
+                "a_md5": self.a_scan.metadata.get("md5"),
+                "a_mime": self.a_scan.metadata.get("mime"),
+                "a_size": self.a_scan.size,
+            })
+
+        if self.b_scan is not None:
+            d.update({
+                "b_ref": str(self.b_scan),
+                "b_md5": self.b_scan.metadata.get("md5"),
+                "b_mime": self.b_scan.metadata.get("mime"),
+                "b_size": self.b_scan.size,
+            })
+
+        if self.new_detections:
+            d["new_detections"] = [x._asdict() for x in self.new_detections]
+
+        if self.removed_detections:
+            d["removed_detections"] = [x._asdict() for x in self.removed_detections]
+
+        return d
 
     def pprint(self):
         from prettyprinter import pprint as pp
@@ -172,36 +150,24 @@ class DiffAnalyzer():
         data = plugins.load_entrypoint("aura.diff_hooks")
         return data["entrypoints"]
 
-    def on_diff(self, sender, ctx):
-        if isinstance(sender, GitDiff):
-            self._on_diff_type_diff(sender, ctx)
-        elif type(sender) == dict:
-            self._on_diff_type_dict(sender, ctx)
-
-    def on_same_file(self, sender):
+    def on_same_file(self, sender):  # TODO: transition to the new diff mechanism
         size = os.stat(sender).st_size
         self.same_files.add((sender, size))
 
-    def _on_diff_type_diff(self, sender: GitDiff, ctx: dict):
-        d = Diff.from_git_diff(git_diff=sender, a_path=ctx["a_path"], b_path=ctx["b_path"])
-        for hook_name, hook in self.get_diff_hooks().items():
-            for output in hook(diff=d):
+    def diff_hook(self, diff: Diff):
+        for hook in self.get_diff_hooks().values():
+            for output in hook(diff=diff):
                 if type(output) == ScanLocation:
                     self.compare(a_path=output, b_path=output.metadata["b_scan_location"])
                 else:
                     self.hits.append(output)
 
-        self.diffs.append(d)
-
-    def _on_diff_type_dict(self, sender, ctx):
-        pprint.pprint(sender)
+        self.diffs.append(diff)
 
     def compare(
         self,
-        a_path: Union[ScanLocation, URIHandler],
-        b_path: Union[ScanLocation, URIHandler],
-        ctx=None,
-        detections=False
+        a_path: Union[ScanLocation, URIHandler, List[ScanLocation]],
+        b_path: Union[ScanLocation, URIHandler, List[ScanLocation]],
     ):
         # TODO: add a check if one is URIHandler and the other one is Path or ScanLocation
         if isinstance(a_path, URIHandler) and isinstance(b_path, URIHandler):
@@ -212,13 +178,7 @@ class DiffAnalyzer():
                         continue
 
                     loc1, loc2 = item
-                    self.compare(loc1, loc2, detections=detections)
-                    if detections:
-                        if type(detections) in (list, tuple):
-                            loc1.metadata["analyzers"] = detections
-                            loc2.metadata["analyzers"] = detections
-
-                        DiffDetections(self.diffs, loc1, loc2)
+                    self.compare(loc1, loc2)
 
             except UnsupportedDiffLocation:
                 for item in b_path.get_diff_paths(a_path):
@@ -227,129 +187,79 @@ class DiffAnalyzer():
                         continue
 
                     loc2, loc1 = item
-                    self.compare(loc1, loc2, detections=detections)
-                    if detections:
-                        if type(detections) in (list, tuple):
-                            loc1.metadata["analyzers"] = detections
-                            loc2.metadata["analyzers"] = detections
-
-                        DiffDetections(self.diffs, loc1, loc2)
+                    self.compare(loc1, loc2)
 
             return
+        elif type(a_path) == list and type(b_path) == list:
+            self._diff_files(a_path, b_path)
         elif a_path.location.is_file() and b_path.location.is_file():
-            self._diff_files(a_path, b_path, ctx)
+            self._diff_files([a_path], [b_path])
         elif b_path.location.is_dir() and a_path.location.is_dir():
-            self._diff_dirs(a_path, b_path, ctx)
+            self._diff_dirs(a_path, b_path)
         else:
             # TODO: be able to compare an archive and a directory
             raise ValueError(f"FS type mismatch: {str(a_path)}, {str(b_path)}")
 
-        if detections:
-            _ = DiffDetections(self.diffs, a_path, b_path)
+    def analyze_changes(self):
+        locations = {}
 
-    def _diff_dirs(self, a_path: ScanLocation, b_path: ScanLocation, ctx):
-        self._diff_git(a_path, b_path, ctx)
+        for d in self.diffs:
+            # Files are exactly same, skip analysis
+            if d.a_scan is not None and d.b_scan is not None and d.a_scan.md5 == d.b_scan.md5:
+                continue
 
-    def _diff_files(self, a_path: ScanLocation, b_path: ScanLocation, ctx):
-        self._diff_git(a_path, b_path, ctx)
+            if d.a_scan:
+                d.a_scan.metadata["source"] = "diff"
+                locations[d.a_scan] = {}
 
-    def _diff_git(self, a_path: ScanLocation, b_path: ScanLocation, ctx=None):
-        """
-        Diff files/dirs by using temporary git commits which works like this:
+            if d.b_scan:
+                d.b_scan.metadata["source"] = "diff"
+                locations[d.b_scan] = {}
 
-        1. Create a temporary empty git repository
-        2. Copy content of a_path & commit
-        3. Remove all copied files from a_path from git repo
-        4. Copy content of b_path & commit
-        5. Extract diff between those 2 commits
+        detections = tuple(Analyzer.run(locations.keys()))
+        diff_refs = {}
+        orphans = []
 
-        :param a_path: location of first file/dir
-        :param b_path: location of second file/dir
-        :param ctx: Diff context
-        :return: None
-        """
-        tmp = tempfile.mkdtemp(prefix="aura_diff_")
-        tmp_pth = Path(tmp)
-        if ctx is None:
-            ctx = {}
+        loc_refs = {}
 
-        ctx.update({
-            "tmp": tmp_pth,
-            "a_path": a_path,
-            "b_path": b_path,
-        })
+        for d in detections:
+            loc = d.scan_location
 
-        try:
-            # Create an empty repository
-            bare_repo = Repo.init(tmp)
-            a_content = []
-            same_files = set()
-            b_content = []
-            # Copy the content from first path
-            if a_path.location.is_dir():
-                for x in a_path.location.iterdir():
-                    dest = tmp_pth / x.name
-                    if x.is_dir():
-                        shutil.copytree(x.absolute(), dest)
-                    else:
-                        shutil.copy(x.absolute(), dest)
-                    a_content.append(os.fspath(dest))
+            while loc:
+                if loc in locations:
+                    loc_refs.setdefault(loc, []).append(d)
+                    diff_refs[d] = loc  # TODO: check if this is used and if not then remove
+                    break
+
+                loc = loc.parent
             else:
-                dest = tmp_pth / a_path.location.name
-                shutil.copy(a_path.location.absolute(), dest)
-                a_content.append(os.fspath(dest))
+                orphans.append(d)
 
-            bare_repo.index.add(a_content)
-            a_commit = bare_repo.index.commit(message=str(a_path))
+        for diff in self.diffs:
+            a_detections = []
+            b_detections = []
+            if diff.a_scan:
+                a_detections = loc_refs.get(diff.a_scan, [])
+            if diff.b_scan:
+                b_detections = loc_refs.get(diff.b_scan, [])
 
-            for x in a_commit.tree.traverse():
-                if isinstance(x, Blob):
-                    same_files.add(x.path)
+            diff.add_detections(a_detections, b_detections)
 
-            # Cleanup repo from pth1 files
-            if a_content:
-                bare_repo.index.remove(items=a_content, r=True, working_tree=True)
+    def _diff_dirs(self, a_path: ScanLocation, b_path: ScanLocation):
+        a_files = list(a_path.list_recursive())
+        b_files = list(b_path.list_recursive())
+        self._diff_files(a_files=a_files, b_files=b_files)
 
-            if b_path.location.is_dir():
-                for x in b_path.location.iterdir():  # type: Path
-                    dest = tmp_pth / x.name
-                    if dest.exists():
-                        shutil.rmtree(dest)
+    def _diff_files(self, a_files: List[ScanLocation], b_files: List[ScanLocation]):
+        closure = FileMatcher(left_files=a_files, right_files=b_files).get_closure()
 
-                    if x.is_dir():
-                        shutil.copytree(x.absolute(), dest)
-                    else:
-                        shutil.copy2(x.absolute(), dest)
-                    b_content.append(os.fspath(dest))
-            else:
-                dest = tmp_pth / b_path.location.name
-                shutil.copy(a_path.location.absolute(), dest)
-                b_content.append(os.fspath(dest))
+        for a in closure["added"]:
+            self.diff_hook(Diff.from_added(a))
+        for r in closure["removed"]:
+            self.diff_hook(Diff.from_removed(r))
 
-            bare_repo.index.add(b_content)
-            b_commit = bare_repo.index.commit(message=str(b_path))
-
-            for x in b_commit.tree.traverse():
-                if isinstance(x, Blob):
-                    same_files.add(x.path)
-
-            for diff in a_commit.diff(b_commit, create_patch=True, M=True, l=100, B=True, C=True):
-                if diff.a_path in same_files:
-                    same_files.remove(diff.a_path)
-
-                if diff.b_path in same_files:
-                    same_files.remove(diff.b_path)
-
-                self.on_diff(diff, ctx=ctx)
-
-            for x in same_files:
-                if a_path.location.is_dir():
-                    self.on_same_file(a_path.location / x)
-                else:
-                    self.on_same_file(x)
-
-        finally:
-            shutil.rmtree(tmp)
+        for (a, b, ratio) in closure["modified"]:
+            self.diff_hook(Diff.from_modified(a_loc=a, b_loc=b, similarity=ratio))
 
     def pprint(self):
         from .output import text
@@ -357,56 +267,53 @@ class DiffAnalyzer():
         out.output_diff(self.diffs)
 
 
-class DiffDetections:
-    ANALYSIS_CACHE = {}
+class FileMatcher:
+    def __init__(
+            self,
+            left_files: Iterable[ScanLocation],
+            right_files: Iterable[ScanLocation],
+    ):
+        self.threshold = 0.60
 
-    def __init__(self, file_diffs: List[Diff], a_location: ScanLocation, b_location: ScanLocation):
-        self.file_diffs: List[Diff] = file_diffs
-        self.a_loc: ScanLocation = a_location
-        self.b_loc: ScanLocation = b_location
-        self.orphans = []
+        self.left = set(left_files)
+        self.right = set(right_files)
 
-        a_refs = {}
-        b_refs = {}
+    def find_file_modifications(self) -> list:
+        modified = []
+        right = set(self.right)
 
-        for d in file_diffs:
-            if d.a_ref:
-                a_refs[d.a_ref] = d
-            if d.b_ref:
-                b_refs[d.b_ref] = d
+        for l in self.left:
+            closest_ratio, closest_file = None, None
 
-        self.a_hits = self.scan_location(self.a_loc)
-        a_pairs, a_orphans = self.pair_hits(a_refs, self.a_hits)
-
-        self.b_hits = self.scan_location(self.b_loc)
-        b_pairs, b_orphans = self.pair_hits(b_refs, self.b_hits)
-
-        for d in file_diffs:
-            a_detections = a_pairs.get(d.a_ref, [])
-            b_detections = b_pairs.get(d.b_ref, [])
-            d.add_detections(a_detections, b_detections)
-
-    def scan_location(self, location) -> Tuple[Detection]:
-        if location.location not in self.ANALYSIS_CACHE:
-            sandbox = Analyzer(location=location)
-            detections = tuple(sandbox.run())
-            self.ANALYSIS_CACHE[location.location] = detections
-        return self.ANALYSIS_CACHE[location.location]
-
-    def pair_hits(self, diff_refs, hits):
-        orphans = []
-        matches = defaultdict(list)
-        sorted_refs = sorted(diff_refs.keys(), key=lambda x: len(x), reverse=True)
-
-        for hit in hits:
-            if hit.detection_type == "FileStats":
-                continue
-
-            for ref in sorted_refs:
-                if hit.location and hit.location.startswith(ref):
-                    matches[ref].append(hit)
+            for r in right:
+                ratio = l.is_renamed_file(other=r)
+                if type(ratio) == IdenticalName:
+                    closest_ratio = ratio
+                    closest_file = r
                     break
-            else:
-                orphans.append(hit)
+                elif l.is_archive and r.is_archive and ratio > 0:
+                    closest_ratio = ratio
+                    closest_file = r
+                elif ratio < self.threshold:
+                    continue
+                elif closest_ratio is None:
+                    closest_ratio = ratio
+                    closest_file = r
+                elif ratio > closest_ratio:
+                    closest_ratio = ratio
+                    closest_file = r
 
-        return matches, orphans
+            if closest_file:
+                modified.append((l, closest_file, closest_ratio))
+                right.remove(closest_file)
+
+        return modified
+
+    def get_closure(self):
+        modified = self.find_file_modifications()
+        modified_locations = [x[0] for x in modified]
+        modified_locations.extend(x[1] for x in modified)
+        removed = [x for x in self.left if x not in modified_locations]
+        added = [x for x in self.right if x not in modified_locations]
+
+        return {"added": added, "modified": modified, "removed": removed}

@@ -13,7 +13,7 @@ Wait = object()
 class AuraExecutor:
     def __init__(self, fork: Optional[bool]=None, *, job_queue=None):
         if fork is None:
-            self.fork = config.CFG["aura"].get("async", True)  # FIXME
+            self.fork = config.can_fork()
         else:
             self.fork = fork
 

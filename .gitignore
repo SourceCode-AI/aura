@@ -1,5 +1,6 @@
 .directory
 .pypirc
+.mutmut-cache
 # Created by .ignore support plugin (hsz.mobi)
 .Python
 [Bb]in

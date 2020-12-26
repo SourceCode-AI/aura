@@ -47,6 +47,7 @@ def run_in_venv(venv_pth:str, cmd, stdin:bytes=b'', aura_path=None):
     return (p.stdout.read().decode(), p.returncode)
 
 
+@pytest.mark.e2e
 def test_apip():
     # Test package taken from pip tests
     # https://github.com/pypa/pip/tree/master/tests/data/packages
@@ -67,8 +68,9 @@ def test_apip():
             f'{venv_dir}/bin/apip'
         )
 
+        assert os.access(f'{venv_dir}/bin/apip', os.X_OK) is True
+
         stdout, ret = run_in_venv(venv_dir, ['which apip'])
-        # print(stdout)
         assert stdout.startswith(venv_dir), stdout
 
         # Installation should fail/abort

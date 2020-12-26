@@ -7,7 +7,7 @@ Produced hits from analyzers are collected for later processing
 import os
 import shutil
 from pathlib import Path
-from typing import Union, Tuple, List
+from typing import Union, Tuple, List, Iterable, Optional, Coroutine
 from collections import deque
 
 from . import utils
@@ -17,29 +17,34 @@ from . import worker_executor
 from .uri_handlers import base
 from .analyzers.detections import Detection
 from .analyzers.find_imports import TopologySort
+from .type_definitions import AnalysisQueueItem
 
 
 logger = config.get_logger(__name__)
 
 
-class Analyzer(object):
-    fork = config.CFG["aura"].get("async", True)
-
-    def __init__(self, location):
-        self.location = location
-
-    def run(self):
+class Analyzer:
+    @classmethod
+    def run(
+            cls,
+            initial_locations: Union[base.ScanLocation, Iterable[base.ScanLocation]]
+    ) -> Coroutine[Detection, Optional[AnalysisQueueItem], None]:
         cleanup = []
-        hits_items = []
         files_queue = deque()
         executor = worker_executor.AuraExecutor(job_queue=files_queue)
-        files_queue.append(self.location)
+
+        if isinstance(initial_locations, base.ScanLocation):
+            files_queue.append(initial_locations)
+        else:
+            for x in initial_locations:
+                files_queue.append(x)
+
         files_queue.append(worker_executor.Wait)
 
         try:
             while len(files_queue) or bool(executor):
                 try:
-                    item: Union[worker_executor.Wait, base.ScanLocation] = files_queue.popleft()
+                    item: AnalysisQueueItem = files_queue.popleft()
                 except IndexError:  # Queue is empty
                     executor.wait()
                     item = False
@@ -49,22 +54,27 @@ class Analyzer(object):
                         locations, detections = f.result()
                         for loc in locations:  # type: base.ScanLocation
                             if loc.cleanup:
-                                cleanup.append(loc.location)
+                                cleanup.append(loc)
 
                             files_queue.append(loc)
 
-                        hits_items.extend(detections)
+                        for x in detections:
+                            comm = yield x
+                            if comm:
+                                files_queue.append(comm)
                     continue
 
                 should_continue: Union[bool, Detection] = item.should_continue()
                 # Equals True if it's ok to process this item
                 # Otherwise returns `Rule` indicating why processing of this location should be halted
                 if should_continue is not True:
-                    hits_items.append(should_continue)
+                    comm = yield should_continue
+                    if comm:
+                        files_queue.append(comm)
                     continue
 
                 if item.location.is_dir():
-                    collected = self.scan_directory(item=item)
+                    collected = cls.scan_directory(item=item)
 
                     for x in collected:
                         files_queue.append(x)
@@ -72,14 +82,17 @@ class Analyzer(object):
                     files_queue.append(worker_executor.Wait)
                     continue
 
-                executor.submit(self.analyze, location=item)
-
-            yield from hits_items
+                executor.submit(cls.analyze, location=item)
         finally:
             for x in cleanup:
+                if isinstance(x, base.ScanLocation):
+                    x.do_cleanup()
+                    continue
+
                 if type(x) != str:
                     x = os.fspath(x)
                 if os.path.exists(x):
+                    logger.info(f"Cleaning up location: {x}")
                     shutil.rmtree(x)
 
     @staticmethod

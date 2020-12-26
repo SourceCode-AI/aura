@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from aura.analyzers.detections import Detection
 from aura import plugins
 
@@ -20,3 +22,22 @@ def test_get_analyzers_custom(fixtures):
                 responses.add(r.detection_type)
 
         assert len(expected_responses-responses) == 0, responses
+
+
+def test_load_entrypoint():
+    plugins.load_entrypoint("aura.analyzers")
+    analyzers_whitelist = {"file_analyzer", "archive", "secrets", "taint_analysis", "setup_py", "sqli"}
+
+    result = analyzers_whitelist - set(plugins.PLUGIN_CACHE["analyzers"].keys())
+    assert len(result) == 0, result
+
+    for name in analyzers_whitelist:
+        assert name == plugins.PLUGIN_CACHE["analyzers"][name].analyzer_id
+
+
+def test_plugin_cache():
+    plugins.load_entrypoint("aura.analyzers")
+
+    with patch("aura.plugins.initialize_analyzer", side_effect=ValueError):
+        plugins.get_analyzers(["file_analyzer", "archive", "secrets", "taint_analysis", "setup_py", "sqli"])
+

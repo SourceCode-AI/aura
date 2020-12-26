@@ -76,12 +76,13 @@ class DataFinder(NodeAnalyzerV2):
         file_pth = os.path.join(tmp_dir, "blob")
 
         location = context.visitor.location.create_child(
-            parent=f"{str(context.visitor.location)}:{context.node.line_no}",
+            parent=context.visitor.location,
             new_location=tmp_dir,
             cleanup=True,
             strip_path=tmp_dir
         )
         location.metadata["source"] = "blob"
+        location.metadata["parent_line"] = context.node.line_no
 
         if type(blob) == str:
             mode = "w"

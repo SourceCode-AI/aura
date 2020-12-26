@@ -8,8 +8,13 @@ from ..utils import Analyzer, md5
 @Analyzer.ID("file_stats")
 def analyze(*, location: ScanLocation):
     """This analyzer collect stats about analyzer files"""
+    l = location
+    while l:
+        if l.metadata.get("source") == "diff":
+            return
+        l = l.parent
 
-    loc = str(location)
+    loc = str(location)  # TODO: refactor this line
 
     info = {
         "mime": location.metadata["mime"],

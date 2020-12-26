@@ -1,4 +1,6 @@
 import os
+import codecs
+import uuid
 
 
 def test_misc_signatures(fixtures):
@@ -172,3 +174,24 @@ patterns:
     finally:
         del os.environ["AURA_SIGNATURES"]
         config.load_config()
+
+
+def test_base64_payload_finder(tmp_path, fixtures):
+    content = ";".join([str(uuid.uuid4()) for _ in range(25)])
+    b64 = codecs.encode(content.encode(), "base64").decode().replace("\n", "")
+    assert type(b64) is str
+    payload = f"variable = sssshhh('{b64}')"
+
+    fname = (tmp_path/"test_file.py")
+    fname.write_text(payload)
+
+    match = {
+        "type": "Base64Blob",
+        "extra": {
+            "base64_decoded": content
+        },
+        "message": "Base64 data blob found",
+        "tags": ["base64"]
+    }
+
+    fixtures.scan_and_match(str(fname), matches=[match])

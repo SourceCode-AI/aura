@@ -2,6 +2,7 @@ import os
 import re
 import json
 import tempfile
+import warnings
 from pathlib import Path
 from unittest.mock import patch
 
@@ -51,7 +52,6 @@ OBFUSCATED_DEFAULT_MATCHES = [
 ]
 
 
-@pytest.mark.timeout(5)
 @pytest.mark.parametrize("exec_mode", ("--async", "--no-async"))
 def test_simple_cli_analysis(exec_mode, fixtures):
     pth = fixtures.path('basic_ast.py')
@@ -61,14 +61,14 @@ def test_simple_cli_analysis(exec_mode, fixtures):
     assert "url" in output["tags"]
 
 
-@pytest.mark.extended
+@pytest.mark.e2e
 @pytest.mark.skipif(yara is None, reason="Yara module/analyzer is not installed")
 def test_complex_cli_analysis(fixtures):
     with patch.object(DataFinder, "get_min_size", return_value=10) as m:
         fixtures.scan_and_match("obfuscated.py", OBFUSCATED_DEFAULT_MATCHES)
 
 
-@pytest.mark.extended
+@pytest.mark.e2e
 def test_custom_analyzer(fixtures):
     fixtures.scan_and_match(
         "obfuscated.py",
@@ -131,6 +131,7 @@ def test_tag_filtering(tag_filter, fixtures):
                 assert tag in hit["tags"], (tag, hit)
 
 
+@pytest.mark.e2e
 def test_info_command(fixtures, tmp_path, mock_pypi_stats):
     from aura import config
     stats: Path = tmp_path / "pypi_stats.json"
@@ -158,16 +159,18 @@ def test_ast_parser(fixtures):
     assert "adalaraoawa aoalalaeaH" in result.stdout
 
 
+@pytest.mark.e2e
 def test_async_cleanup(fixtures):
     from aura.uri_handlers import base
 
     base.cleanup_locations()
     tmp_dir = Path(tempfile.gettempdir())
-    leftovers = list(tmp_dir.glob("aura_pkg__sandbox*"))
-    assert len(leftovers) == 0, leftovers
+    before = set(tmp_dir.glob("aura_pkg__sandbox*"))
+    if before:
+        warnings.warn(f"tmp folder already contains aura leftovers! {tmp_dir}")
 
-    output = fixtures.scan_test_file("mirror/wheel-0.34.2.tar.gz", args=["--async", "-a", "archive"])
+    _ = fixtures.scan_test_file("mirror/wheel-0.34.2.tar.gz", args=["--async", "-a", "archive"])
 
     # Make sure that the temp dir is properly cleaned up also when using async mode
-    leftovers = list(tmp_dir.glob("aura_pkg__sandbox*"))
-    assert len(leftovers) == 0, leftovers
+    leftovers = set(tmp_dir.glob("aura_pkg__sandbox*")) - before
+    assert len(leftovers) == 0, 0

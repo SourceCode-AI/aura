@@ -13,6 +13,7 @@ from abc import ABC, abstractmethod
 from itertools import product
 from dataclasses import dataclass, field
 from pathlib import Path
+from difflib import SequenceMatcher
 from typing import Union, Optional, Generator, Tuple, Iterable
 from warnings import warn
 
@@ -21,7 +22,7 @@ import pkg_resources
 import magic
 
 from .. import config
-from ..utils import KeepRefs, lookup_lines
+from ..utils import KeepRefs, lookup_lines, lzset, jaccard, walk
 from ..exceptions import PythonExecutorError, UnsupportedDiffLocation, FeatureDisabled
 from ..analyzers import find_imports
 from ..analyzers.detections import DataProcessing, Detection, get_severity
@@ -111,16 +112,26 @@ class PackageProvider(ABC):
         ...
 
 
+class IdenticalName(float):
+    """
+    Special case for `is_renamed_file` to indicate that name of the file is identical
+    while preserving similarity ratio type compatiblity
+    """
+    pass
+
+
 @dataclass
 class ScanLocation(KeepRefs):
     location: Union[Path, str]
     metadata: dict = field(default_factory=dict)
-    cleanup: bool = False
-    parent: Optional[str] = None
+    cleanup: Union[bool, Path, str] = False
+    parent: Optional[ScanLocation] = None
     strip_path: str = ""
     size: Optional[int] = None
 
     def __post_init__(self):
+        assert type(self.parent) != str  # Type guard format change, should be ScanLocation or None now
+
         if type(self.location) == str:
             self.__str_location = self.location
             self.location = Path(self.location)
@@ -131,6 +142,7 @@ class ScanLocation(KeepRefs):
             CLEANUP_LOCATIONS.add(self.location)
 
         self.__str_parent = None
+        self._lzset: Optional[set] = None
         self.metadata["path"] = self.location
         self.metadata["normalized_path"] = str(self)
         self.metadata["tags"] = set()
@@ -140,13 +152,14 @@ class ScanLocation(KeepRefs):
             warn("Depth is not set for the scan location", stacklevel=2)
 
         if self.location.is_file():
-            self.__compute_hashes()
-
             self.size = self.location.stat().st_size
+            self.__compute_hashes()
             self.metadata["mime"] = magic.from_file(self.str_location, mime=True)
 
             if self.metadata["mime"] in ("text/plain", "application/octet-stream", "text/none"):
                 self.metadata["mime"] = mimetypes.guess_type(self.__str_location)[0]
+            elif self.metadata["mime"] != "text/x-python" and self.is_python_source_code:  # FIXME: not very elegant mime normalization
+                self.metadata["mime"] = "text/x-python"
 
             if self.is_python_source_code and "no_imports" not in self.metadata:
                 try:
@@ -157,6 +170,14 @@ class ScanLocation(KeepRefs):
                     pass
 
     def __compute_hashes(self):
+        if self.size == 0:  # Can't mmap empty file
+            self.metadata["md5"] = "d41d8cd98f00b204e9800998ecf8427e"
+            self.metadata["sha1"] = "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+            self.metadata["sha256"] = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            self.metadata["sha512"] = "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e"
+            return
+
+
         tl = tlsh.Tlsh()
         md5 = hashlib.md5()
         sha1 = hashlib.sha1()
@@ -188,22 +209,18 @@ class ScanLocation(KeepRefs):
     def __str__(self):
         return self.strip(self.str_location)
 
+    def __hash__(self):
+        return hash(self.location)
+
+    def __eq__(self, other: ScanLocation):
+        if type(other) != ScanLocation:
+            return NotImplemented
+        else:
+            return self.location == other.location
+
     @property
     def str_location(self) -> str:
         return self.__str_location
-
-    @property
-    def str_parent(self) -> Optional[str]:
-        if self.parent is None:
-            return None
-
-        if self.__str_parent is None:
-            if type(self.parent) == str:
-                self.__str_parent = self.parent
-            else:
-                self.__str_parent = os.fspath(self.parent)
-
-        return self.__str_parent
 
     @property
     def filename(self) -> Optional[str]:
@@ -215,6 +232,29 @@ class ScanLocation(KeepRefs):
     @property
     def is_python_source_code(self) -> bool:
         return (self.metadata["mime"] in ("text/x-python", "text/x-script.python"))
+
+    @property
+    def is_archive(self) -> bool:
+        from ..analyzers.archive import SUPPORTED_MIME
+        return self.metadata.get("mime") in SUPPORTED_MIME
+
+    @property
+    def lzset(self) -> set:
+        if self._lzset is None:
+            if self.size == 0:  # mmap can't map empty files
+                self._lzset = set()
+            else:
+                try:
+                    with self.location.open("rb") as fd:
+                        self._lzset = lzset(fd)
+                except FileNotFoundError:
+                    self._lzset = set()
+
+        return self._lzset
+
+    @property
+    def md5(self) -> Optional[str]:
+        return self.metadata.get("md5")
 
     def create_child(self, new_location: Union[str, Path], metadata=None, **kwargs) -> ScanLocation:
         if metadata is None:
@@ -237,7 +277,7 @@ class ScanLocation(KeepRefs):
         elif self.location.is_dir():
             parent = self.parent
         else:
-            parent = self.location
+            parent = self.location  # FIXME refactor, parent should be only None or ScanLocation type
 
         if "strip_path" in kwargs:
             strip_path = kwargs["strip_path"]
@@ -256,7 +296,7 @@ class ScanLocation(KeepRefs):
 
         return child
 
-    def strip(self, target: Union[str, Path]) -> str:
+    def strip(self, target: Union[str, Path], include_parent: bool=True) -> str:
         """
         Strip/normalize given path
         Left side part of the target is replaced with the configured strip path
@@ -270,20 +310,23 @@ class ScanLocation(KeepRefs):
         :param target: Path to replace/strip
         :return: normalized path
         """
-        target: str = os.fspath(target)
+        if type(target) == str:
+            target = Path(target)
 
-        if self.strip_path and target.startswith(self.strip_path):
-            size = len(self.strip_path)
-            if self.strip_path[-1] != "/":
-                size += 1
+        try:
+            target = target.relative_to(self.strip_path)
+        except ValueError:  # strip_path is not a prefix of target
+            pass
 
-            target = target[size:]
+        if include_parent and self.parent:
+            p = str(self.parent)
+            line_no = self.metadata.get("parent_line")
+            if line_no is not None:
+                p = f"{p}:{line_no}"
 
-        if self.parent:
-            if not target.startswith(self.str_parent):  # Target might be already stripped
-                target = self.str_parent + "$" + target
+            return f"{p}${str(target)}"
 
-        return target
+        return str(target)
 
     def should_continue(self) -> Union[bool, Detection]:
         """
@@ -340,6 +383,55 @@ class ScanLocation(KeepRefs):
             if d._severity is None:
                 d._severity = get_severity(d)
 
+    def is_renamed_file(self, other: ScanLocation, max_depth: int=2) -> float:
+        self_name = self.strip(self.str_location, include_parent=False).lstrip("/")
+        other_name = other.strip(other.str_location, include_parent=False).lstrip("/")
+        ratio = jaccard(self.lzset, other.lzset)
+
+        if self_name == other_name:
+            return IdenticalName(ratio)
+
+        self_paths = self_name.split("/")
+        other_paths = other_name.split("/")
+
+        changes = 0
+        for op in SequenceMatcher(None, self_paths, other_paths).get_opcodes():
+            if op[0] == "equal":
+                continue
+            changes += max(op[2]-op[1], op[4]-op[3])
+
+        if changes > max_depth:
+            # Files not within the max depth
+            return 0.0
+        elif self.is_archive and other.is_archive:
+            return SequenceMatcher(None, self.location.name, other.location.name).ratio()
+        else:
+            return ratio
+
+    def list_recursive(self) -> Generator[ScanLocation, None, None]:
+        for f in walk(self.location):
+            yield self.create_child(
+                new_location=f,
+                strip_path=str(self.location),
+                parent=self.parent
+            )
+
+    def do_cleanup(self):
+        if not self.cleanup:
+            return
+
+        if type(self.cleanup) != bool:
+            dest = self.cleanup
+        else:
+            dest = self.location
+
+        if os.path.exists(dest):
+            logger.info(f"cleaning up {dest}")
+            shutil.rmtree(dest)
+
+        if dest in CLEANUP_LOCATIONS:
+            CLEANUP_LOCATIONS.remove(dest)
+
 
 def cleanup_locations():
     """
@@ -348,15 +440,15 @@ def cleanup_locations():
     for obj in ScanLocation.get_instances():  # type: ScanLocation
         if not obj.cleanup:
             continue
+        else:
+            obj.do_cleanup()
 
-        if obj.location in CLEANUP_LOCATIONS:
-            CLEANUP_LOCATIONS.remove(obj.location)
+    for location in CLEANUP_LOCATIONS:  # type: Union[Path, ScanLocation]
+        if isinstance(location, ScanLocation):
+            location.do_cleanup()
 
-        if obj.location.exists():
-            shutil.rmtree(obj.location)
-
-    for location in CLEANUP_LOCATIONS:  # type: Path
-        if location.exists():
+        elif location.exists():
+            logger.info(f"Cleaning up {location}")
             shutil.rmtree(location)
 
 

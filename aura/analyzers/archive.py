@@ -165,11 +165,20 @@ def process_tarfile(path, tmp_dir) -> AnalyzerReturnType:
                 yield x
 
 
+def extract(location: ScanLocation, destination) -> AnalyzerReturnType:
+    if location.metadata["mime"] == "application/zip":
+        yield from process_zipfile(path=location.location, tmp_dir=destination)
+    else:
+        yield from process_tarfile(path=location.location, tmp_dir=destination)
+
+
 def archive_analyzer(*, location: ScanLocation) -> AnalyzerReturnType:
     """
     Archive analyzer that looks for suspicious entries and unpacks the archive for recursive analysis
     """
     if location.location.is_dir():
+        return
+    elif location.metadata.get("source") == "diff":
         return
 
     mime = location.metadata["mime"]
@@ -180,18 +189,13 @@ def archive_analyzer(*, location: ScanLocation) -> AnalyzerReturnType:
     logger.info("Extracting to: '{}' [{}]".format(tmp_dir, mime))
 
     yield location.create_child(
-        parent=str(location),
+        parent=location,
         new_location=tmp_dir,
         cleanup=True,
     )
 
     try:
-        if mime == "application/zip":
-            yield from process_zipfile(path=location.location, tmp_dir=tmp_dir)
-        elif mime in SUPPORTED_MIME:
-            yield from process_tarfile(path=location.location, tmp_dir=tmp_dir)
-        else:
-            return
+        yield from extract(location=location, destination=tmp_dir)
     except (tarfile.ReadError, zipfile.BadZipFile, EOFError) as exc:
         yield ArchiveAnomaly.from_generic_exception(location, exc)
 
@@ -199,9 +203,9 @@ def archive_analyzer(*, location: ScanLocation) -> AnalyzerReturnType:
 def diff_archive(diff) -> AnalyzerReturnType:
     if diff.operation not in "RM":
         return
-    elif diff.a_md5 == diff.b_md5:
+    elif not (diff.a_scan.location.is_file() and diff.b_scan.location.is_file()):
         return
-    elif not (diff.a_path.is_file() and diff.b_path.is_file()):
+    elif diff.a_scan.metadata["md5"] == diff.b_scan.metadata["md5"]:
         return
 
     a_hits = list(archive_analyzer(location=diff.a_scan))

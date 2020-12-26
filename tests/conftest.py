@@ -2,6 +2,8 @@ import os
 import re
 import sys
 import json
+import string
+import random
 import pprint
 import inspect
 import tempfile
@@ -224,6 +226,23 @@ def match_rule(source, target) -> bool:
 
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--e2e", action="store_true", default=False, help="run e2e tests"
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    if config.getoption("--e2e"):
+        # End-to-end tests specified in cli, don't skip e2e tests
+        return
+
+    skip_e2e = pytest.mark.skip(reason="Need to specify --e2e to run end-to-end tests")
+    for item in items:
+        if "e2e" in item.keywords:
+            item.add_marker(skip_e2e)
+
+
 @pytest.fixture(scope="module")
 def fixtures():
     yield Fixtures()
@@ -369,8 +388,16 @@ def reset_plugins():
     from aura.analyzers.python.readonly import ReadOnlyAnalyzer
     from aura import plugins
 
-    ReadOnlyAnalyzer.hooks = []
-    plugins.PLUGIN_CACHE = {}
+    read_only_hooks = ReadOnlyAnalyzer.hooks
+    cache = plugins.PLUGIN_CACHE.copy()
+
+    try:
+        ReadOnlyAnalyzer.hooks = []
+        plugins.PLUGIN_CACHE = {"analyzers": {}}
+        yield
+    finally:
+        ReadOnlyAnalyzer.hooks = read_only_hooks
+        plugins.PLUGIN_CACHE = cache
 
 
 @pytest.fixture(scope="module")
@@ -378,3 +405,14 @@ def mock_tqdm_log_write():
 
     with mock.patch.object(tqdm.tqdm, "write") as m:
         yield m
+
+
+@pytest.fixture()
+def random_text():
+    """
+    Generate random text
+    """
+    def _(length: int):
+        return "".join([random.choice(string.printable+"\n ") for _ in range(length)])
+
+    return _

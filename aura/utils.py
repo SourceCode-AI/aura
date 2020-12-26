@@ -3,8 +3,9 @@ import codecs
 import hashlib
 import shutil
 import weakref
+import mmap
 import dataclasses
-from contextlib import contextmanager
+from contextlib import contextmanager, ExitStack, nullcontext
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -231,6 +232,49 @@ def slotted_dataclass(dataclass_arguments=None, **kwargs):
         return cls
 
     return decorator
+
+
+
+def lzset(indata) -> set:
+    """
+    Create compression dict using Lempel Ziv algorithm
+    Used for estimating similarity using LZJD
+    http://conference.scipy.org/proceedings/scipy2019/pdfs/pylzjd.pdf
+    """
+
+    with ExitStack() as stack:
+        if type(indata) in (str, bytes):
+            size = len(indata)
+            slicer = indata
+        else:
+            indata.seek(0, 2)
+            size = indata.tell()
+            indata.seek(0)
+            slicer = stack.enter_context(mmap.mmap(indata.fileno(), 0, prot=mmap.PROT_READ))
+
+        s = set()
+        start = 0
+        end = 1
+        while end <= size:
+            b_s = slicer[start:end]
+            if b_s not in s:
+                s.add(b_s)
+                start = end
+            end += 1
+        return s
+
+
+def jaccard(a: set, b: set) -> float:
+    """
+    Compute jaccard similarity of the given two sets
+
+    :return: similarity metric (float) in range [0, 1]
+    """
+    divisor = len(a | b)
+    if divisor == 0:
+        return 0.0
+
+    return float(len(a & b)) / divisor
 
 
 class Analyzer:

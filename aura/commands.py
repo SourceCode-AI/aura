@@ -70,8 +70,7 @@ def scan_worker(item: ScanLocation) -> Generator[Detection, None, None]:
         logger.error(f"Location '{item.str_location}' does not exists. Skipping")
         yield []
     else:
-        sandbox = Analyzer(location=item)
-        yield from sandbox.run()
+        yield from Analyzer.run(item)
 
 
 def scan_uri(uri, metadata: Union[list, dict]=None, download_only: bool=False) -> List[Detection]:
@@ -141,6 +140,7 @@ def data_diff(a_path: str, b_path: str, format_uri=("text",), output_opts=None):
     if output_opts is None:
         output_opts = {}
 
+    start = time.monotonic()
     uri_handler1, uri_handler2 = URIHandler.diff_from_uri(a_path, b_path)
 
     if type(format_uri) not in (tuple, list):
@@ -154,11 +154,16 @@ def data_diff(a_path: str, b_path: str, format_uri=("text",), output_opts=None):
         detections = any(x.detections for x in formatters)
 
     analyzer = diff.DiffAnalyzer()
-    analyzer.compare(uri_handler1, uri_handler2, detections=detections)
+    analyzer.compare(uri_handler1, uri_handler2)
+    if detections:  # FIXME pass a list of allowed analyzers
+        analyzer.analyze_changes()
 
     for formatter in formatters:
         with formatter:
             formatter.output_diff(analyzer)
+
+    end = time.monotonic()
+    logger.info(f"Diff completed in {end-start}s")
 
 
 def scan_mirror(output_dir: Path):

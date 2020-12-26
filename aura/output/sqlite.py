@@ -230,6 +230,9 @@ class SQLiteDiffOutput(DiffBase, DiffOutputBase):
         cur = self._db.cursor()
         try:
             for d in self.filtered(diffs_analyzer.diffs):
+                data = d.as_dict()
+
+
                 cur.execute("""
                     INSERT INTO diffs (
                         operation,
@@ -244,16 +247,16 @@ class SQLiteDiffOutput(DiffBase, DiffOutputBase):
                         similarity
                     ) VALUES (?,?,?,?,?,?,?,?,?,?)
                 """, [
-                    d.operation,
-                    d.a_ref,
-                    d.b_ref,
-                    d.a_size,
-                    d.b_size,
-                    d.a_mime,
-                    d.b_mime,
-                    d.a_md5,
-                    d.b_md5,
-                    d.similarity
+                    data["operation"],
+                    data.get("a_ref"),
+                    data.get("b_ref"),
+                    data.get("a_size"),
+                    data.get("b_size"),
+                    data.get("a_mime"),
+                    data.get("b_mime"),
+                    data.get("a_md5"),
+                    data.get("b_md5"),
+                    data["similarity"]
                 ])
 
                 diff_id = cur.lastrowid

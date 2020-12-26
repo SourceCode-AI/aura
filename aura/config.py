@@ -295,5 +295,14 @@ def get_ast_patterns() -> tuple:
     return AST_PATTERNS_CACHE
 
 
+def can_fork() -> bool:
+    if "AURA_NO_FORK" in os.environ:
+        return False
+
+    # FIXME: rename the `async` config to `fork`
+    fork = CFG["aura"].get("async", True)
+    return fork
+
+
 CFG_PATH = find_configuration()
 load_config()

@@ -271,13 +271,15 @@ class PypiPackage:
                 LOGGER.info(f"Diffing `{x['filename']}` and `{y['filename']}`")
 
                 x_loc = get_cached_location(x)
+                x_loc.cleanup = temp_dir
                 y_loc = get_cached_location(y)
+                y_loc.cleanup = temp_dir
                 yield x_loc, y_loc
 
-        finally:
+        except Exception:
             if temp_dir.exists():
                 shutil.rmtree(temp_dir)
-
+            raise
 
 class PackageScore:
     @dataclasses.dataclass

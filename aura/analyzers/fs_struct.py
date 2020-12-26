@@ -29,7 +29,9 @@ def analyze(*, location: ScanLocation) -> AnalyzerReturnType:
         if p.match(location):
             location.metadata["tags"] |= set(p._signature.get("tags", []))
 
-    if location.location.stat().st_size == 0:
+    if not location.location.exists():
+        return
+    elif location.size == 0:
         return
 
     if "sensitive_file" in location.metadata["tags"]:

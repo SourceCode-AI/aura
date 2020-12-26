@@ -6,6 +6,9 @@ from pathlib import Path
 
 import pytest
 
+from aura import diff
+from aura.uri_handlers.base import ScanLocation
+from aura.output.base import DiffOutputBase
 from aura.exceptions import FeatureDisabled
 
 
@@ -68,8 +71,37 @@ DIFF_MATCHES = [
     }
 ]
 
+DIFFS = (
+    diff.Diff(
+        operation="A",
+        a_scan=None,
+        b_scan=ScanLocation(
+            "added_file.py",
+        )
+    ),
+    diff.Diff(
+        operation="D",
+        a_scan=ScanLocation(
+            "removed_file.py"
+        ),
+        b_scan=None
+    ),
+    diff.Diff(
+        operation="M",
+        a_scan=ScanLocation(
+            "modified_file.py"
+        ),
+        b_scan=ScanLocation(
+            "modified_file.py"
+        ),
+        similarity=0.8,
+        diff="This is a diff of the modified file"
+    )
+)
 
-def test_text_scan_output(fixtures):
+
+@pytest.mark.e2e
+def test_text_scan_output_e2e(fixtures):
     """
     Test different output formats
     """
@@ -143,6 +175,7 @@ def test_non_existing(fixtures):
         "sqlite"
     )
 )
+@pytest.mark.e2e
 def test_output_not_created_when_below_minimum_score(output_type, fixtures, tmp_path: Path):
     """
     Test that an output file is never created if the minimum score is never reached
@@ -176,6 +209,7 @@ def test_output_not_created_when_below_minimum_score(output_type, fixtures, tmp_
         "malformed_xmls/bomb.xml"
     )
 )
+@pytest.mark.e2e
 def test_output_path_formatting(skip_binwalk, scan_file, fixtures):
     """
     Test that in the output, the paths have correct output formats:
@@ -202,14 +236,14 @@ def test_output_path_formatting(skip_binwalk, scan_file, fixtures):
         assert temp_prefix not in signature
 
 
-@pytest.mark.skipif(binwalk is None, reason="Binwalk module/analyzer is not installed")
+@pytest.mark.e2e
 def test_diff_output_comprehensive(skip_binwalk, fixtures, fuzzy_rule_match):
     arch1 = fixtures.path("mirror/wheel-0.34.2-py2.py3-none-any.whl")
     arch2 = fixtures.path("mirror/wheel-0.33.0-py2.py3-none-any.whl")
 
     matches = [
         {
-            "operation": "R",
+            "operation": "M",
             "a_ref": "wheel-0.34.2-py2.py3-none-any.whl",
             "b_ref": "wheel-0.33.0-py2.py3-none-any.whl",
             "a_size": 26502,
@@ -221,39 +255,37 @@ def test_diff_output_comprehensive(skip_binwalk, fixtures, fuzzy_rule_match):
         },
         {
             "operation": "M",
-            "a_ref": re.compile(r".*/wheel-0\.34\.2-py2\.py3-none-any\.whl\$wheel/wheelfile\.py$"),
-            "b_ref": re.compile(r".*/wheel-0\.33\.0-py2\.py3-none-any\.whl\$wheel/wheelfile\.py$"),
+            "a_ref": "wheel-0.34.2-py2.py3-none-any.whl$wheel/wheelfile.py",
+            "b_ref": "wheel-0.33.0-py2.py3-none-any.whl$wheel/wheelfile.py",
             "a_size": 7298,
             "b_size": 7168,
             "a_mime": "text/x-python",
             "b_mime": "text/x-python",
             "a_md5": "8d4db173db397856d959ad08cd4745e7",
             "b_md5": "f92b90ab7015c47a95553f4224551229",
-            "similarity": lambda x: x > 0.9,
-            "diff": lambda x: len(x) > 100,
-            "removed_detections": [
-                {
-                    "type": "ModuleImport",
-                    "extra": {
-                        "root": "stat",
-                        "name": "stat"
-                    },
-                    "line": "import stat"
-                }
-            ]
+            #"similarity": lambda x: x > 0.6,
+            # FIXME:
+            # "removed_detections": [
+            #     {
+            #         "type": "ModuleImport",
+            #         "extra": {
+            #             "root": "stat",
+            #             "name": "stat"
+            #         },
+            #         "line": "import stat"
+            #     }
+            # ]
         },
         {
             "operation": "M",
-            "a_ref": re.compile(r".*/wheel-0\.34\.2-py2\.py3-none-any\.whl\$wheel/cli/pack\.py$"),
-            "b_ref": re.compile(r".*/wheel-0\.33\.0-py2\.py3-none-any\.whl\$wheel/cli/pack\.py$"),
+            "a_ref": "wheel-0.34.2-py2.py3-none-any.whl$wheel/cli/pack.py",
+            "b_ref": "wheel-0.33.0-py2.py3-none-any.whl$wheel/cli/pack.py",
             "a_size": 3208,
             "b_size": 2268,
             "a_mime": "text/x-python",
             "b_mime": "text/x-python",
             "a_md5": "67ba28165400d5b8c829d1b78989de45",
             "b_md5": "57241c2632d667f1f5bac5ce77fecfd7",
-            "similarity": lambda x: x> 0.7,
-            "diff": lambda x: len(x) > 100,
             "new_detections": [
                 {
                     "type": "FunctionCall",
@@ -275,19 +307,15 @@ def test_diff_output_comprehensive(skip_binwalk, fixtures, fuzzy_rule_match):
         },
         {
             "operation": "D",
-            "a_ref": re.compile(r".*/wheel-0\.34\.2-py2\.py3-none-any\.whl\$wheel/macosx_libfile\.py$"),
-            "b_ref": None,
+            "a_ref": "wheel-0.34.2-py2.py3-none-any.whl$wheel/macosx_libfile.py",
             "a_size": 11858,
-            "b_size": 0,
-            "a_mime": "text/plain",
-            "b_mime": None,
+            "a_mime": "text/x-python",
             "a_md5": "10e61b8b920752320dbe0562f75f81d5",
-            "b_md5": None,
-            "similarity": 0,
+            "similarity": 0.0,
         }
     ]
 
-    raw_output = fixtures.get_cli_output(["diff", arch1, arch2, "-f", "json", "-a", "ast"])
+    raw_output = fixtures.get_cli_output(["diff", arch1, arch2, "-f", "json"])
     output = json.loads(raw_output.stdout)
     diffs = output["diffs"]
 
@@ -296,7 +324,8 @@ def test_diff_output_comprehensive(skip_binwalk, fixtures, fuzzy_rule_match):
 
 
 @pytest.mark.skipif(binwalk is None, reason="Binwalk module/analyzer is not installed")
-def test_diff_json_output(skip_binwalk, fixtures, fuzzy_rule_match):
+@pytest.mark.e2e
+def test_diff_json_output_e2e(skip_binwalk, fixtures, fuzzy_rule_match):
     pth1 = fixtures.path("diffs/1_a")
     pth2 = fixtures.path("diffs/1_b")
     try:
@@ -312,7 +341,8 @@ def test_diff_json_output(skip_binwalk, fixtures, fuzzy_rule_match):
 
 
 @pytest.mark.skipif(binwalk is None, reason="Binwalk module/analyzer is not installed")
-def test_diff_sqlite_output(skip_binwalk, fixtures, fuzzy_rule_match, tmp_path):
+@pytest.mark.e2e
+def test_diff_sqlite_output_e2e(skip_binwalk, fixtures, fuzzy_rule_match, tmp_path):
     pth1 = fixtures.path("diffs/1_a")
     pth2 = fixtures.path("diffs/1_b")
     db_path = tmp_path / "aura_test_diff_output.sqlite"
@@ -341,7 +371,8 @@ def test_diff_sqlite_output(skip_binwalk, fixtures, fuzzy_rule_match, tmp_path):
 
 
 @pytest.mark.skipif(jsonschema is None, reason="jsonschema module is not installed")
-def test_gitlab_sast_output(fixtures):
+@pytest.mark.e2e
+def test_gitlab_sast_output_e2e(fixtures):
     schema_pth = fixtures.path("gitlab-sast-schema.json")
 
     with open(schema_pth, "r") as fd:
@@ -358,7 +389,8 @@ def test_gitlab_sast_output(fixtures):
     "r.tar.gz",
     "evil.zip"
 ))
-def test_sarif_output(infile, fixtures):
+@pytest.mark.e2e
+def test_sarif_output_e2e(infile, fixtures):
     schema_pth = fixtures.path("sarif-schema.json")
 
     with open(schema_pth, "r") as fd:
@@ -366,3 +398,27 @@ def test_sarif_output(infile, fixtures):
 
     output = fixtures.scan_test_file(infile, args=["-f", "sarif"])
     jsonschema.validate(output, schema)
+
+
+
+def test_text_output(capsys):
+    analyzer = diff.DiffAnalyzer()
+    analyzer.diffs = DIFFS
+
+    formatter = DiffOutputBase.from_uri("text")
+    with formatter:
+        formatter.output_diff(analyzer)
+
+    captured = capsys.readouterr()
+    assert len(captured.err) == 0, captured.err
+
+    assert "File added" in captured.out, captured.out
+    assert "Path: added_file.py" in captured.out, captured.out
+
+    assert "File removed" in captured.out, captured.out
+    assert "Path: removed_file.py" in captured.out, captured.out
+
+    assert "Similarity: 80%" in captured.out, captured.out
+    assert "A Path: modified_file.py" in captured.out, captured.out
+    assert "B Path: modified_file.py" in captured.out, captured.out
+    assert "This is a diff of the modified file" in captured.out, captured.out

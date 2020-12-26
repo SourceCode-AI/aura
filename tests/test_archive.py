@@ -96,7 +96,6 @@ def test_damaged_tarfile(fixtures):
     fixtures.scan_and_match("common-passwords.txt.gz", matches=matches)
 
 
-@pytest.mark.timeout(3)
 def test_recursive_bomb(fixtures):
     matches = [
         {

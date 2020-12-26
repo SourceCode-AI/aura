@@ -217,7 +217,9 @@ class DiffOutputBase(OutputBase, metaclass=ABCMeta):
 
         for diff in diffs:
             if not self.output_same_renames:
-                if diff.operation == "R" and diff.similarity == 1.0:
+                # Can't use only MD5 because tests will fail
+                # (files do not exists so both md5s are set to none hence equal)
+                if diff.operation in "RM" and diff.a_scan.md5 == diff.b_scan.md5 and diff.similarity == 1.0:
                     continue
 
             out.append(diff)
