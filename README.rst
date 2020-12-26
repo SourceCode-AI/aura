@@ -65,9 +65,15 @@ Running Aura
 Aura uses a so-called URIs to identify the protocol and location to scan, if no protocol is used, the scan argument is treated as a path to the file or directory on a local system.
 
 
+.. image:: files/imgs/aura_scan.png
+
+
 Diff packages::
 
     docker run -ti --rm sourcecodeai/aura:dev diff pypi://requests pypi://requests2
+
+
+.. image:: files/imgs/aura_diff.png
 
 
 Find most popular typosquatted packages (you need to call ``aura update`` to download the dataset first)::
