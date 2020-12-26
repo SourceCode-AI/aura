@@ -1,4 +1,3 @@
-import tempfile
 import os
 import uuid
 import random
@@ -6,7 +5,6 @@ import string
 import difflib
 from math import floor
 from pathlib import Path
-from dataclasses import asdict
 from unittest import mock
 
 import pytest

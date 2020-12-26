@@ -6,32 +6,18 @@ Utilities for computing diffs
 import os
 import re
 import difflib
-from typing import Union, Optional, List, Tuple, Iterable
-from pathlib import Path
-from collections import defaultdict
+from typing import Union, Optional, List, Iterable
 from dataclasses import dataclass
 
-from .exceptions import UnsupportedDiffLocation, FeatureDisabled
+from .exceptions import UnsupportedDiffLocation
 from .type_definitions import DiffType, DiffAnalyzerType
 
-try:
-    import magic
-    import tlsh
-    from git import Repo, Diff as GitDiff, Blob
-except ImportError as exc:
-    raise FeatureDisabled("Feature is disabled because one or more python packages are not installed: `GitPython`, `python-tlsh`") from exc
-
-
-from . import utils
 from . import plugins
 from .output.table import Table
 
 from .analyzers.detections import Detection
 from .package_analyzer import Analyzer
 from .uri_handlers.base import ScanLocation, URIHandler, IdenticalName
-
-
-DIFF_EXCLUDE = re.compile(r"^Binary files .+ differ$")
 
 
 @dataclass()

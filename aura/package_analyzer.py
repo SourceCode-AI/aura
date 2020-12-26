@@ -92,7 +92,7 @@ class Analyzer:
                 if type(x) != str:
                     x = os.fspath(x)
                 if os.path.exists(x):
-                    logger.info(f"Cleaning up location: {x}")
+                    logger.debug(f"Cleaning up location: {x}")
                     shutil.rmtree(x)
 
     @staticmethod

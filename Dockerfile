@@ -1,4 +1,4 @@
-ARG pythonver=3.8.3
+ARG pythonver=3.9.1
 ARG alpinever=3.12
 
 FROM python:${pythonver}-alpine${alpinever} AS aura-base

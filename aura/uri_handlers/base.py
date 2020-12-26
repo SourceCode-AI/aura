@@ -426,7 +426,7 @@ class ScanLocation(KeepRefs):
             dest = self.location
 
         if os.path.exists(dest):
-            logger.info(f"cleaning up {dest}")
+            logger.debug(f"cleaning up {dest}")
             shutil.rmtree(dest)
 
         if dest in CLEANUP_LOCATIONS:
@@ -448,7 +448,7 @@ def cleanup_locations():
             location.do_cleanup()
 
         elif location.exists():
-            logger.info(f"Cleaning up {location}")
+            logger.debug(f"Cleaning up {location}")
             shutil.rmtree(location)
 
 
