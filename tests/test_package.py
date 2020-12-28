@@ -36,6 +36,23 @@ def test_package_listing():
 
 
 @responses.activate
+def test_package_info(mock_pypi_rest_api):
+    mock_pypi_rest_api(responses)
+    pkg = package.PypiPackage.from_pypi("wheel")
+
+    repo_url = "https://github.com/pypa/wheel"
+
+    assert pkg.homepage_url == repo_url
+    assert pkg.source_url == repo_url
+    assert pkg.documentation_url == "https://wheel.readthedocs.io/"
+
+    deps = list(pkg.get_dependencies())
+    dep_names = [x.name for x in deps]
+    assert "pytest" in dep_names
+    assert "pytest-cov" in dep_names
+
+
+@responses.activate
 def test_package_retrieval(mock_pypi_rest_api):
     mock_pypi_rest_api(responses)
     pkg = package.PypiPackage.from_pypi("wheel")

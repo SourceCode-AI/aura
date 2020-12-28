@@ -24,24 +24,23 @@ Project goals:
 * allow researches to scan code repositories on a large scale, create datasets and perform analysis to further advance research in the area of vulnerable and malicious code dependencies
 
 
-Why Aura?
----------
+Feature list:
 
-While there are other tools with functionality that overlaps with Aura such as Bandit, dlint, semgrep etc. the focus of these alternatives is different which impacts the functionality and how they are being used. These alternatives are mainly intended to be used in a similar way to linters, integrated into IDEs, frequently run during the development which makes it important to **minimize false positives** and reporting with clear **actionable** explanations in ideal cases.
+- Suitable for analyzing malware with a guarantee of a zero-code execution
+- Advanced deobfuscation mechanisms by rewriting the AST tree - constant propagations, code unrolling, and other dirty tricks
+- Recursive scanning automatically unpacks archives such as zips, wheels, etc.. and scans the content
+- Support scanning also non-python files - plugins can work in a “raw-file” mode such as the built-in Yara integration
+- Scan for hardcoded secrets, passwords, and other sensitive information
+- Custom diff engine - you can compare changes between different data sources such as typosquatting PyPI packages to what changes were made
+- Works for both Python 2.x and Python 3.x source code
+- High performance, designed to scan the whole PyPI repository
+- Output in numerous formats such as pretty plain text, JSON, SQLite, SARIF, etc…
+- Tested on over 4TB of compressed python source code
+- Aura is able to report on code behavior such as network communication, file access, or system command execution
+- Compute the “Aura score” telling you how trustworthy the source code/input data is
+- and much much more…
 
-Aura on the other hand reports on ** behavior of the code**, **anomalies**, and **vulnerabilities** with as much information as possible at the cost of false positive. There are a lot of things reported by aura that are not necessarily actionable by a user but they tell you a lot about the behavior of the code such as doing network communication, accessing sensitive files, or using mechanisms associated with obfuscation indicating a possible malicious code. By collecting this kind of data and aggregating it together, Aura can be compared in functionality to other security systems such as antivirus, IDS, or firewalls that are essentially doing the same analysis but on a different kind of data (network communication, running processes, etc).
-
-Here is a quick overview of differences between Aura and other similar linters and SAST tools:
-
-- **input data**:
-    - **Other SAST tools** - usually restricted to only python (target) source code and python version under which the tool is installed.
-    - **Aura** can analyze both binary (or non-python code) and python source code as well. Able to analyze a mixture of python code compatible with different python versions (py2k & py3k) using **the same Aura installation**.
-- **reporting**:
-    - **Other SAST tools** - Aims at integrating well with other systems such as IDEs, CI systems with actionable results while trying to minimize false positives to prevent overwhelming users with too many non-significant alerts.
-    - **Aura** - reports as much information as possible that is not immediately actionable such as behavioral and anomaly analysis. The output format is designed for easy machine processing and aggregation rather than human readable.
-- **configuration**:
-    - **Other SAST tools** - The tools are fine-tuned to the target project by customizing the signatures to target specific technologies used by the target project. The overriding configuration is often possible by inserting comments inside the source code such as ``# nosec`` that will suppress the alert at that position
-    - **Aura** - it is expected that there is little to no knowledge in advance about the technologies used by code that is being scanned such as auditing a new python package for approval to be used as a dependency in a project. In most cases, it is not even possible to modify the scanned source code such as using comments to indicate to linter or aura to skip detection at that location because it is scanning a copy of that code that is hosted at some remote location.
+Didn't find what you are looking for? Aura's architecture is based on a robust plugin system, where you can customize almost anything, ranging from a set of data analyzers, transport protocols to custom out formats.
 
 
 Installation
@@ -89,6 +88,26 @@ Find most popular typosquatted packages (you need to call ``aura update`` to dow
    :target: https://cdn.sourcecode.ai/pypi_datasets/index/datasets.html
    :align: center
    :width: 256
+
+
+Why Aura?
+---------
+
+While there are other tools with functionality that overlaps with Aura such as Bandit, dlint, semgrep etc. the focus of these alternatives is different which impacts the functionality and how they are being used. These alternatives are mainly intended to be used in a similar way to linters, integrated into IDEs, frequently run during the development which makes it important to **minimize false positives** and reporting with clear **actionable** explanations in ideal cases.
+
+Aura on the other hand reports on ** behavior of the code**, **anomalies**, and **vulnerabilities** with as much information as possible at the cost of false positive. There are a lot of things reported by aura that are not necessarily actionable by a user but they tell you a lot about the behavior of the code such as doing network communication, accessing sensitive files, or using mechanisms associated with obfuscation indicating a possible malicious code. By collecting this kind of data and aggregating it together, Aura can be compared in functionality to other security systems such as antivirus, IDS, or firewalls that are essentially doing the same analysis but on a different kind of data (network communication, running processes, etc).
+
+Here is a quick overview of differences between Aura and other similar linters and SAST tools:
+
+- **input data**:
+    - **Other SAST tools** - usually restricted to only python (target) source code and python version under which the tool is installed.
+    - **Aura** can analyze both binary (or non-python code) and python source code as well. Able to analyze a mixture of python code compatible with different python versions (py2k & py3k) using **the same Aura installation**.
+- **reporting**:
+    - **Other SAST tools** - Aims at integrating well with other systems such as IDEs, CI systems with actionable results while trying to minimize false positives to prevent overwhelming users with too many non-significant alerts.
+    - **Aura** - reports as much information as possible that is not immediately actionable such as behavioral and anomaly analysis. The output format is designed for easy machine processing and aggregation rather than human readable.
+- **configuration**:
+    - **Other SAST tools** - The tools are fine-tuned to the target project by customizing the signatures to target specific technologies used by the target project. The overriding configuration is often possible by inserting comments inside the source code such as ``# nosec`` that will suppress the alert at that position
+    - **Aura** - it is expected that there is little to no knowledge in advance about the technologies used by code that is being scanned such as auditing a new python package for approval to be used as a dependency in a project. In most cases, it is not even possible to modify the scanned source code such as using comments to indicate to linter or aura to skip detection at that location because it is scanning a copy of that code that is hosted at some remote location.
 
 
 Authors & Contributors

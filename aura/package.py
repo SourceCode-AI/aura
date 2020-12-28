@@ -86,6 +86,24 @@ class PypiPackage:
     def __getitem__(self, item):
         return self.info[item]
 
+    @property
+    def source_url(self) -> Optional[str]:
+        if src := self.info["info"]["project_urls"].get("Source"):
+            return src
+
+        if src := self.homepage_url:
+            parsed_src = urlparse(src)
+            if parsed_src.netloc == "github.com":
+                return src
+
+    @property
+    def homepage_url(self) -> Optional[str]:
+        return self.info["info"].get("home_page")
+
+    @property
+    def documentation_url(self) -> Optional[str]:
+        return self.info["info"]["project_urls"].get("Documentation")
+
     def get_latest_release(self) -> str:
         return self.info["info"]["version"]
 
@@ -334,7 +352,7 @@ class PackageScore:
             self.__load_github()
 
     def __load_github(self):
-        self.repo_url = self.pkg.info["info"].get("project_urls", {}).get("Source")
+        self.repo_url = self.pkg.source_url
         if self.repo_url is None:
             return
 
@@ -430,15 +448,15 @@ class PackageScore:
         return self.Value(releases, normalized, "Multiple releases", f"{releases} (+{normalized})")
 
     def has_source_repository(self) -> Value:
-        source = 1 if self.pkg["info"]["project_urls"].get("Source") else 0
+        source = 1 if self.pkg.source_url else 0
         return self.Value(source, source, "Has source repository", f"+{source}")
 
     def has_documentation(self) -> Value:
-        doc = 1 if self.pkg["info"]["project_urls"].get("Documentation") else 0
+        doc = 1 if self.pkg.documentation_url else 0
         return self.Value(doc, doc, "Has documentation", f"+{doc}")
 
     def has_homepage(self) -> Value:
-        homepage = 1 if self.pkg["info"]["project_urls"].get("Homepage") else 0
+        homepage = 1 if self.pkg.homepage_url else 0
         return self.Value(homepage, homepage, "Has homepage", f"+{homepage}")
 
     def has_wheel(self) -> Value:

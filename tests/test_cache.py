@@ -10,6 +10,14 @@ from aura import exceptions
 
 
 
+@pytest.mark.parametrize("url,cache_id", (
+        ("https://google.com/", "f82438a9862a39d642f39887b3e8e5b4"),
+))
+def test_url_cache_ids(url, cache_id):
+    computed = cache.URLCache.cache_id(url=url)
+    assert computed == cache_id
+
+
 @mock.patch("aura.cache.Cache.get_location")
 def test_cache_mock_location(cache_mock, tmp_path):
     cache_mock.return_value = tmp_path
@@ -18,7 +26,7 @@ def test_cache_mock_location(cache_mock, tmp_path):
 
 @mock.patch("aura.cache.Cache.get_location")
 @pytest.mark.parametrize("filename,content,cache_id,call", (
-        ("testjson_file", "json_content", "mirrorjson_testjson_file", cache.Cache.proxy_mirror_json),
+        ("testjson_file", "json_content", "mirrorjson_testjson_file", cache.MirrorJSON.proxy),
         ("testpkg_file", "pkg_content", "mirror_testpkg_file", cache.Cache.proxy_mirror)
 ))
 def test_proxy_mirror_json(cache_mock, tmp_path, filename, content, cache_id, call):
@@ -55,6 +63,7 @@ def test_proxy_mirror_json(cache_mock, tmp_path, filename, content, cache_id, ca
 
 
 @mock.patch("aura.cache.Cache.get_location")
+@pytest.mark.e2e
 def test_mirror_cache(cache_mock, fixtures, simulate_mirror, tmp_path):
     cache_content = list(tmp_path.iterdir())
     assert len(cache_content) == 0

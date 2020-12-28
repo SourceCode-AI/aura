@@ -68,7 +68,7 @@ diff = ["GitPython"]
 [tool.poetry.dev-dependencies]
 responses = "^0.12"
 tox = "~3.20"
-pytest = "~6.0"
+pytest = "~6.2"
 pytest-cov = "~2.10"
 pytest-randomly = "~3.4"
 sphinx = "~3.2"
