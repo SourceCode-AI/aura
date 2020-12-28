@@ -51,6 +51,7 @@ html_theme_options = {
     "github_user": "SourceCode-AI",
     "github_repo": "aura",
     "github_banner": True,
+    "github_type": "star",
     "show_powered_by": False
 }
 

@@ -3,13 +3,12 @@
 
 ======
 
-.. image:: https://img.shields.io/badge/Homepage-WIP-blue
-.. image:: https://img.shields.io/badge/-Documentation-blue
-   :target: https://docs.aura.sourcecode.ai/
-.. image:: https://img.shields.io/badge/docker-SourceCodeAI/aura-blue
-   :target: https://hub.docker.com/r/sourcecodeai/aura
-.. image:: https://img.shields.io/github/license/SourceCode-AI/aura?color=blue
-.. image:: https://travis-ci.com/SourceCode-AI/aura.svg?branch=dev
+.. class:: center
+
+    |homepage_flair| |docs_flair| |docker_flair|
+    |license_flair| |travis_flair|
+
+
 
 
 Security auditing and static code analysis
@@ -84,10 +83,12 @@ Find most popular typosquatted packages (you need to call ``aura update`` to dow
 .. image:: https://asciinema.org/a/367999.svg
    :target: https://asciinema.org/a/367999
 
+----
 
 .. image:: files/imgs/download_dataset.png
    :target: https://cdn.sourcecode.ai/pypi_datasets/index/datasets.html
    :align: center
+   :width: 256
 
 
 Authors & Contributors
@@ -114,3 +115,20 @@ Use the following citation when using Aura or data produced by Aura in research:
     SUPERVISOR = "Vit Bukac",
     URL = "Available at WWW <https://is.muni.cz/th/y41ft/>",
     }
+
+
+.. |homepage_flair| image:: https://img.shields.io/badge/Homepage-aura.sourcecode.ai-blue
+   :target: https://aura.sourcecode.ai/
+   :align: middle
+
+.. |docs_flair| image:: https://img.shields.io/badge/-Documentation-blue
+   :target: https://docs.aura.sourcecode.ai/
+   :align: middle
+
+.. |docker_flair| image:: https://img.shields.io/badge/docker-SourceCodeAI/aura-blue
+   :target: https://hub.docker.com/r/sourcecodeai/aura
+   :align: middle
+
+.. |license_flair| image:: https://img.shields.io/github/license/SourceCode-AI/aura?color=blue
+
+.. |travis_flair| image:: https://travis-ci.com/SourceCode-AI/aura.svg?branch=dev
