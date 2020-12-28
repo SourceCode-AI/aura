@@ -15,7 +15,7 @@ from .analyzers.python.readonly import ReadOnlyAnalyzer
 PLUGIN_CACHE = {"analyzers": {}}
 
 
-def initialize_analyzer(analyzer: AnalyzerType, name: Optional[str]) -> AnalyzerType:
+def initialize_analyzer(analyzer: AnalyzerType, name: Optional[str]=None) -> AnalyzerType:
     """
     Initialize the analyzer (if needed)
     If analyzer is a subclass of ``NodeAnalyzerV2``, create an instance of it and add it to read only hooks
@@ -29,7 +29,7 @@ def initialize_analyzer(analyzer: AnalyzerType, name: Optional[str]) -> Analyzer
     elif callable(analyzer):
         pass
     else:
-        raise ValueError(f"Could not initialize the '{name or analyzer}' analyzer")
+        raise TypeError(f"Could not initialize the '{name or analyzer}' analyzer")
 
     if name:
         setattr(analyzer, "analyzer_id", name)

@@ -41,6 +41,9 @@ def test_package_retrieval(mock_pypi_rest_api):
     pkg = package.PypiPackage.from_pypi("wheel")
     url = "https://files.pythonhosted.org/packages/8c/23/848298cccf8e40f5bbb59009b32848a4c38f4e7f3364297ab3c3e2e2cd14/wheel-0.34.2-py2.py3-none-any.whl"
 
+    assert pkg.name == "wheel"
+    assert pkg.source == "pypi"  # TODO: add tests for other package options
+
     with pkg.url2local(url) as location:
         assert location.is_file()
         file_name = url.split("/")[-1]

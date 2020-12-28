@@ -42,11 +42,7 @@ class PypiPackage:
         self.name: str = name
         self.info: dict = info
         self.source: Optional[str] = source
-        self.release: str = "all"
-        self.packagetype: Optional[str] = None
-        self.filename: Optional[str] = None
-        self.md5: Optional[str] = None
-        self.opts: dict = opts or {}
+        self.opts: dict = opts or {}  # TODO: check if this attribute is used anywhere
         # normalize missing data
         self.info["info"].setdefault("project_urls", {})
         if self.info["info"]["project_urls"] is None:
@@ -103,7 +99,7 @@ class PypiPackage:
         self,
         dest,
         all=True,
-        **filters
+        **filters  # TODO: add tests for the filters
     ):
         dest = Path(dest)
         files = []
@@ -280,6 +276,7 @@ class PypiPackage:
             if temp_dir.exists():
                 shutil.rmtree(temp_dir)
             raise
+
 
 class PackageScore:
     @dataclasses.dataclass

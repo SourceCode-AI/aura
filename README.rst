@@ -84,6 +84,12 @@ Find most popular typosquatted packages (you need to call ``aura update`` to dow
 .. image:: https://asciinema.org/a/367999.svg
    :target: https://asciinema.org/a/367999
 
+
+.. image:: files/imgs/download_dataset.png
+   :target: https://cdn.sourcecode.ai/pypi_datasets/index/datasets.html
+   :align: center
+
+
 Authors & Contributors
 ======================
 
