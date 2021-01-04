@@ -1,4 +1,5 @@
 .. image:: files/logo/logotype.png
+   :target: https://aura.sourcecode.ai/
 
 
 ======
@@ -7,7 +8,6 @@
 
     |homepage_flair| |docs_flair| |docker_flair|
     |license_flair| |travis_flair|
-
 
 
 
@@ -115,6 +115,17 @@ Authors & Contributors
 
 * **Martin Carnogursky** - *Initial work and project lead* - https://is.muni.cz/person/410345
 * **Mirza Zulfan** - *Logo Design* - https://github.com/mirzazulfan
+
+
+Donate
+======
+
+* GitHub Sponsors: https://github.com/sponsors/RootLUG
+* Liberapay: https://liberapay.com/SourceCode.AI
+* BuyMeACoffee: https://www.buymeacoffee.com/SourceCodeAI
+* BTC: 3FVTaLsLwTDinmDjPh3BjS1qv3bYHbkcYc
+* XMR: 46xvWZGCexo1NbvjLMMpLB1GhRd819AQr8eFPJT1q6kKMuuDy43JLiESh9XUM3asjk4SVUYqGakFVQZRY1adx8cS6ka4EXr
+* ETH/ERC20: 0x708F1A08E3ee4922f037673E720c405518C0Ec85
 
 
 LICENSE

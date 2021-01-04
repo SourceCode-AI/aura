@@ -1,6 +1,7 @@
 import json
 import uuid
 from unittest import mock
+from pathlib import Path
 
 import pytest
 
@@ -8,6 +9,19 @@ from aura import cache
 from aura import mirror
 from aura import exceptions
 
+
+CACHE_ENTRIES = {
+    "mirror/wheel-0.33.0-py2.py3-none-any.whl": {"type": "mirrorfile"}
+}
+
+
+def create_cache_entry(arg: str, metadata: dict, fixtures) -> cache.Cache:
+    if metadata["type"] == "mirrorfile":
+        c = cache.MirrorFile(src=Path(fixtures.path(arg)), tags=metadata.get("tags"))
+        c.fetch()
+        assert c.is_valid
+        assert c.metadata_location.exists()
+        return c
 
 
 @pytest.mark.parametrize("url,cache_id", (
@@ -27,7 +41,7 @@ def test_cache_mock_location(cache_mock, tmp_path):
 @mock.patch("aura.cache.Cache.get_location")
 @pytest.mark.parametrize("filename,content,cache_id,call", (
         ("testjson_file", "json_content", "mirrorjson_testjson_file", cache.MirrorJSON.proxy),
-        ("testpkg_file", "pkg_content", "mirror_testpkg_file", cache.Cache.proxy_mirror)
+        ("testpkg_file", "pkg_content", "mirror_testpkg_file", cache.MirrorFile.proxy)
 ))
 def test_proxy_mirror_json(cache_mock, tmp_path, filename, content, cache_id, call):
     f = tmp_path / filename
@@ -47,7 +61,7 @@ def test_proxy_mirror_json(cache_mock, tmp_path, filename, content, cache_id, ca
     out = call(src=f)
     assert out != f
     assert out == cache_file
-    assert len(list(cache_path.iterdir())) == 1
+    assert len(list(x for x in cache_path.iterdir() if not x.name.endswith(".metadata.json"))) == 1
     assert out.read_text() == content
 
     # Make sure the cache does not attempt to do any kind of file access if the cache entry exists
@@ -107,3 +121,23 @@ def test_mirror_cache_no_remote_access(mirror_mock, cache_mock, fixtures, tmp_pa
     (cache_path/f"mirrorjson_{pkg}").write_text(json.dumps(pkg_content))
     out = m.get_json(pkg)
     assert out == pkg_content
+
+
+@mock.patch("aura.cache.get_cache_threshold")
+@mock.patch("aura.cache.Cache.get_location")
+@pytest.mark.parametrize("threshold", (0, 10))
+def test_cache_purge(cache_location, tmock, threshold, tmp_path, fixtures):
+    cache_path = tmp_path / "cache"
+    cache_location.return_value = cache_path
+    tmock.return_value = threshold
+
+    assert cache.Cache.get_location() == cache_path
+    cache_path.mkdir()
+
+    for k, v in CACHE_ENTRIES.items():
+        create_cache_entry(k, v, fixtures=fixtures)
+
+    items = list(cache.CacheItem.analyze())
+    cache.CacheItem.cleanup(items=items)
+    total = sum(x.size for x in items if not x._deleted)
+    assert total <= threshold

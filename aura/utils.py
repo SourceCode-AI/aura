@@ -1,4 +1,5 @@
 import os
+import re
 import codecs
 import hashlib
 import shutil
@@ -20,6 +21,9 @@ from . import config
 
 logger = config.get_logger(__name__)
 T = TypeVar("T")
+
+SIZE_UNITS = ["kb", "mb", "gb", "tb", "pb"]
+
 
 
 class KeepRefs(Generic[T]):
@@ -275,6 +279,34 @@ def jaccard(a: set, b: set) -> float:
         return 0.0
 
     return float(len(a & b)) / divisor
+
+
+def convert_size(desc: Union[str, int]) -> int:
+    if type(desc) == int:
+        return desc
+
+    parsed = re.match(r"^(\d+)([kmgtp]b?)?$", desc, flags=re.I)
+    g = parsed.groups()
+
+    if len(g) < 1 or len(g) > 2:
+        raise ValueError(f"Could not parse the string '{desc}'")
+
+    amount: str = g[0]
+    if not amount.isdigit():
+        raise ValueError(f"'{amount}' is not a valid number")
+
+    amount: int = int(amount)
+
+    if len(g) == 2 and g[1] is not None:
+        unit = g[1].lower()
+        if not unit.endswith("b"):
+            unit += "b"
+
+        pos = SIZE_UNITS.index(unit) + 1
+    else:
+        pos = 0
+
+    return amount * (1024**pos)
 
 
 class Analyzer:

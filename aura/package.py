@@ -129,7 +129,7 @@ class PypiPackage:
 
         for url in filtered:
             with open(dest / url["filename"], "wb") as fd:
-                cache.Cache.proxy_url(url=url["url"], fd=fd, cache_id=url["filename"])
+                cache.URLCache.proxy(url=url["url"], fd=fd, cache_id=url["filename"])
             files.append(url)
 
         return files
@@ -271,7 +271,7 @@ class PypiPackage:
                 pkg_path /= pkg["filename"]
 
                 with pkg_path.open("wb") as fd:
-                    cache.Cache.proxy_url(url=pkg["url"], fd=fd)
+                    cache.URLCache.proxy(url=pkg["url"], fd=fd)
 
                 location_cache[pkg["url"]] = ScanLocation(
                     location=pkg_path,

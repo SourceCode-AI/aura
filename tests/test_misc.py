@@ -2,6 +2,10 @@ import os
 import codecs
 import uuid
 
+import pytest
+
+from aura import utils
+
 
 def test_misc_signatures(fixtures):
     matches = [
@@ -195,3 +199,14 @@ def test_base64_payload_finder(tmp_path, fixtures):
     }
 
     fixtures.scan_and_match(str(fname), matches=[match])
+
+
+@pytest.mark.parametrize("size,expected", (
+        ("1", 1),
+        ("42", 42),
+        ("1GB", 1024**3),
+        ("1G", 1024**3)
+))
+def test_size_conversion(size: str, expected: int):
+    output = utils.convert_size(size)
+    assert output == expected

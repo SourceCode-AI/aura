@@ -1,22 +1,85 @@
+from __future__ import annotations
+
 import os
 import shutil
 import hashlib
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Generator, Iterable
+
+import click
 
 from . import utils
 from . import config
+from .json_proxy import loads, dumps
+
 
 logger = config.get_logger(__name__)
 
 
+class CacheItem:
+    def __init__(self, path: Path):
+        self.path = path
+        self.metadata = loads(path.read_text())
+
+        self.cls = CACHE_TYPES[self.metadata["type"]]
+        self.item_path = path.parent / f"{self.cls.prefix}{self.metadata['id']}"
+        self.item_stat = self.item_path.stat()
+        # Used to avoid re-listing the cache content to find deleted items
+        # Used for example in tests to assert which cache items were deleted
+        self._deleted = False
+
+    @classmethod
+    def iter_items(cls) -> Generator[CacheItem, None, None]:
+        for x in Cache.get_location().iterdir():
+            if not x.name.endswith(".metadata.json"):
+                continue
+
+            yield cls(x)
+
+    @property
+    def mtime(self):
+        return self.item_stat.st_mtime
+
+    @property
+    def size(self):
+        return self.item_stat.st_size
+
+    def delete(self):
+        self.item_path.unlink(missing_ok=True)
+        self.path.unlink(missing_ok=True)
+        self._deleted = True
+
+    @classmethod
+    def analyze(cls) -> Generator[CacheItem, None, None]:
+        items = list(cls.iter_items())
+        items.sort(key=lambda x: -x.size)
+        yield from items
+
+    @classmethod
+    def cleanup(cls, items: Optional[Iterable[CacheItem]]=None):
+        total, used, free = shutil.disk_usage(Cache.get_location())
+        remaining = used
+        threshold = get_cache_threshold()
+
+        if items is None:
+            items = cls.analyze()
+
+        for x in items:  # type: CacheItem
+            if remaining < threshold:
+                break
+
+            remaining -= x.size
+            x.delete()
+
+
 class Cache(ABC):
+    prefix = ""
     DISABLE_CACHE = bool(os.environ.get("AURA_NO_CACHE"))
     __location: Optional[Path] = None
 
     @abstractmethod
-    def __init__(self, cache_id):
+    def __init__(self, *args, **kwargs):
         ...
 
     @classmethod
@@ -31,7 +94,11 @@ class Cache(ABC):
 
     @property
     def cache_file_location(self) -> Path:
-        return self.get_location() / self.cid
+        return self.get_location() / f"{self.prefix}{self.cid}"
+
+    @property
+    def metadata_location(self) -> Path:
+        return self.get_location() / f"{self.prefix}{self.cid}.metadata.json"
 
     @property
     def is_valid(self) -> bool:
@@ -58,47 +125,20 @@ class Cache(ABC):
         return cls.__location
 
     @classmethod
-    def purge_cache(cls):  # TODO
-        total, used, free = shutil.disk_usage(cls.get_location())
-        cache_items = [x for x in cls.get_location().iterdir()]
-        cache_items.sort(key=lambda x: x.stat().st_mtime)
-
-    @classmethod
     def proxy_url(cls, *, url, fd, cache_id=None):
         return URLCache.proxy(url=url, fd=fd, cache_id=cache_id)
-
-    @classmethod
-    def proxy_mirror(cls, *, src: Path, cache_id=None):
-        if cls.get_location() is None:  # Caching is disabled
-            return src
-
-        if cache_id is None:
-            cache_id = src.name
-
-        cache_id = f"mirror_{cache_id}"
-        cache_pth: Path = cls.get_location() / cache_id
-
-        if cache_pth.exists():
-            logger.debug(f"Retrieving mirror file path {cache_id} from cache")
-            return cache_pth
-
-        if not src.exists():
-            return src
-
-        try:
-            shutil.copyfile(src, cache_pth, follow_symlinks=True)
-            return cache_pth
-        except Exception as exc:
-            cache_pth.unlink(missing_ok=True)
-            raise exc
 
     def delete(self):
         self.cache_file_location.unlink(missing_ok=True)
 
 
 class URLCache(Cache):
-    def __init__(self, cache_id):
-        self.cid = f"url_{cache_id}"
+    prefix = "url_"
+
+    def __init__(self, url: str, cache_id=None, tags: Optional[List[str]]=None):
+        self.url = url
+        self.tags = tags or []
+        self.cid = cache_id or self.cache_id(url=url)
 
     @classmethod
     def cache_id(cls, url: [str, bytes]) -> str:
@@ -110,67 +150,78 @@ class URLCache(Cache):
         return hashlib.md5(burl).hexdigest()
 
     @classmethod
-    def proxy(cls, *, url, fd, group=None, cache_id=None):
+    def proxy(cls, *, url, fd=None, group=None, cache_id=None, tags=None):
         if cls.get_location() is None:
+            if fd is None:
+                logger.warning("FD is set to None but cache is disabled, URL caching has zero effect")
+                return
+
             return utils.download_file(url, fd=fd)
 
-        metadata = {
-            "url": url,
-            "group": group,
-            "type": "url"
-        }
-
-        if cache_id is None:
-            cache_id = cls.cache_id(url=url)
-
-        cache_obj = cls(cache_id)
+        cache_obj = cls(url=url, cache_id=cache_id, tags=tags)
 
         if cache_obj.is_valid:
             logger.info(f"Loading {cache_obj.cid} from cache")
-            cache_obj.fetch(fd)
+            if fd:
+                cache_obj.fetch(fd)
             return
 
         try:
-            cache_obj.download(url)
-            cache_obj.fetch(fd)
+            cache_obj.download()
+            if fd:
+                cache_obj.fetch(fd)
         except Exception as exc:
             cache_obj.delete()
             raise exc
+
+    @property
+    def metadata(self) -> dict:
+        return {
+            "url": self.url,
+            "id": self.cid,
+            "tags": self.tags,
+            "type": self.url
+        }
 
     def fetch(self, fd):
         with self.cache_file_location.open("rb") as cfd:
             shutil.copyfileobj(cfd, fd)
             fd.flush()
 
-    def download(self, url):
+        self.metadata_location.write_text(dumps(self.metadata))
+
+    def download(self):
         with self.cache_file_location.open("wb") as cfd:
-            utils.download_file(url, cfd)
+            utils.download_file(self.url, cfd)
             cfd.flush()
 
 
 class MirrorJSON(Cache):
-    def __init__(self, cache_id):
-        self.cid = f"mirrorjson_{cache_id}"
+    prefix = "mirrorjson_"
+
+    def __init__(self, src: Path, cache_id=None, tags: Optional[List[str]]=None):
+        self.src = src
+        self.tags = tags or []
+        self.cid = cache_id or self.cache_id(src)
 
     @classmethod
     def cache_id(cls, src: Path) -> str:
         return src.name
 
-    def fetch(self, src: Path):
-        shutil.copyfile(src=src, dst=self.cache_file_location, follow_symlinks=True)
-
     @classmethod
-    def proxy(cls, *, src: Path):
+    def proxy(cls, *, src: Path) -> Path:
         if cls.get_location() is None:  # Caching is disabled
             return src
 
-        cache_id = MirrorJSON.cache_id(src=src)
-        cache_obj = MirrorJSON(cache_id)
+        cache_obj = MirrorJSON(src=src)
 
         if cache_obj.is_valid:
             logger.debug(f"Retrieving package mirror JSON {cache_obj.cid} from cache")
             return cache_obj.cache_file_location
 
+        # If the mirror is a mounted network drive (common configuration), this would trigger a network traffic/calls
+        # We want to prevent any network traffic for performance reasons if possible,
+        # so we check if the path exists AFTER we check for the cache entry, e.g. `cache_obj.is_valid`
         if not src.exists():
             return src
 
@@ -180,3 +231,88 @@ class MirrorJSON(Cache):
         except Exception as exc:
             cache_obj.delete()
             raise exc
+
+    @property
+    def metadata(self) -> dict:
+        return {
+            "src": str(self.src),
+            "id": self.cid,
+            "tags": self.tags,
+            "type": "mirrorjson"
+        }
+
+    def fetch(self, src: Path):
+        shutil.copyfile(src=src, dst=self.cache_file_location, follow_symlinks=True)
+        self.metadata_location.write_text(dumps(self.metadata))
+
+
+
+class MirrorFile(Cache):
+    prefix = "mirror_"
+
+    def __init__(self, src: Path, cache_id=None, tags: Optional[List[str]]=None):
+        self.src = src
+        self.tags = tags or []
+        self.cid = cache_id or self.cache_id(src)
+
+    @classmethod
+    def cache_id(cls, arg: Path) -> str:
+        return arg.name
+
+    @classmethod
+    def proxy(cls, *, src: Path, cache_id=None, tags=None) -> Path:
+        if cls.get_location() is None:  # Caching is disabled
+            return src
+
+        cache_obj = cls(src=src, cache_id=cache_id, tags=tags)
+
+        if cache_obj.is_valid:
+            logger.debug(f"Retrieving mirror file path {cache_obj.cid} from cache")
+            return cache_obj.cache_file_location
+
+        if not src.exists():
+            return src
+
+        try:
+            cache_obj.fetch()
+            return cache_obj.cache_file_location
+        except Exception as exc:
+            cache_obj.delete()
+            raise exc
+
+    @property
+    def metadata(self) -> dict:
+        return {
+            "src": self.src,
+            "id": self.cid,
+            "tags": self.tags,
+            "type": "mirrorfile"
+        }
+
+    def fetch(self):
+        shutil.copyfile(src=self.src, dst=self.cache_file_location, follow_symlinks=True)
+        self.metadata_location.write_text(dumps(self.metadata))
+
+
+CACHE_TYPES = {
+    "url": URLCache,
+    "mirrorfile": MirrorFile,
+    "mirrorjson": MirrorJSON
+}
+
+
+def get_cache_threshold() -> int:
+    desc = config.CFG.get("cache", {}).get("max-size", 0)
+    return utils.convert_size(desc)
+
+
+def purge(standard: bool=False):
+    mode = config.CFG.get("cache", {}).get("mode", "ask")
+    if mode not in ("ask", "auto", "always"):
+        raise ValueError(f"Cache mode has invalid value in the configuration: '{mode}'")
+
+    if mode == "ask" and standard:
+        if click.confirm("Would you like to purge the cache?"):
+            CacheItem.cleanup()
+    elif (mode == "auto" and standard) or mode == "always":
+        CacheItem.cleanup()
