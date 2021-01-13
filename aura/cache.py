@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import shutil
 import hashlib
+import datetime
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional, List, Generator, Iterable
@@ -38,12 +39,19 @@ class CacheItem:
             yield cls(x)
 
     @property
-    def mtime(self):
+    def mtime(self) -> int:
         return self.item_stat.st_mtime
 
     @property
-    def size(self):
+    def size(self) -> int:
         return self.item_stat.st_size
+
+    @property
+    def is_expired(self) -> bool:
+        now = datetime.datetime.utcnow()
+        modified = datetime.datetime.utcfromtimestamp(self.mtime)
+        exp_threshold = get_expiration()
+        return now > modified+exp_threshold
 
     def delete(self):
         self.item_path.unlink(missing_ok=True)
@@ -58,7 +66,11 @@ class CacheItem:
 
     @classmethod
     def cleanup(cls, items: Optional[Iterable[CacheItem]]=None):
-        total, used, free = shutil.disk_usage(Cache.get_location())
+        cache_loc = Cache.get_location()
+        if cache_loc is None:
+            return
+
+        total, used, free = shutil.disk_usage(cache_loc)
         remaining = used
         threshold = get_cache_threshold()
 
@@ -66,8 +78,10 @@ class CacheItem:
             items = cls.analyze()
 
         for x in items:  # type: CacheItem
-            if remaining < threshold:
-                break
+            if x.is_expired:
+                pass
+            elif remaining < threshold:
+                continue
 
             remaining -= x.size
             x.delete()
@@ -307,6 +321,9 @@ def get_cache_threshold() -> int:
 
 
 def purge(standard: bool=False):
+    if Cache.DISABLE_CACHE:
+        return
+
     mode = config.CFG.get("cache", {}).get("mode", "ask")
     if mode not in ("ask", "auto", "always"):
         raise ValueError(f"Cache mode has invalid value in the configuration: '{mode}'")
@@ -316,3 +333,9 @@ def purge(standard: bool=False):
             CacheItem.cleanup()
     elif (mode == "auto" and standard) or mode == "always":
         CacheItem.cleanup()
+
+
+def get_expiration(category: str="default") -> datetime.timedelta:
+    exp_section = config.CFG.get("cache", {}).get("expiration", {})
+    exp_hours = exp_section.get(category) or exp_section.get("default") or 0
+    return datetime.timedelta(hours=exp_hours)

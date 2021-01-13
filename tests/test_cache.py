@@ -1,3 +1,4 @@
+import os
 import json
 import uuid
 from unittest import mock
@@ -5,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from aura import config
 from aura import cache
 from aura import mirror
 from aura import exceptions
@@ -33,12 +35,6 @@ def test_url_cache_ids(url, cache_id):
 
 
 @mock.patch("aura.cache.Cache.get_location")
-def test_cache_mock_location(cache_mock, tmp_path):
-    cache_mock.return_value = tmp_path
-    assert cache.Cache.get_location() == tmp_path
-
-
-@mock.patch("aura.cache.Cache.get_location")
 @pytest.mark.parametrize("filename,content,cache_id,call", (
         ("testjson_file", "json_content", "mirrorjson_testjson_file", cache.MirrorJSON.proxy),
         ("testpkg_file", "pkg_content", "mirror_testpkg_file", cache.MirrorFile.proxy)
@@ -47,6 +43,7 @@ def test_proxy_mirror_json(cache_mock, tmp_path, filename, content, cache_id, ca
     f = tmp_path / filename
     cache_path = tmp_path / "cache"
     cache_path.mkdir()
+
     cache_file = cache_path/cache_id
     cache_mock.return_value = cache_path
 
@@ -76,28 +73,25 @@ def test_proxy_mirror_json(cache_mock, tmp_path, filename, content, cache_id, ca
     assert out == f
 
 
-@mock.patch("aura.cache.Cache.get_location")
 @pytest.mark.e2e
-def test_mirror_cache(cache_mock, fixtures, simulate_mirror, tmp_path):
-    cache_content = list(tmp_path.iterdir())
-    assert len(cache_content) == 0
-
-    cache_mock.return_value = tmp_path
-    assert cache.Cache.get_location() == tmp_path
+def test_mirror_cache( fixtures, simulate_mirror, mock_cache):
     out = fixtures.get_cli_output(['scan', '--download-only', 'mirror://wheel', '-f', 'json'])
 
     parsed_output = json.loads(out.stdout)
     assert len(parsed_output["detections"]) == 0
 
-    cache_content = list(x.name for x in tmp_path.iterdir())
+    cache_content = [
+        x.item_path.name
+        for x in cache.CacheItem.iter_items()
+    ]
+
     assert len(cache_content) > 0
     assert "mirror_wheel-0.34.2.tar.gz" in cache_content, cache_content
     assert "mirror_wheel-0.34.2-py2.py3-none-any.whl" in cache_content
 
 
-@mock.patch("aura.cache.Cache.get_location")
 @mock.patch("aura.mirror.LocalMirror.get_mirror_path")
-def test_mirror_cache_no_remote_access(mirror_mock, cache_mock, fixtures, tmp_path):
+def test_mirror_cache_no_remote_access(mirror_mock, tmp_path, mock_cache):
     """
     Test that if the content is fully cached, the mirror uri handler does not attempt to access the mirror but rather retrieves **all** content from cache only
     This is mainly to test correctness of prefetching the data for global PyPI scan to ensure no further network calls are made
@@ -105,13 +99,10 @@ def test_mirror_cache_no_remote_access(mirror_mock, cache_mock, fixtures, tmp_pa
     pkg = str(uuid.uuid4())
     pkg_content = {"id": pkg}
     mirror_path = tmp_path / "mirror"
-    cache_path = tmp_path / "cache"
-    cache_path.mkdir()
-    cache_mock.return_value = cache_path
     mirror_mock.return_value = mirror_path
     m = mirror.LocalMirror()
 
-    assert cache.Cache.get_location() == cache_path
+    cache_path = cache.Cache.get_location()
     assert m.get_mirror_path() == mirror_path
     assert mirror_path.exists() == False
 
@@ -124,15 +115,9 @@ def test_mirror_cache_no_remote_access(mirror_mock, cache_mock, fixtures, tmp_pa
 
 
 @mock.patch("aura.cache.get_cache_threshold")
-@mock.patch("aura.cache.Cache.get_location")
 @pytest.mark.parametrize("threshold", (0, 10))
-def test_cache_purge(cache_location, tmock, threshold, tmp_path, fixtures):
-    cache_path = tmp_path / "cache"
-    cache_location.return_value = cache_path
+def test_cache_purge(tmock, threshold, tmp_path, fixtures, mock_cache):
     tmock.return_value = threshold
-
-    assert cache.Cache.get_location() == cache_path
-    cache_path.mkdir()
 
     for k, v in CACHE_ENTRIES.items():
         create_cache_entry(k, v, fixtures=fixtures)
@@ -141,3 +126,43 @@ def test_cache_purge(cache_location, tmock, threshold, tmp_path, fixtures):
     cache.CacheItem.cleanup(items=items)
     total = sum(x.size for x in items if not x._deleted)
     assert total <= threshold
+
+
+@mock.patch("aura.cache.CacheItem.cleanup")
+@pytest.mark.parametrize("mode,confirm,standard,run_cleanup", (
+    ("ask", False, True, False),
+    ("ask", True, True, True),
+    ("ask", True, False, False),
+    ("ask", False, False, False),
+    ("auto", False, True, True),
+    ("auto", True, False, False),
+    ("always", False, True, True),
+    ("always", False, False, True)
+))
+def test_purge_modes(cleanup_mock, mode, confirm, standard, run_cleanup, confirm_prompt):
+    confirm_prompt.return_value = confirm
+
+    with mock.patch.dict(config.CFG["cache"], values={"mode": mode}, clear=True):
+        with mock.patch.object(cache.Cache, "DISABLE_CACHE", new=False):
+            cache.purge(standard=standard)
+
+    if run_cleanup:
+        cleanup_mock.assert_called_once()
+    else:
+        cleanup_mock.assert_not_called()
+
+
+@mock.patch("aura.cache.CacheItem.is_expired", new_callable=mock.PropertyMock)
+def test_always_delete_expired(exp_mock, mock_cache, fixtures):
+    exp_mock.return_value = True
+
+    for k, v in CACHE_ENTRIES.items():
+        create_cache_entry(k, v, fixtures=fixtures)
+
+    items = list(cache.CacheItem.analyze())
+
+    cache.CacheItem.cleanup(items=items)
+
+    for x in items:
+        assert x.is_expired is True
+        assert x._deleted is True

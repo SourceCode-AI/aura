@@ -8,7 +8,7 @@ import mmap
 import dataclasses
 from contextlib import contextmanager, ExitStack, nullcontext
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from functools import partial, lru_cache
 from typing import Generator, Union, List, TypeVar, Generic, Mapping, cast, BinaryIO
@@ -307,6 +307,12 @@ def convert_size(desc: Union[str, int]) -> int:
         pos = 0
 
     return amount * (1024**pos)
+
+
+def convert_time(desc: int) -> timedelta:
+    if type(desc) == int:
+        return timedelta(hours=desc)
+    # TODO: add parsing from strings similar to `convert_size`
 
 
 class Analyzer:

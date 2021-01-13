@@ -15,6 +15,7 @@ from prettyprinter import install_extras
 
 from . import commands
 from . import exceptions
+from .cache import purge
 from .uri_handlers.base import URIHandler
 
 from . import __version__
@@ -127,6 +128,8 @@ def scan(
         ps.print_stats(.1)
         print(s.getvalue())
 
+
+    purge(standard=False)
     sys.exit(0)
 
 
@@ -175,6 +178,7 @@ def diff(pth1, pth2, *, format=None, detections=True, patch=None, same_renames=N
         format_uri=format,
         output_opts=output_opts
     )
+    purge(standard=False)
 
 
 @cli.command(name="parse_ast")
@@ -211,11 +215,13 @@ def parse_ast(path, stages=None, format="text"):
 @cli.command(name="info")
 def info():
     commands.show_info()
+    purge(standard=True)
 
 
 @cli.command(name="update")
 def update_aura():
     from . import update
+    purge(standard=True)
     update.update_all()
 
 

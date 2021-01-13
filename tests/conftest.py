@@ -416,3 +416,23 @@ def random_text():
         return "".join([random.choice(string.printable+"\n ") for _ in range(length)])
 
     return _
+
+
+@pytest.fixture(scope="function", autouse=True)
+def confirm_prompt():
+    with mock.patch("click.confirm") as m:
+        m.return_value = True
+        yield m
+
+
+@pytest.fixture(scope="function")
+def mock_cache(tmp_path):
+    with mock.patch("aura.cache.Cache.get_location") as m:
+        from aura import cache
+
+        with mock.patch.object(cache.Cache, "DISABLE_CACHE", new=False):
+
+            c_path = tmp_path / "cache"
+            c_path.mkdir()
+            m.return_value = c_path
+            yield m

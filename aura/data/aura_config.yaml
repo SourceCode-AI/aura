@@ -205,6 +205,8 @@ cache: &cache
   # - "always": purge cache after every operation. This is same as "auto" + other non-standard operations including `aura scan`, `aura diff`
   mode: ask
   max-size: 1G
+  expiration:
+    default: 72  # 3 days
 
 
 interpreters: &interpreters
