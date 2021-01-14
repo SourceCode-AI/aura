@@ -41,6 +41,9 @@ ADD custom_analyzer.py \
 ADD aura /analyzer/aura
 ADD tests /analyzer/tests
 
+
+ENV AURA_NO_CACHE=true
+
 # Install Aura
 RUN source $HOME/.poetry/env && \
     poetry install --no-dev &&\
