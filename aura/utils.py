@@ -25,7 +25,6 @@ T = TypeVar("T")
 SIZE_UNITS = ["kb", "mb", "gb", "tb", "pb"]
 
 
-
 class KeepRefs(Generic[T]):
     """
     A class that would keep references to all created instances

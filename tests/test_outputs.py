@@ -13,12 +13,6 @@ from aura.exceptions import FeatureDisabled
 
 
 try:
-    import binwalk
-except ImportError:
-    binwalk = None
-
-
-try:
     import jsonschema
 except ImportError:
     jsonschema = None
@@ -210,7 +204,7 @@ def test_output_not_created_when_below_minimum_score(output_type, fixtures, tmp_
     )
 )
 @pytest.mark.e2e
-def test_output_path_formatting(skip_binwalk, scan_file, fixtures):
+def test_output_path_formatting(scan_file, fixtures):
     """
     Test that in the output, the paths have correct output formats:
     - Archives have $ denoting the path afterwards indicate the path in the archive
@@ -237,7 +231,7 @@ def test_output_path_formatting(skip_binwalk, scan_file, fixtures):
 
 
 @pytest.mark.e2e
-def test_diff_output_comprehensive(skip_binwalk, fixtures, fuzzy_rule_match):
+def test_diff_output_comprehensive(fixtures, fuzzy_rule_match):
     arch1 = fixtures.path("mirror/wheel-0.34.2-py2.py3-none-any.whl")
     arch2 = fixtures.path("mirror/wheel-0.33.0-py2.py3-none-any.whl")
 
@@ -323,9 +317,8 @@ def test_diff_output_comprehensive(skip_binwalk, fixtures, fuzzy_rule_match):
         assert any(fuzzy_rule_match(x, match) for x in diffs), (match, diffs)
 
 
-@pytest.mark.skipif(binwalk is None, reason="Binwalk module/analyzer is not installed")
 @pytest.mark.e2e
-def test_diff_json_output_e2e(skip_binwalk, fixtures, fuzzy_rule_match):
+def test_diff_json_output_e2e(fixtures, fuzzy_rule_match):
     pth1 = fixtures.path("diffs/1_a")
     pth2 = fixtures.path("diffs/1_b")
     try:
@@ -340,9 +333,8 @@ def test_diff_json_output_e2e(skip_binwalk, fixtures, fuzzy_rule_match):
         assert any(fuzzy_rule_match(x, match) for x in diffs), (match, diffs)
 
 
-@pytest.mark.skipif(binwalk is None, reason="Binwalk module/analyzer is not installed")
 @pytest.mark.e2e
-def test_diff_sqlite_output_e2e(skip_binwalk, fixtures, fuzzy_rule_match, tmp_path):
+def test_diff_sqlite_output_e2e(fixtures, fuzzy_rule_match, tmp_path):
     pth1 = fixtures.path("diffs/1_a")
     pth2 = fixtures.path("diffs/1_b")
     db_path = tmp_path / "aura_test_diff_output.sqlite"

@@ -135,6 +135,9 @@ A string was found in the source code (post-processed AST) that is a valid base6
 Binwalk
 ^^^^^^^
 
+.. warning::
+    Removed in Aura 2.1: https://github.com/SourceCode-AI/aura/issues/11
+
 Detection triggered by binwalk output run on the raw input data
 
 ::

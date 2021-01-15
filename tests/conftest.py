@@ -368,21 +368,6 @@ def mock_pypi_stats():
         yield m
 
 
-@pytest.fixture()
-def skip_binwalk():
-    from aura.exceptions import FeatureDisabled
-
-    try:
-        from aura.analyzers import binwalk_analyzer
-
-        m = mock.MagicMock()
-        m.return_value = False
-        binwalk_analyzer.can_process_location = m
-        yield m
-    except FeatureDisabled:
-        yield
-
-
 @pytest.fixture(scope="function", autouse=True)
 def reset_plugins():
     from aura.analyzers.python.readonly import ReadOnlyAnalyzer
