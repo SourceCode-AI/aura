@@ -109,6 +109,14 @@ tags: &tags
   #- "!test-code"
 
 
+diff: &diff
+  # Threshold after which files are considered to be similar/modified
+  similarity_threshold: 0.60
+  # Max depth of files to consider for pairing similar files
+  # Increasing this significantly impacts performance of fuzzy matching potentially similar files
+  depth_limit: 2
+
+
 severities: &severities
   critical:
     score: 100

@@ -383,7 +383,8 @@ class ScanLocation(KeepRefs):
             if d._severity is None:
                 d._severity = get_severity(d)
 
-    def is_renamed_file(self, other: ScanLocation, max_depth: int=2) -> float:
+    def is_renamed_file(self, other: ScanLocation, max_depth: Optional[int]=None) -> float:
+        max_depth = max_depth or get_diff_depth_limit()
         self_name = self.strip(self.str_location, include_parent=False).lstrip("/")
         other_name = other.strip(other.str_location, include_parent=False).lstrip("/")
         ratio = jaccard(self.lzset, other.lzset)
@@ -450,6 +451,10 @@ def cleanup_locations():
         elif location.exists():
             logger.debug(f"Cleaning up {location}")
             shutil.rmtree(location)
+
+
+def get_diff_depth_limit() -> int:
+    return config.CFG["diff"].get("depth_limit", 2)
 
 
 atexit.register(cleanup_locations)

@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from .exceptions import UnsupportedDiffLocation
 from .type_definitions import DiffType, DiffAnalyzerType
 
+from . import config
 from . import plugins
 from .output.table import Table
 
@@ -258,9 +259,9 @@ class FileMatcher:
             self,
             left_files: Iterable[ScanLocation],
             right_files: Iterable[ScanLocation],
+            threshold: Optional[float]=None
     ):
-        self.threshold = 0.60
-
+        self.threshold = threshold or self.get_similarity_threshold()
         self.left = set(left_files)
         self.right = set(right_files)
 
@@ -303,3 +304,7 @@ class FileMatcher:
         added = [x for x in self.right if x not in modified_locations]
 
         return {"added": added, "modified": modified, "removed": removed}
+
+    @classmethod
+    def get_similarity_threshold(cls) -> float:
+        return config.CFG["diff"].get("similarity_threshold", 0.60)
