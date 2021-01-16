@@ -279,14 +279,14 @@ def simulate_mirror(fixtures):
 
         for pkg, pkg_files in MIRROR_FILES.items():
             # copy the package JSON metadata
-            os.link(
+            os.symlink(
                 fixtures.path(f"mirror/{pkg}.json"),
                 json_path / pkg
             )
 
             for p in pkg_files:
                 os.makedirs(pmirror / p["path"])
-                os.link(
+                os.symlink(
                     fixtures.path(f"mirror/{p['name']}"),
                     os.fspath(pmirror / p["path"] / p["name"])
                 )

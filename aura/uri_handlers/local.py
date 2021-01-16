@@ -39,6 +39,9 @@ class LocalFileHandler(URIHandler):
     def get_diff_paths(self, other: URIHandler):
         if isinstance(other, LocalFileHandler):
             for loc1, loc2 in product(self.get_paths(), other.get_paths()):
+                loc1.metadata["report_imports"] = True
+                loc2.metadata["report_imports"] = True
+
                 if loc1.location.is_dir():
                     loc1.strip_path = str(loc1.location.absolute())
                 else:

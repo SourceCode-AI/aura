@@ -15,14 +15,18 @@ class ASTPatternMatcherVisitor(Visitor):
         super().__init__(location=location)
         self.convergence = None
         self._signatures = config.get_ast_patterns()
-        self._always_report = config.CFG["aura"].get("always_report_module_imports", True) or os.environ.get("AURA_ALL_MODULE_IMPORTS", False)
+        self._report_modules = (
+                config.CFG["aura"].get("always_report_module_imports", True) or
+                os.environ.get("AURA_ALL_MODULE_IMPORTS", False) or
+                self.location.metadata.get("report_imports")
+        )
 
     def _visit_node(self, context: Context):
         for signature in self._signatures:  # type: ASTPattern
             if signature.match(context.node):
                 signature.apply(context)
 
-        if self._always_report and type(context.node) == Import:
+        if self._report_modules and type(context.node) == Import:
             self.gen_module_import(context)
 
     def gen_module_import(self, context: Context):

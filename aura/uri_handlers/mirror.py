@@ -43,7 +43,7 @@ class MirrorHandler(URIHandler):
             if metadata:
                 meta = metadata.copy()
             else:
-                meta = {"depth": 0}
+                meta = {"depth": 0, "report_imports": True}
 
             meta.setdefault("package", {})["info"] = x
             pkg_path = self.mirror_path / urlparse(x["url"]).path.lstrip("/")

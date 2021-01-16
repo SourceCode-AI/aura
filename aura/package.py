@@ -276,7 +276,7 @@ class PypiPackage:
                 location_cache[pkg["url"]] = ScanLocation(
                     location=pkg_path,
                     strip_path=str(pkg_path.parent),
-                    metadata={"release": pkg}
+                    metadata={"release": pkg, "report_imports": True}
                 )
             return location_cache[pkg["url"]]
 

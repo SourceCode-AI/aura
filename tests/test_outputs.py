@@ -258,17 +258,16 @@ def test_diff_output_comprehensive(fixtures, fuzzy_rule_match):
             "a_md5": "8d4db173db397856d959ad08cd4745e7",
             "b_md5": "f92b90ab7015c47a95553f4224551229",
             #"similarity": lambda x: x > 0.6,
-            # FIXME:
-            # "removed_detections": [
-            #     {
-            #         "type": "ModuleImport",
-            #         "extra": {
-            #             "root": "stat",
-            #             "name": "stat"
-            #         },
-            #         "line": "import stat"
-            #     }
-            # ]
+            "removed_detections": [
+                {
+                    "type": "ModuleImport",
+                    "extra": {
+                        "root": "stat",
+                        "name": "stat"
+                    },
+                    "line": "import stat"
+                }
+            ]
         },
         {
             "operation": "M",
