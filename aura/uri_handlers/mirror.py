@@ -28,7 +28,12 @@ class MirrorHandler(URIHandler):
 
     @property
     def metadata(self):
-        return {"package": self.package_name, "package_opts": self.opts}
+        return {
+            "uri": self.uri,
+            "scheme": self.scheme,
+            "package_name": self.package_name,
+            "package_opts": self.opts  # TODO: pypi scheme is using `package_release`, unify this
+        }
 
     def get_paths(self, metadata: Optional[dict]=None, package=None) -> Generator[ScanLocation, None, None]:
         if package is None:
@@ -44,6 +49,7 @@ class MirrorHandler(URIHandler):
                 meta = metadata.copy()
             else:
                 meta = {"depth": 0, "report_imports": True}
+                meta.update(self.metadata)
 
             meta.setdefault("package", {})["info"] = x
             pkg_path = self.mirror_path / urlparse(x["url"]).path.lstrip("/")

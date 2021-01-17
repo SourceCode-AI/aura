@@ -1,10 +1,13 @@
 import os
 import codecs
 import uuid
+from unittest.mock import patch
 
 import pytest
 
 from aura import utils
+from aura.uri_handlers.base import ScanLocation
+from aura.analyzers import fs_struct
 
 
 def test_misc_signatures(fixtures):
@@ -73,7 +76,9 @@ def test_different_source_code_encoding(fixtures):
     fixtures.scan_and_match("encoding_ISO_8859_2.py", matches=matches)
 
 
-def test_fs_structure_detections(fixtures, tmp_path):
+@pytest.mark.e2e
+@patch("aura.analyzers.fs_struct.enable_suspicious_files", return_value=True)
+def test_fs_structure_detections(fs_mock, fixtures, tmp_path):
     files = {
         "bytecode.pyc": "some_bytecode_content",
         ".pypirc": "pypirc_content",
@@ -210,3 +215,19 @@ def test_base64_payload_finder(tmp_path, fixtures):
 def test_size_conversion(size: str, expected: int):
     output = utils.convert_size(size)
     assert output == expected
+
+
+
+@pytest.mark.parametrize("metadata, expected", (
+        ({}, False),
+        ({"suspicious_files": True}, True),
+        ({"suspicious_files": False}, False),
+        ({"scheme": "pypi"}, True),
+        ({"scheme": "mirror"}, True),
+        ({"scheme": "local"}, False),
+        ({"scheme": "local", "suspicious_files": True}, True),
+        ({"scheme": "pypi", "suspicious_files": False}, False)
+))
+def test_suspicious_file_trigger(metadata, expected):
+    loc = ScanLocation("does_not_exists", metadata=metadata)
+    assert fs_struct.enable_suspicious_files(location=loc) is expected

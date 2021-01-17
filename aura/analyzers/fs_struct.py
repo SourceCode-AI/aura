@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 # Analyzer for FileSystem structure
-import fnmatch
 from typing import Iterable
 
 from .detections import Detection
@@ -21,6 +20,17 @@ def get_file_patterns() -> Iterable[FilePatternMatcher]:
         FILE_PATTERNS = tuple(FilePatternMatcher(x) for x in config.SEMANTIC_RULES.get("files", []))
 
     return FILE_PATTERNS
+
+
+def enable_suspicious_files(location: ScanLocation) -> bool:
+    flag = location.metadata.get("suspicious_files")
+    if flag is not None:
+        return flag
+
+    if location.metadata.get("scheme") in ("pypi", "mirror"):
+        return True
+    else:
+        return False
 
 
 @Analyzer.ID("file_analyzer")
@@ -47,28 +57,29 @@ def analyze(*, location: ScanLocation) -> AnalyzerReturnType:
             tags = set(location.metadata["tags"])
         )
 
-    name = location.location.name
-    if name.startswith("."):
-        f_type = "hidden_file"
+    if enable_suspicious_files(location):
+        name = location.location.name
+        if name.startswith("."):
+            f_type = "hidden_file"
 
-    elif name.endswith(".pyc"):
-        if "__pycache__" in location.location.parts:
+        elif name.endswith(".pyc"):
+            if "__pycache__" in location.location.parts:
+                return
+
+            f_type = "python_bytecode"
+        else:
             return
 
-        f_type = "python_bytecode"
-    else:
-        return
-
-    if f_type:
-        yield Detection(
-            detection_type="SuspiciousFile",
-            message="A potentially suspicious file has been found",
-            score=config.get_score_or_default("contain-suspicious-file", 0),
-            signature=f"suspicious_file#{str(location)}",
-            extra={
-                "file_name": location.location.name,
-                "file_type": f_type
-            },
-            location=location.location,
-            tags={f_type} | location.metadata["tags"]
-        )
+        if f_type:
+            yield Detection(
+                detection_type="SuspiciousFile",
+                message="A potentially suspicious file has been found",
+                score=config.get_score_or_default("contain-suspicious-file", 0),
+                signature=f"suspicious_file#{str(location)}",
+                extra={
+                    "file_name": location.location.name,
+                    "file_type": f_type
+                },
+                location=location.location,
+                tags={f_type} | location.metadata["tags"]
+            )

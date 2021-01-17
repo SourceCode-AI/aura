@@ -69,6 +69,7 @@ class PyPiHandler(URIHandler, PackageProvider):
                 meta = metadata.copy()
             else:
                 meta = {"depth": 0}
+                meta.update(self.metadata)
 
             meta.setdefault("package", {})["info"] = f
 

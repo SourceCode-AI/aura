@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 
 from aura import mirror
 from aura import exceptions
+from aura.analyzers import fs_struct
 from aura.uri_handlers import mirror as umirror
 
 
@@ -37,6 +38,13 @@ def test_mirror_uri_handler(simulate_mirror):
     assert len(paths) == 2
     filenames = set(x.filename for x in paths)
     assert {"wheel-0.34.2-py2.py3-none-any.whl", "wheel-0.34.2.tar.gz"} == filenames
+
+
+def test_mirror_suspicious_file_trigger(simulate_mirror):
+    handler = umirror.MirrorHandler(urlparse("mirror://wheel"))
+
+    for loc in handler.get_paths():
+        assert fs_struct.enable_suspicious_files(loc) is True
 
 
 def test_mirror_uri_variations(simulate_mirror):
