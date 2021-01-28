@@ -84,7 +84,9 @@ def test_binop_string_vars():
     ("'hello_world'[:5]", 'hello'),
     ("'hello_world'[::2]", 'hlowrd'),
     ("'hello_world'[::-1]", 'dlrow_olleh'),
-    ("'hello_world'[-1:0:-2]", 'drwol')
+    ("'hello_world'[-1:0:-2]", 'drwol'),
+    ("'hello_world'[0]", 'h'),
+    ("'hello_world'[-1]", 'd'),
 ))
 def test_string_slice(src, result):
     tree = process_source_code(src)

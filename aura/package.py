@@ -5,6 +5,7 @@ import datetime
 import dataclasses
 import tempfile
 import shutil
+import difflib
 import xmlrpc.client
 from functools import partial
 from urllib.parse import urlparse, ParseResult
@@ -18,7 +19,6 @@ import requests
 from packaging.version import Version
 from packaging.utils import canonicalize_name
 from packaging.requirements import Requirement
-from textdistance import jaccard
 
 from . import config
 from . import github
@@ -240,7 +240,7 @@ class PypiPackage:
 
         sum1 = self["info"]["summary"] or ""
         sum2 = other["info"]["summary"] or ""
-        sum_sim = jaccard.normalized_similarity(sum1, sum2)
+        sum_sim = difflib.SequenceMatcher(lambda x: x in " \t\n", sum1, sum2).ratio()
         info_table += ("Description Similarity", sum_sim)
 
         is_similar_desc = (sum_sim >= 0.8)

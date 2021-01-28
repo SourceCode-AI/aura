@@ -46,7 +46,6 @@ pytz = "~2020.1"
 "ruamel.yaml" = "~0.15"
 
 # TODO: make the following dependencies optional
-textdistance = "~4.2.0"
 python-tlsh = "~3.17.0"
 prettyprinter = "~0.18.0"
 jinja2 = "~2.11.2"

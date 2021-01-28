@@ -92,26 +92,33 @@ class ASTRewrite(Visitor):
         elif not type(context.node.value) in (String,):
             return
 
-        step = context.node.slice.get("step")
-        if type(step) == Number:
-            step = int(step)
-        elif step is not None and type(step) != int:
-            return
-
         value = str(context.node.value)
-        lower = context.node.slice.get("lower")
-        if type(lower) == Number:
-            lower = int(lower)
-        elif lower is not None and type(lower) != int:
-            return
 
-        upper = context.node.slice.get("upper")
-        if type(upper) == Number:
-            upper = int(upper)
-        elif upper is not None and type(upper) != int:
-            return
+        if type(context.node.slice) == Number:
+            sliced_str = value[int(context.node.slice)]
+        elif type(context.node.slice) == dict and context.node.slice.get("_type") == "Slice":
+            step = context.node.slice.get("step")
+            if type(step) == Number:
+                step = int(step)
+            elif step is not None and type(step) != int:
+                return
 
-        sliced_str = value[lower:upper:step]
+            lower = context.node.slice.get("lower")
+            if type(lower) == Number:
+                lower = int(lower)
+            elif lower is not None and type(lower) != int:
+                return
+
+            upper = context.node.slice.get("upper")
+            if type(upper) == Number:
+                upper = int(upper)
+            elif upper is not None and type(upper) != int:
+                return
+
+            sliced_str = value[lower:upper:step]
+        else:
+            return  # Unknown slice type
+
         new_node = String(sliced_str)
         new_node.enrich_from_previous(context.node)
         context.replace(new_node)
@@ -339,9 +346,10 @@ class ASTRewrite(Visitor):
         else:
             return
 
-        new_node = Number(value= op(value))
+        new_node = Number(value=op(value))
         new_node.enrich_from_previous(context.node)
         context.replace(new_node)
+        return True
 
     def return_statement(self, context):
         if not isinstance(context.node, ReturnStmt):  # Covers also yield and yield from
@@ -363,3 +371,4 @@ class ASTRewrite(Visitor):
         # We don't need the `Var` itself but only the target value it points to
         if type(context.node.value) == Var and isinstance(context.node.value.value, ASTNode):
             context.node.value = context.node.value.value
+            context.visitor.modified = True

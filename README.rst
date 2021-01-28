@@ -71,7 +71,7 @@ Diff packages::
     docker run -ti --rm sourcecodeai/aura:dev diff pypi://requests pypi://requests2
 
 
-.. image:: files/imgs/aura_diff.png
+.. image:: docs/source/_static/imgs/aura_diff.png
 
 
 Find most popular typosquatted packages (you need to call ``aura update`` to download the dataset first)::

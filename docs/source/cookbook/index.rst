@@ -5,6 +5,7 @@ Tutorials
 ---------
 
 .. toctree::
+    typosquatting.rst
     tutorials/creating_path_analyzer.rst
     tutorials/creating_ast_analyzer.rst
 
