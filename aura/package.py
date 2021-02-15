@@ -129,7 +129,7 @@ class PypiPackage:
 
         for url in filtered:
             with open(dest / url["filename"], "wb") as fd:
-                cache.URLCache.proxy(url=url["url"], fd=fd, cache_id=url["filename"])
+                cache.FileDownloadCache.proxy(url=url["url"], fd=fd, cache_id=url["filename"])
             files.append(url)
 
         return files
@@ -271,7 +271,7 @@ class PypiPackage:
                 pkg_path /= pkg["filename"]
 
                 with pkg_path.open("wb") as fd:
-                    cache.URLCache.proxy(url=pkg["url"], fd=fd)
+                    cache.FileDownloadCache.proxy(url=pkg["url"], fd=fd)
 
                 location_cache[pkg["url"]] = ScanLocation(
                     location=pkg_path,
@@ -349,9 +349,9 @@ class PackageScore:
         self.github = None
 
         if fetch_github:
-            self.__load_github()
+            self.load_github()
 
-    def __load_github(self):
+    def load_github(self):
         self.repo_url = self.pkg.source_url
         if self.repo_url is None:
             return

@@ -100,8 +100,8 @@ ruamel.yaml.composer.Composer.compose_document = compose_document
 
 
 # Helper for loading API tokens for external integrations
-def get_token(name: str) -> str:
-    value = CFG.get("api_tokens", name, fallback=None)
+def get_token(name: str) -> str:  # TODO: add tests
+    value = CFG.get("api_tokens", {}).get(name)
     # If the token is not specified in the config, fall back to the env variable
     if value is None:
         value = os.environ.get(f"AURA_{name.upper()}_TOKEN", None)

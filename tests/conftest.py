@@ -421,3 +421,9 @@ def mock_cache(tmp_path):
             c_path.mkdir()
             m.return_value = c_path
             yield m
+
+
+@pytest.fixture(scope="function", autouse=True)
+def reset_mock_responses():
+    yield
+    responses.reset()

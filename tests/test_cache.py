@@ -30,7 +30,7 @@ def create_cache_entry(arg: str, metadata: dict, fixtures) -> cache.Cache:
         ("https://google.com/", "f82438a9862a39d642f39887b3e8e5b4"),
 ))
 def test_url_cache_ids(url, cache_id):
-    computed = cache.URLCache.cache_id(url=url)
+    computed = cache.FileDownloadCache.cache_id(url=url)
     assert computed == cache_id
 
 

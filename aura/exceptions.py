@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
+from typing import Optional
 
 
-class AuraException(Exception):
+class AuraException(RuntimeError):
     pass
 
 
@@ -55,10 +56,14 @@ class UnsupportedDiffLocation(InvalidLocation):
 
 class PythonExecutorError(AuraException):
     def __init__(self, *args, **kwargs):
-        super(PythonExecutorError, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.stdout = None
         self.stderr = None
 
 
 class ASTParseError(AuraException):
+    pass
+
+
+class RateLimitError(AuraException):
     pass

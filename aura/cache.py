@@ -6,9 +6,10 @@ import hashlib
 import datetime
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional, List, Generator, Iterable
+from typing import Optional, List, Generator, Iterable, BinaryIO
 
 import click
+import requests
 
 from . import utils
 from . import config
@@ -140,7 +141,7 @@ class Cache(ABC):
 
     @classmethod
     def proxy_url(cls, *, url, fd, cache_id=None):
-        return URLCache.proxy(url=url, fd=fd, cache_id=cache_id)
+        return FileDownloadCache.proxy(url=url, fd=fd, cache_id=cache_id)
 
     def delete(self):
         self.cache_file_location.unlink(missing_ok=True)
@@ -164,7 +165,45 @@ class URLCache(Cache):
         return hashlib.md5(burl).hexdigest()
 
     @classmethod
-    def proxy(cls, *, url, fd=None, group=None, cache_id=None, tags=None):
+    def proxy(cls, *, url: str, cache_id=None, tags=None, session=None) -> str:
+        if session is None:
+            session = requests
+
+        if cls.get_location() is None:
+            return session.get(url).text
+
+        cache_obj = cls(url=url, cache_id=cache_id, tags=tags)
+
+        if cache_obj.is_valid:
+            logger.info(f"Loading {cache_obj.cid} from cache")
+            return cache_obj.fetch()
+
+        try:
+            resp = session.get(url)
+            cache_obj.cache_file_location.write_text(resp.text)
+            return resp.text
+        except Exception:
+            cache_obj.delete()
+            raise
+
+    @property
+    def metadata(self) -> dict:
+        return {
+            "url": self.url,
+            "id": self.cid,
+            "tags": self.tags,
+            "type": self.url
+        }
+
+    def fetch(self) -> str:
+        return self.cache_file_location.read_text()
+
+
+class FileDownloadCache(URLCache):
+    prefix = "filedownload_"
+
+    @classmethod
+    def proxy(cls, *, url, fd: Optional[BinaryIO]=None, cache_id=None, tags=None, session=None):
         if cls.get_location() is None:
             if fd is None:
                 logger.warning("FD is set to None but cache is disabled, URL caching has zero effect")
@@ -184,18 +223,9 @@ class URLCache(Cache):
             cache_obj.download()
             if fd:
                 cache_obj.fetch(fd)
-        except Exception as exc:
+        except Exception:
             cache_obj.delete()
-            raise exc
-
-    @property
-    def metadata(self) -> dict:
-        return {
-            "url": self.url,
-            "id": self.cid,
-            "tags": self.tags,
-            "type": self.url
-        }
+            raise
 
     def fetch(self, fd):
         with self.cache_file_location.open("rb") as cfd:
@@ -204,9 +234,9 @@ class URLCache(Cache):
 
         self.metadata_location.write_text(dumps(self.metadata))
 
-    def download(self):
+    def download(self, session=None):
         with self.cache_file_location.open("wb") as cfd:
-            utils.download_file(self.url, cfd)
+            utils.download_file(self.url, cfd, session=session)
             cfd.flush()
 
 
@@ -310,6 +340,7 @@ class MirrorFile(Cache):
 
 CACHE_TYPES = {
     "url": URLCache,
+    "filedownload": FileDownloadCache,
     "mirrorfile": MirrorFile,
     "mirrorjson": MirrorJSON
 }

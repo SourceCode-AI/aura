@@ -85,7 +85,7 @@ def md5(
     return ctx.hexdigest() if hex else ctx.digest()
 
 
-def download_file(url: str, fd: BinaryIO) -> None:
+def download_file(url: str, fd: BinaryIO, session=None) -> None:
     """
     Download data from given URL and write it to the file descriptor
     This function is designed for speed as other approaches are not able to utilize full network speed
@@ -99,9 +99,14 @@ def download_file(url: str, fd: BinaryIO) -> None:
         pbar.update(len(data))
         return data
 
-    with requests.get(url, stream=True) as r:
+    if session is None:
+        session = requests
+
+    with session.get(url, stream=True) as r:
+        content_length = r.headers.get('Content-length', None)
+
         pbar = tqdm.tqdm(
-            total=int(r.headers['Content-length']),
+            total=int(content_length) if content_length is not None else None,
             unit="bytes",
             unit_scale=True,
             unit_divisor=1024,
@@ -312,6 +317,18 @@ def convert_time(desc: int) -> timedelta:
     if type(desc) == int:
         return timedelta(hours=desc)
     # TODO: add parsing from strings similar to `convert_size`
+
+
+def remaining_time(end: float) -> float:
+    """
+    Given an end time, compute remaining time left
+    This is used mostly to get time left until the api rate limit resets
+
+    :param end: utc timestamps
+    :return: seconds left till the end time is reached
+    """
+    now = datetime.utcnow().timestamp()
+    return 0.0 if end < now else (now - end)
 
 
 class Analyzer:

@@ -219,7 +219,7 @@ def show_info():
     formatter.output_info_data(info_data)
 
 
-def generate_typosquatting(distance=2, limit=None, pkgs=None, format_uri="text"):
+def generate_typosquatting(distance=2, limit=None, pkgs=None, format_uri="text", extended=False):
     if not pkgs:
         pkgs = typos.get_popular_packages()
 
@@ -227,7 +227,7 @@ def generate_typosquatting(distance=2, limit=None, pkgs=None, format_uri="text")
     combinations = typos.generate_combinations(left=pkgs)
 
     formatter = TyposquattingOutputBase.from_uri(format_uri)
-    formatter.output_typosquatting(islice(typos.enumerator(combinations, f), 0, limit))
+    formatter.output_typosquatting(islice(typos.enumerator(combinations, f, extended=extended), 0, limit))
 
 
 def prefetch(*uris):
@@ -237,3 +237,4 @@ def prefetch(*uris):
             executor.submit(lambda :list(handler.get_paths()))
 
         executor.shutdown(wait=True)
+
