@@ -183,8 +183,16 @@ def generate_combinations(
     if right is None:
         right = get_all_pypi_packages()
 
+    #yield from itertools.product(left, right)
     set_left = set(left)
-    yield from itertools.product(left, itertools.filterfalse(lambda x: x not in set_left, right))
+
+    for x, y in itertools.product(left, right):
+        if y in set_left:
+            continue
+        else:
+            yield (x, y)
+
+    #yield from itertools.product(left, itertools.filterfalse(lambda x: x not in set_left, right))
 
 
 def enumerator(

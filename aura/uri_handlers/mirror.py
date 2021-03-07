@@ -49,8 +49,8 @@ class MirrorHandler(URIHandler):
                 meta = metadata.copy()
             else:
                 meta = {"depth": 0, "report_imports": True}
-                meta.update(self.metadata)
 
+            meta.update(self.metadata)
             meta.setdefault("package", {})["info"] = x
             pkg_path = self.mirror_path / urlparse(x["url"]).path.lstrip("/")
             target = cache.MirrorFile.proxy(src=pkg_path, cache_id=x['filename'])

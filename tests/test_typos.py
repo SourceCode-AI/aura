@@ -1,5 +1,6 @@
 import os
 import json
+from itertools import product
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -115,3 +116,17 @@ def test_mocked_get_all_pypi_packages(mock):
     assert "pack-age-2" in packages
     assert "pack-age-3" in packages
     assert "pack-age-4" in packages
+
+
+@patch("aura.typos.get_all_pypi_packages")
+def test_generate_combinations(pypi_mock):
+    left = ["al", "bl", "dup"]
+    # The `dup` value from right should be filtered out by `generate_combinations` as it is already in the left side
+    right = ["ar", "br", "dup"]
+
+    pypi_mock.return_value = right
+
+    valid = set(product(left, right[:2]))
+    combinations = set(typos.generate_combinations(left=left))
+
+    assert valid == combinations

@@ -34,10 +34,15 @@ class Analyzer:
         executor = worker_executor.AuraExecutor(job_queue=files_queue)
 
         if isinstance(initial_locations, base.ScanLocation):
-            files_queue.append(initial_locations)
-        else:
-            for x in initial_locations:
-                files_queue.append(x)
+            initial_locations = (initial_locations,)
+
+        for x in initial_locations:
+            detections = tuple(cls.run_input_hooks(location=x))
+            files_queue.append(x)
+            for d in detections:
+                comm = yield d
+                if comm:
+                    files_queue.append(comm)
 
         files_queue.append(worker_executor.Wait)
 
@@ -113,6 +118,13 @@ class Analyzer:
         location.post_analysis(detections)
 
         return (locations, detections)
+
+    @staticmethod
+    def run_input_hooks(location: base.ScanLocation) -> Iterable[Detection]:
+        analyzers = plugins.load_entrypoint("aura.input_hooks")
+
+        for input_hook in analyzers["entrypoints"].values():
+            yield from input_hook(location=location)
 
     @staticmethod
     def scan_directory(item: base.ScanLocation):

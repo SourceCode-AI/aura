@@ -194,6 +194,16 @@ patterns: &default_patterns
       - code_execution
     taint: sink
 
+  - id: get_variables
+    pattern:
+      - "globals()"
+      - "locals()"
+    detection:
+      score: 100
+      message: Usage of locals() or globals() found in a source code
+    tags:
+      - obfuscation
+
   - id: inline_import
     pattern:
       - "__import__(...)"

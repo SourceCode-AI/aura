@@ -34,7 +34,7 @@ except NameError:
     text_input = input
 
 
-SUPPORTED_PIP_VERSIONS = ("19.*", "10.*", "20.*", "18.*")
+SUPPORTED_PIP_VERSIONS = ("19.*", "10.*", "20.*", "18.*", "21.*")
 AURA_PATH = None
 logger = logging.getLogger("apip")
 
