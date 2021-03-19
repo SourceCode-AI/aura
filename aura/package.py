@@ -129,7 +129,7 @@ class PypiPackage:
 
         for url in filtered:
             with open(dest / url["filename"], "wb") as fd:
-                cache.FileDownloadCache.proxy(url=url["url"], fd=fd, cache_id=url["filename"])
+                cache.FileDownloadCache.proxy(url=url["url"], fd=fd)
             files.append(url)
 
         return files

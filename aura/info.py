@@ -15,6 +15,7 @@ except ImportError:
 from . import __version__ as version
 from .exceptions import InvalidConfiguration
 from .uri_handlers.base import URIHandler
+from . import github
 from . import plugins
 from . import config
 from .json_proxy import loads
@@ -73,6 +74,19 @@ def check_git() -> dict:
         }
 
 
+def check_github_api() -> dict:
+    if github.API_TOKEN:
+        return {
+            "enabled": True,
+            "description": "GitHub API token is present, rate limiting is increased"
+        }
+    else:
+        return {
+            "enabled": False,
+            "description": "Github API token not present, rate limiting is significantly lowered"
+        }
+
+
 def check_schema() -> Optional[dict]:
     """
     Returns None if jsonschema is not installed indicating it's not possible to verify the schema
@@ -126,6 +140,7 @@ def gather_aura_information() -> dict:
     info["integrations"]["pypi_stats"] = check_pypi_stats()
     info["integrations"]["reverse_dependencies"] = check_reverse_dependencies()
     info["integrations"]["git"] = check_git()
+    info["integrations"]["github"] = check_github_api()
 
     return info
 

@@ -48,7 +48,7 @@ class MirrorHandler(URIHandler):
             if metadata:
                 meta = metadata.copy()
             else:
-                meta = {"depth": 0, "report_imports": True}
+                meta = {"depth": 0, "report_imports": True, "package_instance": self.package}
 
             meta.update(self.metadata)
             meta.setdefault("package", {})["info"] = x

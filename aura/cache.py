@@ -143,6 +143,9 @@ class Cache(ABC):
     def proxy_url(cls, *, url, fd, cache_id=None):
         return FileDownloadCache.proxy(url=url, fd=fd, cache_id=cache_id)
 
+    def save_metadata(self):
+        self.metadata_location.write_text(dumps(self.metadata))
+
     def delete(self):
         self.cache_file_location.unlink(missing_ok=True)
 
@@ -181,6 +184,7 @@ class URLCache(Cache):
         try:
             resp = session.get(url)
             cache_obj.cache_file_location.write_text(resp.text)
+            cache_obj.save_metadata()
             return resp.text
         except Exception:
             cache_obj.delete()
@@ -192,7 +196,7 @@ class URLCache(Cache):
             "url": self.url,
             "id": self.cid,
             "tags": self.tags,
-            "type": self.url
+            "type": self.prefix.rstrip("_")
         }
 
     def fetch(self) -> str:
@@ -221,6 +225,7 @@ class FileDownloadCache(URLCache):
 
         try:
             cache_obj.download()
+            cache_obj.save_metadata()
             if fd:
                 cache_obj.fetch(fd)
         except Exception:
@@ -231,8 +236,6 @@ class FileDownloadCache(URLCache):
         with self.cache_file_location.open("rb") as cfd:
             shutil.copyfileobj(cfd, fd)
             fd.flush()
-
-        self.metadata_location.write_text(dumps(self.metadata))
 
     def download(self, session=None):
         with self.cache_file_location.open("wb") as cfd:
@@ -290,7 +293,6 @@ class MirrorJSON(Cache):
         self.metadata_location.write_text(dumps(self.metadata))
 
 
-
 class MirrorFile(Cache):
     prefix = "mirror_"
 
@@ -330,7 +332,7 @@ class MirrorFile(Cache):
             "src": self.src,
             "id": self.cid,
             "tags": self.tags,
-            "type": "mirrorfile"
+            "type": "mirror"
         }
 
     def fetch(self):
@@ -341,7 +343,7 @@ class MirrorFile(Cache):
 CACHE_TYPES = {
     "url": URLCache,
     "filedownload": FileDownloadCache,
-    "mirrorfile": MirrorFile,
+    "mirror": MirrorFile,
     "mirrorjson": MirrorJSON
 }
 

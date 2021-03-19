@@ -6,11 +6,12 @@ import shutil
 import weakref
 import mmap
 import dataclasses
-from contextlib import contextmanager, ExitStack, nullcontext
+from contextlib import contextmanager, ExitStack
 from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
 from functools import partial, lru_cache
+from urllib.parse import urlparse
 from typing import Generator, Union, List, TypeVar, Generic, Mapping, cast, BinaryIO
 
 import tqdm
@@ -104,13 +105,20 @@ def download_file(url: str, fd: BinaryIO, session=None) -> None:
 
     with session.get(url, stream=True) as r:
         content_length = r.headers.get('Content-length', None)
+        desc = "Downloading file"
+
+        if content_disposition := r.headers.get("content-disposition"):
+            fname = re.findall("filename=(.+)", content_disposition)[0]
+            desc = f"Downloading `{fname}`"
+        elif "." in (fname := urlparse(url).path.split("/")[-1]):  # Fallback method, attempt to parse the filename from URL
+            desc = f"Downloading `{fname}`"
 
         pbar = tqdm.tqdm(
             total=int(content_length) if content_length is not None else None,
             unit="bytes",
             unit_scale=True,
             unit_divisor=1024,
-            desc="Downloading file",
+            desc=desc,
             disable=config.PROGRESSBAR_DISABLED,
         )
         r.raw.read = partial(

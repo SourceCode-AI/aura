@@ -9,7 +9,7 @@ from concurrent import futures
 from pathlib import Path
 from functools import partial
 from itertools import islice
-from typing import Union, Optional, Tuple, Generator, List
+from typing import Union, Optional, Tuple, Generator, List, TextIO
 
 import click
 from prettyprinter import pprint
@@ -228,13 +228,4 @@ def generate_typosquatting(distance=2, limit=None, pkgs=None, format_uri="text",
 
     formatter = TyposquattingOutputBase.from_uri(format_uri)
     formatter.output_typosquatting(islice(typos.enumerator(combinations, f, extended=extended), 0, limit))
-
-
-def prefetch(*uris):
-    with futures.ThreadPoolExecutor() as executor:
-        for uri in uris:
-            handler = URIHandler.from_uri(uri)
-            executor.submit(lambda :list(handler.get_paths()))
-
-        executor.shutdown(wait=True)
 

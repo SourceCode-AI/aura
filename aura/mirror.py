@@ -15,8 +15,7 @@ from .config import CFG
 class LocalMirror:
     @classmethod
     def get_mirror_path(cls) -> Path:
-        env_path = os.environ.get('AURA_MIRROR_PATH', None)
-        if env_path:
+        if env_path := os.environ.get('AURA_MIRROR_PATH', None):
             return Path(env_path)
 
         return Path(CFG["aura"]["mirror"])

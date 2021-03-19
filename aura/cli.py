@@ -17,8 +17,6 @@ from . import commands
 from . import exceptions
 from .cache import purge
 from .uri_handlers.base import URIHandler
-
-from . import __version__
 from . import config
 
 
@@ -240,9 +238,11 @@ def find_typosquatting(max_distance, limit=100, pkg=None, format="text", extende
 
 
 @cli.command()
-@click.argument("uris", nargs=-1, metavar="<URI 1>, <URI 2>, ...")
+@click.argument("uris", type=click.File("r"))
 def prefetch(uris):
-    commands.prefetch(*uris)
+    from . import prefetch as pf
+
+    pf.prefetch_mirror(pf.read_uris(uris))
 
 
 @cli.command(name="check_requirement")

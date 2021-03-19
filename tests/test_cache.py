@@ -1,10 +1,11 @@
-import os
+import io
 import json
 import uuid
 from unittest import mock
 from pathlib import Path
 
 import pytest
+import responses
 
 from aura import config
 from aura import cache
@@ -74,7 +75,7 @@ def test_proxy_mirror_json(cache_mock, tmp_path, filename, content, cache_id, ca
 
 
 @pytest.mark.e2e
-def test_mirror_cache( fixtures, simulate_mirror, mock_cache):
+def test_mirror_cache(fixtures, simulate_mirror, mock_cache):
     out = fixtures.get_cli_output(['scan', '--download-only', 'mirror://wheel', '-f', 'json'])
 
     parsed_output = json.loads(out.stdout)
@@ -166,3 +167,42 @@ def test_always_delete_expired(exp_mock, mock_cache, fixtures):
     for x in items:
         assert x.is_expired is True
         assert x._deleted is True
+
+
+@pytest.mark.e2e
+@responses.activate
+def test_url_caching(mock_cache):
+    payload = "Hello body"
+    url = "https://url_cache_test.example.com"
+
+    responses.add(responses.GET, url, body=payload, status=200)
+
+    response = cache.URLCache.proxy(url=url)
+    assert response == payload
+
+    cache_items = tuple(cache.CacheItem.iter_items())
+    assert len(cache_items) == 1
+    assert cache_items[0].metadata["url"] == url
+
+    cache.CacheItem.cleanup()
+    assert len(tuple(cache.CacheItem.iter_items())) == 0
+
+
+@pytest.mark.e2e
+@responses.activate
+def test_filedownload_caching(mock_cache):
+    payload = b"this is some file payload"
+    url = "https://url_cache_test.example.com/some_file.tgz"
+    fd = io.BytesIO()
+
+    responses.add(responses.GET, url, body=payload, status=200, stream=True)
+
+    cache.FileDownloadCache.proxy(url=url, fd=fd)
+    assert fd.getvalue() == payload
+
+    cache_items = tuple(cache.CacheItem.iter_items())
+    assert len(cache_items) == 1
+    assert cache_items[0].metadata["url"] == url
+
+    cache.CacheItem.cleanup()
+    assert len(tuple(cache.CacheItem.iter_items())) == 0
