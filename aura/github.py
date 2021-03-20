@@ -122,8 +122,8 @@ class GitHubPrefetcher:
                 logger.warning(f"GitHub repository does not exists or access was denied: `{url}`")
             except RateLimitError:
                 await self.queue.put(url)
-            except HTTPError:
-                logger.exception("An HTTP error occurred while prefetching the repository data")
+            except Exception:
+                logger.exception("An error occurred while prefetching the repository data")
 
 
 def update_rate_limits(response: requests.Response, **kwargs):
