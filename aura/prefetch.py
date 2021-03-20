@@ -13,6 +13,7 @@ async def fetch_package(uri_queue, github_prefetcher):
     try:
         while True:
             uri = await uri_queue.get()
+            logger.info(f"Prefetching: `{uri}`")
             handler = URIHandler.from_uri(uri)
             for x in handler.get_paths():
                 if pkg := x.metadata.get("package_instance"):

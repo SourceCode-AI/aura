@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import traceback
 from urllib.parse import urlparse
 from urllib.error import HTTPError
 from typing import Optional, Union
@@ -121,6 +122,8 @@ class GitHubPrefetcher:
                 logger.warning(f"GitHub repository does not exists or access was denied: `{url}`")
             except RateLimitError:
                 await self.queue.put(url)
+            except HTTPError:
+                logger.exception("An HTTP error occurred while prefetching the repository data")
 
 
 def update_rate_limits(response: requests.Response, **kwargs):
