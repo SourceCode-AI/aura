@@ -3,6 +3,7 @@ import logging
 from typing import Iterable, TextIO
 
 from . import github
+from .exceptions import NoSuchPackage
 from .uri_handlers.base import URIHandler
 
 
@@ -13,14 +14,20 @@ async def fetch_package(uri_queue, github_prefetcher):
     try:
         while True:
             uri = await uri_queue.get()
-            logger.info(f"Prefetching: `{uri}`")
-            handler = URIHandler.from_uri(uri)
-            for x in handler.get_paths():
-                if pkg := x.metadata.get("package_instance"):
-                    source_url = pkg.source_url
-                    if source_url:
-                        await github_prefetcher.queue.put(source_url)
-            uri_queue.task_done()
+            try:
+                logger.info(f"Prefetching: `{uri}`")
+                handler = URIHandler.from_uri(uri)
+                for x in handler.get_paths():
+                    if pkg := x.metadata.get("package_instance"):
+                        source_url = pkg.source_url
+                        if source_url:
+                            await github_prefetcher.queue.put(source_url)
+            except NoSuchPackage:
+                logger.info(f"Package does not exists: `{uri}`")
+            except Exception:
+                logger.exception(f"An error occurred while prefetching the uri: `{uri}`")
+            finally:
+                uri_queue.task_done()
     except asyncio.CancelledError:
         pass
 
