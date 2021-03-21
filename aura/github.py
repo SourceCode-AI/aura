@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import traceback
 from urllib.parse import urlparse
 from urllib.error import HTTPError
 from typing import Optional, Union
@@ -11,6 +10,7 @@ from typing import Optional, Union
 import requests
 
 from . import config
+from .worker_executor import non_blocking
 from .cache import URLCache
 from .utils import remaining_time
 from .exceptions import NoSuchRepository, RateLimitError
@@ -117,7 +117,7 @@ class GitHubPrefetcher:
             # Fetch the github repo data which will store it in a cache
             try:
                 logger.info(f"Attempting to prefetch repository data for: `{url}`")
-                _ = GitHub.from_url(url)
+                _ = await non_blocking(GitHub.from_url, url)
             except NoSuchRepository:
                 logger.warning(f"GitHub repository does not exists or access was denied: `{url}`")
             except RateLimitError:

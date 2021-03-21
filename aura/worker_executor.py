@@ -1,4 +1,6 @@
 import time
+import asyncio
+import sys
 from concurrent import futures
 from typing import Optional
 
@@ -81,3 +83,13 @@ class AuraExecutor:
         self.pg.reset(total)
         self.pg.n = self.completed
         self.pg.refresh()
+
+
+async def non_blocking(func, /, *args, **kwargs):
+    """
+    Wrapper that attempts to convert blocking function into non-blocking if possible for asyncio use
+    """
+    if sys.version_info[1] >= 9:  # Available only in py3.9+
+        return await asyncio.to_thread(func, *args, **kwargs)
+    else:  # Fallback, just call function directly in blocking mode
+        return func(*args, **kwargs)

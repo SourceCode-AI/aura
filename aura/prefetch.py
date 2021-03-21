@@ -3,6 +3,7 @@ import logging
 from typing import Iterable, TextIO
 
 from . import github
+from .worker_executor import non_blocking
 from .exceptions import NoSuchPackage
 from .uri_handlers.base import URIHandler
 
@@ -16,8 +17,8 @@ async def fetch_package(uri_queue, github_prefetcher):
             uri = await uri_queue.get()
             try:
                 logger.info(f"Prefetching: `{uri}`")
-                handler = URIHandler.from_uri(uri)
-                for x in handler.get_paths():
+                handler = await non_blocking(URIHandler.from_uri, uri)
+                for x in await non_blocking(handler.get_paths):
                     if pkg := x.metadata.get("package_instance"):
                         source_url = pkg.source_url
                         if source_url:
