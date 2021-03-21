@@ -48,7 +48,12 @@ class GitHub:
         if len(paths) < 2:
             raise NoSuchRepository(url)
 
-        return cls(owner=paths[0], repo_name=paths[1])
+        repo_name: str = paths[1]
+
+        if repo_name.endswith(".git"):
+            repo_name = repo_name[:-4]
+
+        return cls(owner=paths[0], repo_name=repo_name)
 
     @classmethod
     def time_to_reset(cls) -> float:
@@ -68,6 +73,11 @@ class GitHub:
             return self.__get_json(url)
         except HTTPError as exc:
             if exc.code == 404:
+                raise NoSuchRepository(f"{self.owner}/{self.name}") from exc
+            else:
+                raise
+        except requests.HTTPError as exc:
+            if exc.response.status_code == 404:
                 raise NoSuchRepository(f"{self.owner}/{self.name}") from exc
             else:
                 raise

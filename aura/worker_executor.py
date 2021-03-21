@@ -81,10 +81,9 @@ class AuraExecutor:
         else:
             total = self.total
 
-        self.pg.reset(total)
+        self.pg.total = total
         self.pg.n = self.completed
-        self.pg.refresh()
-
+        self.pg.update(0)
 
 
 class AsyncQueue:
@@ -103,10 +102,9 @@ class AsyncQueue:
         if config.PROGRESSBAR_DISABLED:
             return
 
-        self.progressbar.reset(self.total)
+        self.progressbar.total = self.total
         self.progressbar.n = self.completed
-        self.progressbar.refresh()
-
+        self.progressbar.update(0)
 
     async def put(self, item):
         await self.q.put(item)

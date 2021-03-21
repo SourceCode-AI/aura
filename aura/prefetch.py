@@ -14,8 +14,6 @@ logger = logging.getLogger(__name__)
 async def fetch_package(uri_queue, github_prefetcher):
     try:
         while True:
-            import time
-
             uri = await uri_queue.get()
             try:
                 logger.info(f"Prefetching: `{uri}`")
