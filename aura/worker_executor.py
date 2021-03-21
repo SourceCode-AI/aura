@@ -5,6 +5,7 @@ from concurrent import futures
 from typing import Optional
 
 import tqdm
+from tqdm.asyncio import tqdm as async_tqdm
 
 from . import config
 
@@ -28,7 +29,7 @@ class AuraExecutor:
         self.total = 0
         self.completed = 0
         self.q = job_queue
-        self.pg = tqdm.tqdm(
+        self.pg = async_tqdm(
             desc="Analyzing files",
             bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}",
             leave=False,
@@ -83,6 +84,57 @@ class AuraExecutor:
         self.pg.reset(total)
         self.pg.n = self.completed
         self.pg.refresh()
+
+
+
+class AsyncQueue:
+    def __init__(self, maxsize=0, *, loop=None, desc=None):
+        self.q = asyncio.Queue(maxsize=maxsize, loop=loop)
+        self.total = 0
+        self.completed = 0
+        self.progressbar = tqdm.tqdm(
+            desc=desc,
+            bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}",
+            leave=False,
+            disable=config.PROGRESSBAR_DISABLED
+        )
+
+    def _update_progress(self):
+        if config.PROGRESSBAR_DISABLED:
+            return
+
+        self.progressbar.reset(self.total)
+        self.progressbar.n = self.completed
+        self.progressbar.refresh()
+
+
+    async def put(self, item):
+        await self.q.put(item)
+        self.total += 1
+        self._update_progress()
+
+    def put_nowait(self, item):
+        self.q.put_nowait(item)
+        self.total += 1
+        self._update_progress()
+
+    async def get(self):
+        return await self.q.get()
+
+    def get_nowait(self):
+        return self.get_nowait()
+
+    def task_done(self):
+        self.completed += 1
+        self.q.task_done()
+        self._update_progress()
+
+    async def join(self):
+        return await self.q.join()
+
+
+
+
 
 
 async def non_blocking(func, /, *args, **kwargs):

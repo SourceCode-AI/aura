@@ -10,7 +10,7 @@ from typing import Optional, Union
 import requests
 
 from . import config
-from .worker_executor import non_blocking
+from .worker_executor import non_blocking, AsyncQueue
 from .cache import URLCache
 from .utils import remaining_time
 from .exceptions import NoSuchRepository, RateLimitError
@@ -81,7 +81,7 @@ class GitHubPrefetcher:
     STOP = object()
 
     def __init__(self):
-        self.queue = asyncio.Queue()
+        self.queue = AsyncQueue(desc="GitHub prefetch")
         # Safety margin for API requests to leave in the rate limit
         # There is usually more than one request required to load the github data
         self.safety_buffer = 10
@@ -109,21 +109,24 @@ class GitHubPrefetcher:
 
             await asyncio.sleep(api_wait_time)
             url: Optional[str] = await self.queue.get()
-            if not url:
-                continue
-            elif url == GitHubPrefetcher.STOP:
-                break
-
-            # Fetch the github repo data which will store it in a cache
             try:
-                logger.info(f"Attempting to prefetch repository data for: `{url}`")
-                _ = await non_blocking(GitHub.from_url, url)
-            except NoSuchRepository:
-                logger.warning(f"GitHub repository does not exists or access was denied: `{url}`")
-            except RateLimitError:
-                await self.queue.put(url)
-            except Exception:
-                logger.exception("An error occurred while prefetching the repository data")
+                if not url:
+                    continue
+                elif url == GitHubPrefetcher.STOP:
+                    break
+
+                # Fetch the github repo data which will store it in a cache
+                try:
+                    logger.info(f"Attempting to prefetch repository data for: `{url}`")
+                    _ = await non_blocking(GitHub.from_url, url)
+                except NoSuchRepository:
+                    logger.warning(f"GitHub repository does not exists or access was denied: `{url}`")
+                except RateLimitError:
+                    await self.queue.put(url)
+                except Exception:
+                    logger.exception("An error occurred while prefetching the repository data")
+            finally:
+                self.queue.task_done()
 
 
 def update_rate_limits(response: requests.Response, **kwargs):

@@ -3,7 +3,7 @@ import logging
 from typing import Iterable, TextIO
 
 from . import github
-from .worker_executor import non_blocking
+from .worker_executor import non_blocking, AsyncQueue
 from .exceptions import NoSuchPackage
 from .uri_handlers.base import URIHandler
 
@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 async def fetch_package(uri_queue, github_prefetcher):
     try:
         while True:
+            import time
+
             uri = await uri_queue.get()
             try:
                 logger.info(f"Prefetching: `{uri}`")
@@ -33,14 +35,13 @@ async def fetch_package(uri_queue, github_prefetcher):
         pass
 
 
-
 def prefetch_mirror(uris: Iterable[str], workers=10):
     loop = asyncio.get_event_loop()
 
     pf = github.GitHubPrefetcher()
     loop.create_task(pf.process())
 
-    uri_queue = asyncio.Queue()
+    uri_queue = AsyncQueue(desc="Mirror package prefetch")
 
     workers = [loop.create_task(fetch_package(uri_queue, pf)) for _ in range(workers)]
 
