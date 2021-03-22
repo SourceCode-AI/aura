@@ -106,10 +106,10 @@ class GitHubPrefetcher:
 
         reset_time = GitHub.time_to_reset()
 
-        if GitHub.x_api_remaining - self.safety_buffer <= 0:
+        if (remaining := GitHub.x_api_remaining - self.safety_buffer) <= 0:
             return reset_time
 
-        return (reset_time / (GitHub.x_api_remaining-self.safety_buffer))
+        return reset_time / remaining
 
     async def process(self):
         while True:
@@ -132,6 +132,7 @@ class GitHubPrefetcher:
                 except NoSuchRepository:
                     logger.warning(f"GitHub repository does not exists or access was denied: `{url}`")
                 except RateLimitError:
+                    logger.warning(f"GitHub reate limit reached")
                     await self.queue.put(url)
                 except Exception:
                     logger.exception("An error occurred while prefetching the repository data")
