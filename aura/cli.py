@@ -239,10 +239,11 @@ def find_typosquatting(max_distance, limit=100, pkg=None, format="text", extende
 
 @cli.command()
 @click.argument("uris", type=click.File("r"))
-def prefetch(uris):
+@click.option("--workers", "-w", type=int, default=10)
+def prefetch(uris, workers=10):
     from . import prefetch as pf
 
-    pf.prefetch_mirror(pf.read_uris(uris))
+    pf.prefetch_mirror(pf.read_uris(uris), workers=workers)
 
 
 @cli.command(name="check_requirement")

@@ -111,19 +111,24 @@ class GitHubPrefetcher:
 
         return reset_time / remaining
 
-    async def process(self):
+    async def process(self, max_retries=3, backoff=1.0):
         while True:
             api_wait_time = self.wait_time
-            if self.wait_time > 3:
+            if api_wait_time > 3:
                 logger.info(f"Rate limit reached, waiting for {api_wait_time}s")
 
             await asyncio.sleep(api_wait_time)
-            url: Optional[str] = await self.queue.get()
+            item: Optional[str] = await self.queue.get()
             try:
-                if not url:
+                if not item:
                     continue
-                elif url == GitHubPrefetcher.STOP:
+                elif type(item) == tuple:
+                    retries, url = item
+                elif item == GitHubPrefetcher.STOP:
                     break
+                else:
+                    url = item
+                    retries = 0
 
                 # Fetch the github repo data which will store it in a cache
                 try:
@@ -135,7 +140,11 @@ class GitHubPrefetcher:
                     logger.warning(f"GitHub reate limit reached")
                     await self.queue.put(url)
                 except Exception:
-                    logger.exception("An error occurred while prefetching the repository data")
+                    logger.exception(f"An error occurred while prefetching the repository data: {retries} retries")
+                    if retries < max_retries:
+                        retries += 1
+                        await asyncio.sleep(backoff*retries)
+                        await self.queue.put((retries, url))
             finally:
                 self.queue.task_done()
 
