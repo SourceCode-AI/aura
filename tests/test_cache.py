@@ -91,6 +91,36 @@ def test_mirror_cache(fixtures, simulate_mirror, mock_cache):
     assert "mirror_wheel-0.34.2-py2.py3-none-any.whl" in cache_content
 
 
+@pytest.mark.parametrize("file_path", (
+    "crypto.py",
+    "evil.tar.gz",
+    "djamgo-0.0.1-py3-none-any.whl",
+    "sarif-schema.json"
+))
+def test_mirror_cache_paths(file_path, fixtures, mock_cache):
+    pth = Path(fixtures.path(file_path))
+    assert pth.exists()
+
+    cached = cache.MirrorFile.proxy(src=pth)
+    assert cached != pth
+
+    with mock.patch.object(cache.MirrorFile, "fetch", side_effect=RuntimeError("failed")):
+        cached2 = cache.MirrorFile.proxy(src=pth)
+
+    assert cached2 == cached
+
+    cache_obj = cache.MirrorFile(src=pth)
+    assert cache_obj.is_valid
+    assert cache_obj.cache_file_location == cached
+    assert cache_obj.cache_file_location.exists()
+    assert cache_obj.metadata_location.exists()
+
+    cache_obj.delete()
+    assert not cache_obj.cache_file_location.exists()
+    assert not cache_obj.metadata_location.exists()
+    assert not cache_obj.is_valid
+
+
 @mock.patch("aura.mirror.LocalMirror.get_mirror_path")
 def test_mirror_cache_no_remote_access(mirror_mock, tmp_path, mock_cache):
     """

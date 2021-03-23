@@ -364,7 +364,7 @@ class PackageScore:
                 pkg_name = canonicalize_name(line["package_name"])
                 if pkg_name == self.package_name:
                     downloads = int(line.get("downloads", 0))
-                    normalized = math.ceil(math.log(downloads, 10))
+                    normalized = log_scale(downloads)
                     explanation = f"{downloads} (+{normalized})"
                     return self.Value(downloads, normalized, "PyPI downloads", explanation)
         except ValueError:
@@ -377,7 +377,7 @@ class PackageScore:
             return PackageScore.NA("Reverse dependencies")
 
         dependencies = len(dependencies)
-        normalized = math.ceil(math.log(dependencies, 10))
+        normalized = log_scale(dependencies)
         explanation = f"{dependencies} (+{normalized})"
 
         return self.Value(dependencies, normalized, "Reverse dependencies", explanation)
@@ -387,7 +387,7 @@ class PackageScore:
             return self.NA("GitHub stars")
 
         stars = self.github.repo["stargazers_count"]
-        normalized = math.ceil(math.log(stars, 10))
+        normalized = log_scale(stars)
         explanation = f"{stars} (+{normalized})"
         return self.Value(stars, normalized, "GitHub stars", explanation)
 
@@ -396,7 +396,7 @@ class PackageScore:
             return self.NA("GitHub forks")
 
         forks = self.github.repo["forks"]
-        normalized = math.ceil(math.log(forks, 10))
+        normalized = log_scale(forks)
         explanation = f"{forks} (+{normalized})"
         return self.Value(forks, normalized, "GitHub forks", explanation)
 
@@ -405,7 +405,7 @@ class PackageScore:
             return self.NA("GitHub contributors")
 
         contributors = len(self.github.contributors)
-        normalized = math.ceil(math.log(contributors, 10))
+        normalized = log_scale(contributors)
         explanation = f"{contributors} (+{normalized})"
         return self.Value(contributors, normalized, "GitHub contributors", explanation)
 
@@ -441,10 +441,7 @@ class PackageScore:
 
     def has_multiple_releases(self) -> Value:
         releases = len(self.pkg["releases"])
-        if releases:
-            normalized = math.ceil(math.log(releases, 10))
-        else:
-            normalized = 0
+        normalized = log_scale(releases)
         return self.Value(releases, normalized, "Multiple releases", f"{releases} (+{normalized})")
 
     def has_source_repository(self) -> Value:
@@ -519,7 +516,6 @@ class PackageScore:
         return score_table
 
 
-
 def packagetype_filter(release: ReleaseInfo, packagetype: str="all") -> bool:
     if packagetype == "all":
         return True
@@ -560,3 +556,13 @@ def get_packages_for_author(author: str) -> List[Tuple[str, str]]:
         "https://pypi.org/pypi", use_builtin_types=True
     )
     return list(repo.user_packages(author))
+
+
+def log_scale(metric: int, base=10) -> int:
+    """
+    Normalizes the metric to log scale score
+    """
+    if metric > 0:
+        return math.ceil(math.log(metric, base))
+    else:
+        return 0

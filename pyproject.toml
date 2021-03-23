@@ -149,3 +149,7 @@ addopts = "--strict-markers"
 markers = [
     "e2e: marks tests with end-to-end behaviour, there are relativelly slow as they test a compelte behaviour from executing the cli command to the finished results",
 ]
+
+[tool.black]
+line-length = 120
+target-version = ["py38"]

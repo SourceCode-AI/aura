@@ -148,6 +148,7 @@ class Cache(ABC):
 
     def delete(self):
         self.cache_file_location.unlink(missing_ok=True)
+        self.metadata_location.unlink(missing_ok=True)
 
 
 class URLCache(Cache):
@@ -218,7 +219,7 @@ class FileDownloadCache(URLCache):
         cache_obj = cls(url=url, cache_id=cache_id, tags=tags)
 
         if cache_obj.is_valid:
-            logger.info(f"Loading {cache_obj.cid} from cache")
+            logger.debug(f"Loading {cache_obj.cid} from cache")
             if fd:
                 cache_obj.fetch(fd)
             return
