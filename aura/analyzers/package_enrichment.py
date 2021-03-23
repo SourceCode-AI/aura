@@ -19,7 +19,8 @@ def analyze(*, location: ScanLocation) -> AnalyzerReturnType:
         "documentation_url": pkg.documentation_url,
         "latest_release": pkg.get_latest_release(),
         "score": pkg_score.get_score_matrix(),
-        "reverse_dependencies": package.get_reverse_dependencies(pkg_name=pkg_name)
+        "reverse_dependencies": package.get_reverse_dependencies(pkg_name=pkg_name),
+        "classifiers": pkg.info["info"].get("classifiers", [])
     }
 
     yield Detection(

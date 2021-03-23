@@ -349,7 +349,10 @@ class PackageScore:
         self.github = None
 
         if fetch_github:
-            self.load_github()
+            try:
+                self.load_github()
+            except exceptions.NoSuchRepository:
+                LOGGER.warning(f"Repository does not exists: `{self.pkg.source_url}`")
 
     def load_github(self):
         self.repo_url = self.pkg.source_url
