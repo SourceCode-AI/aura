@@ -94,6 +94,23 @@ def test_string_slice(src, result):
     assert str(tree) == result
 
 
+def test_if_condition_dont_modify_data():
+    src = """
+    x = "a"
+    if x == "c":
+        x = "b"
+    elif x[1] == "d":
+        x = "e"
+    
+    x[0]
+    """
+
+    tree = process_source_code(src)
+    assert isinstance(tree, String)
+    # Make sure that the statements inside the `if` conditions have not modified the variable `x`
+    assert str(tree) == "a"
+
+
 @pytest.mark.parametrize(
     "src,result", (
     ("'aGVsbG9fd29ybGQ='.decode('base64')", "hello_world"),
