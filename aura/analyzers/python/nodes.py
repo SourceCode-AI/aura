@@ -994,6 +994,10 @@ class Call(ASTNode):
                     if not ctx.match(arg, self.args[idx]):
                         return False
 
+        for other_kwarg in other.kwargs.keys():
+            if other_kwarg not in self.kwargs:
+                return False
+
         for name, val in self.kwargs.items():
             if name not in other.kwargs:
                 if is_wildcard:

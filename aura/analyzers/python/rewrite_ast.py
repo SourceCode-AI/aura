@@ -95,7 +95,10 @@ class ASTRewrite(Visitor):
         value = str(context.node.value)
 
         if type(context.node.slice) == Number:
-            sliced_str = value[int(context.node.slice)]
+            try:
+                sliced_str = value[int(context.node.slice)]
+            except IndexError:  # out of range
+                return
         elif type(context.node.slice) == dict and context.node.slice.get("_type") == "Slice":
             step = context.node.slice.get("step")
             if type(step) == Number:
@@ -332,10 +335,16 @@ class ASTRewrite(Visitor):
         elif context.node.get("_type") != "UnaryOp":
             return
 
-        if not type(context.node["operand"]) in (Number, int):
+        operand = context.node["operand"]
+
+        if type(operand) == Number:
+            value = operand.value
+        elif type(operand) in (int, float):
+            value = operand
+        else:
+            # Incompatible operand type
             return
 
-        value = int(context.node["operand"])
         op_name = context.node["op"]["_type"]
         if op_name == "UAdd":
             op = lambda x: +x
