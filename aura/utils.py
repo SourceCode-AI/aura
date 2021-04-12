@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from functools import partial, lru_cache
 from urllib.parse import urlparse
+from zlib import adler32
 from typing import Generator, Union, List, TypeVar, Generic, Mapping, cast, BinaryIO
 
 import tqdm
@@ -337,6 +338,17 @@ def remaining_time(end: float) -> float:
     """
     now = datetime.utcnow().timestamp()
     return 0.0 if end < now else (now - end)
+
+
+def fast_checksum(data: Union[bytes, str]) -> str:
+    """
+    Generates a fast checksum for the input data
+    This function is not to be used for cryptography but rather for deduplication and similar use cases as the hashing is optimized for speed
+    """
+    if type(data) == str:
+        data = data.encode("utf-8")
+
+    return hex(adler32(data))[2:]  # Omit the `0x` at the start from `hex()`
 
 
 class Analyzer:

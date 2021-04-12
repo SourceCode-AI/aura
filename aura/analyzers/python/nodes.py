@@ -1469,6 +1469,10 @@ class Context:
     def call_graph(self):
         return self.visitor.call_graph
 
+    @property
+    def signature(self) -> str:
+        return f"{self.visitor.normalized_path}/{self.node.line_no}"
+
     def as_child(self, node: NodeType, replace=lambda x: None) -> Context:
         return Context(
             parent=self,

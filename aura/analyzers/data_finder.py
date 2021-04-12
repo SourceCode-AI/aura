@@ -43,7 +43,6 @@ class DataFinder(NodeAnalyzerV2):
 
     def node_String(self, context: Context):
         val = context.node.value
-        pth = os.fspath(context.visitor.normalized_path)
 
         if BASE64_REGEX.match(val):
             try:
@@ -57,7 +56,7 @@ class DataFinder(NodeAnalyzerV2):
                     score=config.get_score_or_default("base-64-blob", 0),
                     tags={"base64",},
                     extra={"base64_decoded": result},
-                    signature=f"data_finder#base64_blob#{hash(result)}#{hash(pth)}",
+                    signature=f"data_finder#base64_blob#{utils.fast_checksum(result)}#{context.signature}",
                 )
             except UnicodeError:
                 pass
@@ -129,7 +128,7 @@ class StringFinder(NodeAnalyzerV2):
                     "signature_id": hit._signature["id"],
                     "string": value
                 },
-                signature=f"string_finder#{hit._signature['id']}#{utils.md5(value)}#{context.visitor.normalized_path}/{context.node.line_no}",
+                signature=f"string_finder#{hit._signature['id']}#{utils.fast_checksum(value)}#{context.signature}",
                 score=score,
                 node=context.node,
                 location=context.visitor.path,

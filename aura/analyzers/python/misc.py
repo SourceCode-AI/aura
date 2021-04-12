@@ -3,7 +3,7 @@ import math
 from .. import base
 from .. import detect_redos
 from ..detections import Detection
-from ...utils import Analyzer
+from ...utils import Analyzer, fast_checksum
 from ... import config
 
 
@@ -20,13 +20,14 @@ class MiscAnalyzer(base.NodeAnalyzerV2):
 
         if ENTROPY_THRESHOLD > 0 and entropy >= ENTROPY_THRESHOLD:
             hit = Detection(
+                detection_type="HighEntropyString",
                 message="A string with high shanon entropy was found",
                 extra={
                     "type": "high_entropy_string",
                     "entropy": entropy,
                     "string": val,
                 },
-                signature=f"misc#high_entropy#{context.visitor.normalized_path}#{context.node.line_no}",
+                signature=f"misc#high_entropy#{fast_checksum(val)}#{context.signature}",
                 node=context.node
             )
             hit.line_no = context.node.line_no
@@ -41,12 +42,13 @@ class MiscAnalyzer(base.NodeAnalyzerV2):
         try:
             if detect_redos.catastrophic(val):
                 hit = Detection(
+                    detection_type="ReDoS",
                     message = "Possible catastrophic ReDoS",
                     extra = {
                         "type": "redos",
                         "regex": val,
                     },
-                    signature = f"misc#redos#{context.visitor.normalized_path}#{context.node.line_no}",
+                    signature = f"misc#redos#{fast_checksum(val)}#{context.signature}",
                     node=context.node,
                     tags={"redos"}
                 )
@@ -58,7 +60,7 @@ class MiscAnalyzer(base.NodeAnalyzerV2):
                 extra={
                     "regex": val
                 },
-                signature=f"misc#redos_recursion_error#{context.visitor.normalized_path}#{context.node.line_no}",
+                signature=f"misc#redos_recursion_error#{fast_checksum(val)}#{context.signature}",
                 node=context.node
             )
 
@@ -72,10 +74,10 @@ class MiscAnalyzer(base.NodeAnalyzerV2):
 
         hit = Detection(
             message = f"Usage of {context.node.name} in an object indicates a possible pickle exploit",
-            signature = f"pickleploit#{context.visitor.normalized_path}#{context.node.line_no}",
-            line_no = context.node.line_no,
+            signature = f"misc#pickleploit#{context.signature}",
+            node = context.node,
             score = 100,
-            tags = {context.node.name}
+            tags = {context.node.cached_full_name, "pickleploit"}
         )
         yield hit
 

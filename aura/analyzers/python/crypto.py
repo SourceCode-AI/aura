@@ -82,12 +82,13 @@ class CryptoGenKey(base.NodeAnalyzerV2):
         hit = Detection(
             detection_type="CryptoKeyGeneration",
             message="Generation of cryptography key detected",
-            signature=f"crypto#gen_key#{context.visitor.normalized_path}#{context.node.line_no}",
+            signature=f"crypto#gen_key#{context.signature}",
             extra={
                 "function": context.node.cached_full_name,
                 "key_type": info["type"],
                 "key_size": key_size,
             },
+            node=context.node,
         )
 
         if key_size is not None and key_size < MIN_KEY_SIZES.get(info["type"], 0):

@@ -51,7 +51,7 @@ def test_redos(fixtures):
 
     matches = [
         {
-            "type": "Detection",
+            "type": "ReDoS",
             "extra": {
                 "type": "redos",
                 "regex": regex
