@@ -30,13 +30,14 @@ from .uri_handlers.base import ScanLocation
 from .output import table
 from .mirror import LocalMirror
 from .type_definitions import ReleaseInfo
+from .exceptions import NoSuchPackage
 
 
 LOGGER = config.get_logger(__name__)
 
 
 class PypiPackage:
-    mirror = None
+    mirror = LocalMirror()
 
     def __init__(self, name: str, info: dict, source: Optional[str]=None, opts: Optional[dict]=None):
         self.name: str = name
@@ -49,27 +50,24 @@ class PypiPackage:
             self.info["info"]["project_urls"] = {}
 
     @classmethod
-    def from_pypi(cls, name: str, *args, **kwargs):
+    def from_cached(cls, name: str, *args, **kwargs):
         name = canonicalize_name(name)
-        resp = requests.get(f"https://pypi.org/pypi/{name}/json")
-        if resp.status_code == 404:
-            LOGGER.error(f"Package {name} does not exists on PyPI")
-            raise exceptions.NoSuchPackage(f"{name} on PyPI repository")
 
-        kwargs["info"] = loads(resp.text)
+        if cls.mirror.get_mirror_path():
+            try:
+                kwargs["info"] = cls.mirror.get_json(name)
+                kwargs["source"] = "local_mirror"
+                return cls(name, *args, **kwargs)
+            except NoSuchPackage:
+                pass
+
+        try:
+            resp = cache.URLCache.proxy(url=f"https://pypi.org/pypi/{name}/json", tags=["pypi_json"])
+        except requests.exceptions.HTTPError as exc:
+            raise NoSuchPackage(f"`{name}` on PyPI repository") from exc
+
+        kwargs["info"] = loads(resp)
         kwargs["source"] = "pypi"
-
-        return cls(name, *args, **kwargs)
-
-    @classmethod
-    def from_local_mirror(cls, name: str, *args, **kwargs):
-        name = canonicalize_name(name)
-
-        if cls.mirror is None:
-            cls.mirror = LocalMirror()
-
-        kwargs["source"] = "local_mirror"
-        kwargs["info"] = cls.mirror.get_json(name)
 
         return cls(name, *args, **kwargs)
 
@@ -341,7 +339,7 @@ class PackageScore:
         self.package_name = package_name
 
         if package is None:
-            self.pkg = PypiPackage.from_pypi(package_name)
+            self.pkg = PypiPackage.from_cached(package_name)
         else:
             self.pkg = package
 

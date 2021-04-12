@@ -13,12 +13,17 @@ from .config import CFG
 
 
 class LocalMirror:
-    @classmethod
-    def get_mirror_path(cls) -> Path:
-        if env_path := os.environ.get('AURA_MIRROR_PATH', None):
-            return Path(env_path)
+    _mirror_path = None  # Used for caching
 
-        return Path(CFG["aura"]["mirror"])
+    @classmethod
+    def get_mirror_path(cls) -> typing.Optional[Path]:
+        if cls._mirror_path is None:
+            if env_path := os.environ.get('AURA_MIRROR_PATH', None):
+                cls._mirror_path = Path(env_path)
+            else:
+                cls._mirror_path = Path(CFG["aura"]["mirror"])
+
+        return cls._mirror_path
 
     def list_packages(self) -> typing.Generator[Path, None, None]:
         yield from (self.get_mirror_path() / "json").iterdir()

@@ -35,7 +35,7 @@ def analyzer_poetry_lock(*, location: ScanLocation):
         pkg_name = str(pkg["name"])
 
         try:
-            pypi = package.PypiPackage.from_pypi(pkg_name)
+            pypi = package.PypiPackage.from_cached(pkg_name)
             latest = Version(pypi.get_latest_release())
 
             if latest > pkg_version:

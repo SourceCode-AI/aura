@@ -71,7 +71,7 @@ def check_unpinned(requirement: Requirement, location: ScanLocation) -> Optional
 
 
 def check_outdated(requirement: Requirement, location: ScanLocation) -> Optional[Detection]:
-    pypi = package.PypiPackage.from_pypi(requirement.name)
+    pypi = package.PypiPackage.from_cached(requirement.name)
     latest = pypi.get_latest_release()
     spec_set = requirement.specifier
 

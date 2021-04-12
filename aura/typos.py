@@ -213,7 +213,7 @@ def enumerator(
         res = method(orig, typo)
         if res and res < 2:
             if orig not in pkg_cache:
-                orig_pkg = package.PypiPackage.from_pypi(orig)
+                orig_pkg = package.PypiPackage.from_cached(orig)
                 pkg_cache[orig] = orig_pkg
             else:
                 orig_pkg = pkg_cache[orig]
@@ -225,7 +225,7 @@ def enumerator(
                 orig_score = pkg_score_cache[orig]
 
             if typo not in pkg_cache:
-                typo_pkg = package.PypiPackage.from_pypi(typo)
+                typo_pkg = package.PypiPackage.from_cached(typo)
                 pkg_cache[typo] = typo_pkg
             else:
                 typo_pkg = pkg_cache[typo]

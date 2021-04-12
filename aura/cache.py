@@ -169,12 +169,15 @@ class URLCache(Cache):
         return hashlib.md5(burl).hexdigest()
 
     @classmethod
-    def proxy(cls, *, url: str, cache_id=None, tags=None, session=None) -> str:
+    def proxy(cls, *, url: str, cache_id=None, tags=None, session=None, throw_exc=True) -> str:
         if session is None:
             session = requests
 
         if cls.get_location() is None:
-            return session.get(url).text
+            resp = session.get(url)
+            if throw_exc:
+                resp.raise_for_status()
+            return resp.text
 
         cache_obj = cls(url=url, cache_id=cache_id, tags=tags)
 
@@ -184,6 +187,8 @@ class URLCache(Cache):
 
         try:
             resp = session.get(url)
+            if throw_exc:
+                resp.raise_for_status()
             cache_obj.cache_file_location.write_text(resp.text)
             cache_obj.save_metadata()
             return resp.text

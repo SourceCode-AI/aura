@@ -10,7 +10,7 @@ def analyze(*, location: ScanLocation) -> AnalyzerReturnType:
     if not (pkg_name:=location.metadata.get("package_name")):
         return
 
-    pkg = package.PypiPackage.from_pypi(pkg_name)
+    pkg = package.PypiPackage.from_cached(pkg_name)
     pkg_score = pkg.score
 
     extra = {

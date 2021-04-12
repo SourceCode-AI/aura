@@ -28,7 +28,7 @@ class PyPiHandler(URIHandler, PackageProvider):
 
         self.uri = uri
         self.package_name = uri.netloc
-        self.pkg = PypiPackage.from_pypi(name=self.package_name)
+        self.pkg = PypiPackage.from_cached(name=self.package_name)
         self.file_name = uri.path.lstrip("/")
         self.opts = {"release": "latest", "cleanup": False}
 

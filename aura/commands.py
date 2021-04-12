@@ -5,7 +5,6 @@ import os
 import json
 import time
 import traceback
-from concurrent import futures
 from pathlib import Path
 from functools import partial
 from itertools import islice
