@@ -99,26 +99,7 @@ def test_check_name_invalid(typo, mock_pypi_stats):
     assert len(results) == 0, results
 
 
-
-@patch("xmlrpc.client.ServerProxy")
-def test_mocked_get_all_pypi_packages(mock):
-    srv_mock = mock.return_value
-    srv_mock.list_packages.return_value = [
-        "PaCkaGe1",
-        "pack_age_2",
-        "pack.age.3",
-        "Pack_age.4"
-    ]
-
-    packages = list(typos.get_all_pypi_packages())
-    assert len(packages) == 4, packages
-    assert "package1" in packages
-    assert "pack-age-2" in packages
-    assert "pack-age-3" in packages
-    assert "pack-age-4" in packages
-
-
-@patch("aura.typos.get_all_pypi_packages")
+@patch("aura.cache.PyPIPackageList._get_package_list")
 def test_generate_combinations(pypi_mock):
     left = ["al", "bl", "dup"]
     # The `dup` value from right should be filtered out by `generate_combinations` as it is already in the left side

@@ -236,3 +236,26 @@ def test_filedownload_caching(mock_cache):
 
     cache.CacheItem.cleanup()
     assert len(tuple(cache.CacheItem.iter_items())) == 0
+
+
+@pytest.mark.e2e
+@mock.patch("aura.cache.PyPIPackageList._get_package_list")
+def test_pypi_cache(pkg_list_mock, mock_cache):
+    pkgs = ["pkg1", "pkg2", "pkg3"]
+    pkg_list_mock.return_value = pkgs
+
+    output = cache.PyPIPackageList.proxy()
+    assert output == pkgs
+    assert pkg_list_mock.called is True
+    pkg_list_mock.reset_mock()
+
+    output = cache.PyPIPackageList.proxy()
+    assert output == pkgs
+    assert pkg_list_mock.called is False
+
+    cache_items = tuple(cache.CacheItem.iter_items())
+    assert len(cache_items) == 1
+    assert cache_items[0].metadata["type"] == "pypi_package_list"
+
+    cache.CacheItem.cleanup()
+    assert len(tuple(cache.CacheItem.iter_items())) == 0

@@ -12,6 +12,7 @@ from .detections import Detection
 from ..utils import Analyzer, normalize_path
 from ..uri_handlers.base import ScanLocation
 from ..config import get_score_or_default
+from ..type_definitions import AnalyzerReturnType
 
 
 def get_checksum(alg: str, path: Path) -> str:
@@ -23,7 +24,7 @@ def get_checksum(alg: str, path: Path) -> str:
 
 
 @Analyzer.ID("wheel")
-def analyze_wheel(*, location: ScanLocation) -> Generator[Detection, None, None]:
+def analyze_wheel(*, location: ScanLocation) -> AnalyzerReturnType:
     """Find anomalies in the Wheel packages that could be caused by manipulation or using a non-standard tools"""
     parts = location.location.parts
 

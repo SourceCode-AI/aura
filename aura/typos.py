@@ -9,6 +9,7 @@ from typing import Optional, Generator, Iterable, Tuple, Callable, List
 from packaging.utils import canonicalize_name
 
 from . import config
+from . import cache
 from . import package
 
 
@@ -24,14 +25,6 @@ def threshold_or_default(threshold: Optional[int]) -> int:
         return int(config.get_settings("aura.pypi_download_threshold", fallback=10000))
     else:
         return threshold
-
-
-def get_all_pypi_packages() -> Generator[str, None, None]:
-    """
-    Retrieve a list of all PyPI packages using pypi xml rpc service
-    """
-    repo = xmlrpc.client.ServerProxy(WAREHOUSE_XML_RPC, use_builtin_types=True)
-    yield from map(canonicalize_name, repo.list_packages())
 
 
 def damerau_levenshtein(s1: str, s2: str, max_distance: int=3, cap=None) -> int:
@@ -181,7 +174,7 @@ def generate_combinations(
         right: Optional[Iterable[str]] = None
 ) -> Generator[Tuple[str, str], None, None]:
     if right is None:
-        right = get_all_pypi_packages()
+        right =cache.PyPIPackageList.proxy()
 
     #yield from itertools.product(left, right)
     set_left = set(left)

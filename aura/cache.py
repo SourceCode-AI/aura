@@ -4,12 +4,14 @@ import os
 import shutil
 import hashlib
 import datetime
+import xmlrpc.client
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Optional, List, Generator, Iterable, BinaryIO
 
 import click
 import requests
+from packaging.utils import canonicalize_name
 
 from . import utils
 from . import config
@@ -346,11 +348,61 @@ class MirrorFile(Cache):
         self.metadata_location.write_text(dumps(self.metadata))
 
 
+class PyPIPackageList(Cache):
+    prefix = "pypi_package_list"
+
+    def __init__(self, cache_id="", tags: Optional[List[str]]=None):
+        self.cid = cache_id
+        self.tags = tags or []
+
+    @classmethod
+    def cache_id(cls, arg) -> str:
+        return ""
+
+    @classmethod
+    def _get_package_list(cls) -> List[str]:
+        repo = xmlrpc.client.ServerProxy(
+            "https://pypi.python.org/pypi", use_builtin_types=True
+        )
+        return [canonicalize_name(x) for x in repo.list_packages()]
+
+    @classmethod
+    def proxy(cls) -> List[str]:
+        if cls.get_location() is None:
+            return cls._get_package_list()
+
+        cache_obj = cls()
+        if cache_obj.is_valid:
+            return loads(cache_obj.cache_file_location.read_text())
+
+        try:
+            return cache_obj.fetch()
+        except Exception as exc:
+            cache_obj.delete()
+            raise exc
+
+    @property
+    def metadata(self) -> dict:
+        return {
+            "id": self.cid,
+            "tags": self.tags,
+            "type": self.prefix
+        }
+
+    def fetch(self):
+        packages = self._get_package_list()
+        self.save_metadata()
+        self.cache_file_location.write_text(dumps(packages))
+        return packages
+
+
+
 CACHE_TYPES = {
     "url": URLCache,
     "filedownload": FileDownloadCache,
     "mirror": MirrorFile,
-    "mirrorjson": MirrorJSON
+    "mirrorjson": MirrorJSON,
+    "pypi_package_list": PyPIPackageList
 }
 
 

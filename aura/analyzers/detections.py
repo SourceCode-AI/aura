@@ -72,6 +72,7 @@ class Detection:
         data = {
             "score": self.score,
             "type": self.name,
+            "slug": self.slug,
             "severity": get_severity(self)
         }
 
@@ -141,6 +142,10 @@ class Detection:
         if self._diff_hash is None:
             self._diff_hash = hash((self.line, self.name, self.message))
         return self._diff_hash
+
+    @property
+    def slug(self) ->str:
+        return self.name.lower()
 
 
 class DataProcessing(Detection):

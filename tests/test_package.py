@@ -21,20 +21,6 @@ def test_non_existing_package():
         package.PypiPackage.from_cached(f"does_not_exists_{str(uuid.uuid4())}")
 
 
-def test_package_listing():
-    existing = {
-        "requests",
-        "django",
-    }
-
-    xml_client.ServerProxy = Mock()
-    instance = xml_client.ServerProxy.return_value
-    instance.list_packages.return_value = existing
-    on_pypi = set(x.lower() for x in package.PypiPackage.list_packages())
-
-    assert len(existing.difference(on_pypi)) == 0
-
-
 @responses.activate
 def test_package_info(mock_pypi_rest_api):
     mock_pypi_rest_api(responses)
