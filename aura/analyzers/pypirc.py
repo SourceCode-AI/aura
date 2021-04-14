@@ -14,9 +14,12 @@ def analyze(*, location: ScanLocation) -> AnalyzerReturnType:
     """
     if location.location.name != ".pypirc":
         return
-
-    pypirc = configparser.ConfigParser()
-    pypirc.read(str(location.location))
+    try:
+        pypirc = configparser.ConfigParser()
+        pypirc.read(str(location.location))
+    except configparser.ParsingError:
+        # TODO: generate a detection
+        return
 
     # Filter on these values, some pregenerated configurations use them and we don't want to generate false positives on these
     user_blacklist = config.CFG.get("pypirc", {}).get("username_blacklist", [])
@@ -31,6 +34,8 @@ def analyze(*, location: ScanLocation) -> AnalyzerReturnType:
 
             if username in user_blacklist or password in pwd_blacklist:
                 continue
+            elif not (password and username):  # Filter blank values
+                continue
 
             sig = fast_checksum(f"{section_name}#{username}#{password}")
 
@@ -41,9 +46,10 @@ def analyze(*, location: ScanLocation) -> AnalyzerReturnType:
                 location = location.location,
                 score = 100,  # TODO: make the score configurable
                 extra = {
+                    "section": section_name,
                     "username": username,
                     "password": password
                 },
-                tags = {"sensitive_file", "secrets_leak"}
+                tags = {"sensitive_file", "secrets_leak", "pypirc"}
             )
 

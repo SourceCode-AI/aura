@@ -117,6 +117,20 @@ diff: &diff
   depth_limit: 2
 
 
+pypirc: &pypirc
+  # Blacklist values to reduce false positives from the default configurations
+  username_blacklist:
+    - "empty"
+    - "${PYPI_USERNAME}"
+    - "None"
+  password_blacklist:
+    - "empty"
+    - "${PYPI_PASSWORD}"
+    - "..."
+    - "None"
+    - "<your test password goes here>"
+    - "<your production password goes here>"
+
 severities: &severities
   critical:
     score: 100

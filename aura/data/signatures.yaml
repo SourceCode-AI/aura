@@ -397,13 +397,6 @@ files: &default_files
     tags:
       - test_code
 
-  - type: exact
-    pattern: ".pypirc"
-    target: filename
-    tags:
-      - sensitive_file
-      - pypirc
-
   - type: regex
     pattern: "^id_[rd]sa$"
     target: filename
