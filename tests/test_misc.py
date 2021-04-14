@@ -81,7 +81,7 @@ def test_different_source_code_encoding(fixtures):
 def test_fs_structure_detections(fs_mock, fixtures, tmp_path):
     files = {
         "bytecode.pyc": "some_bytecode_content",
-        ".pypirc": "pypirc_content",
+        # FIXME: ".pypirc": "pypirc_content",
         ".empty.txt": ""
     }
 
@@ -97,23 +97,6 @@ def test_fs_structure_detections(fs_mock, fixtures, tmp_path):
             "extra": {
                 "file_name": "bytecode.pyc",
                 "file_type": "python_bytecode"
-            }
-        },
-        {
-            "type": "SuspiciousFile",
-            "message": "A potentially suspicious file has been found",
-            "tags": ["hidden_file"],
-            "extra": {
-                "file_name": ".pypirc",
-                "file_type": "hidden_file"
-            }
-        },
-        {
-            "type": "SensitiveFile",
-            "message": "A potentially sensitive file has been found",
-            "tags": ["sensitive_file"],
-            "extra": {
-                "file_name": ".pypirc"
             }
         }
     ]

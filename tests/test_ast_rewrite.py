@@ -196,3 +196,19 @@ def test_string_format_via_mod():
     tree = process_source_code(src)
     assert isinstance(tree, String)
     assert str(tree) == "Hello world"
+
+
+
+@pytest.mark.parametrize("src,modules", (
+    ("import a", {"a"}),
+    ("import a.b", {"a.b"}),
+    ("import m1, m2, m3", {"m1", "m2", "m3"}),
+    ("import a as b", {"a"}),
+    ("from a import *", {"a.*"}),
+    ("from a import b, c", {"a.b", "a.c"}),
+    ("from a import b as c", {"a.b"})
+))
+def test_various_imports(src, modules):
+    tree = process_source_code(src)
+    assert isinstance(tree, Import)
+    assert tree.get_modules() == modules

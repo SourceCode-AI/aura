@@ -39,7 +39,7 @@ class ASTPatternMatcherVisitor(Visitor):
                     "name": module_name
                 },
                 node=context.node,
-                signature=f"module_import#{module_name}#{context.visitor.normalized_path}",
+                signature=f"module_import#{module_name}#{context.signature}",
                 tags=context.node.tags
             )
             self.hits.append(hit)
