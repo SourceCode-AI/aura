@@ -10,7 +10,8 @@ from aura.analyzers.python_src_inspector import collect
 
 
 
-def process_taint(src: str, pattern: str, taint: str="tainted"):
+@patch("aura.cache.ASTPatternCache.proxy")
+def process_taint(src: str, pattern: str, cache_mock, taint: str="tainted"):
     tree = collect(dedent(src), minimal=True)
     loc = ScanLocation(location="<unknown>")
     p = ASTPattern({
@@ -18,9 +19,10 @@ def process_taint(src: str, pattern: str, taint: str="tainted"):
         "taint": taint
     })
 
-    with patch.object(config, "get_ast_patterns", return_value=[p]) as mock:
-        v = Visitor.run_stages(location=loc,  ast_tree=tree)
-        return v.tree[-1]
+    cache_mock.return_value = [p]
+
+    v = Visitor.run_stages(location=loc,  ast_tree=tree)
+    return v.tree[-1]
 
 
 

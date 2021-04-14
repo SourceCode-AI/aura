@@ -4,10 +4,12 @@ import os
 import shutil
 import hashlib
 import datetime
+import pickle
 import xmlrpc.client
+import concurrent.futures
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional, List, Generator, Iterable, BinaryIO
+from typing import Optional, List, Generator, Iterable, BinaryIO, Tuple
 
 import click
 import requests
@@ -15,6 +17,7 @@ from packaging.utils import canonicalize_name
 
 from . import utils
 from . import config
+from .pattern_matching import ASTPattern
 from .json_proxy import loads, dumps
 
 
@@ -396,13 +399,78 @@ class PyPIPackageList(Cache):
         return packages
 
 
+class ASTPatternCache(Cache):
+    prefix = "ast_patterns_"
+    # We want to store the compiled patterns also here as it is accessed very frequently
+    # (de)serializing the ast patterns on each access would be very slow
+    _AST_PATTERN_CACHE = None
+    _SIGNATURE_HASH = None
+
+    def __init__(self, cache_id=None, tags: Optional[List[str]]=None):
+        self.cid = cache_id or self.get_patterns_hash()
+        self.tags = tags or []
+
+    @classmethod
+    def _compile_all(cls):
+        if cls._AST_PATTERN_CACHE is None:
+            with concurrent.futures.ThreadPoolExecutor() as e:
+                cls._AST_PATTERN_CACHE = tuple(e.map(ASTPattern, config.SEMANTIC_RULES.get("patterns", [])))
+
+        return cls._AST_PATTERN_CACHE
+
+    @classmethod
+    def get_patterns_hash(cls) -> str:
+        """
+        Compute the checksum of signatures/configuration
+        ast pattern cache should be invalidated if the configuration changes
+        """
+        if cls._SIGNATURE_HASH is None:
+            payload = dumps(config.SEMANTIC_RULES.get("patterns", []))
+            cls._SIGNATURE_HASH = utils.fast_checksum(payload)
+
+        return cls._SIGNATURE_HASH
+
+    @classmethod
+    def cache_id(cls, arg) -> str:
+        return cls.get_patterns_hash()
+
+    @classmethod
+    def proxy(cls, cache_id=None) -> Tuple[ASTPattern, ...]:
+        if cls._AST_PATTERN_CACHE:
+            return cls._AST_PATTERN_CACHE
+
+        if cls.get_location() is None:
+            return cls._compile_all()
+
+        cache_obj = cls(cache_id=cache_id)
+        if cache_obj.is_valid:
+            return pickle.loads(cache_obj.cache_file_location.read_bytes())
+
+        try:
+            patterns = cls._compile_all()
+            cache_obj.save_metadata()
+            cache_obj.cache_file_location.write_bytes(pickle.dumps(patterns))
+            return patterns
+        except Exception as exc:
+            cache_obj.delete()
+            raise exc
+
+    @property
+    def metadata(self) -> dict:
+        return {
+            "id": self.cid,
+            "tags": self.tags,
+            "type": "ast_patterns"
+        }
+
 
 CACHE_TYPES = {
     "url": URLCache,
     "filedownload": FileDownloadCache,
     "mirror": MirrorFile,
     "mirrorjson": MirrorJSON,
-    "pypi_package_list": PyPIPackageList
+    "pypi_package_list": PyPIPackageList,
+    "ast_patterns": ASTPatternCache
 }
 
 

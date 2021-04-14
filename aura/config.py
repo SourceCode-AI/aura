@@ -2,11 +2,9 @@
 import os
 import sys
 import typing
-import time
 import resource
 import logging
 import warnings
-import concurrent.futures
 from importlib import resources
 from pathlib import Path
 from functools import lru_cache
@@ -33,7 +31,6 @@ LOG_ERR = None
 # This is used to trigger breakpoint during AST traversing of specific lines
 DEBUG_LINES = set()
 DEFAULT_AST_STAGES = ("convert", "rewrite", "ast_pattern_matching", "taint_analysis", "readonly")
-AST_PATTERNS_CACHE: Optional[tuple] = None
 PROGRESSBAR_DISABLED: bool = ("AURA_NO_PROGRESS" in os.environ)
 
 DEFAULT_CFG_PATH = "aura.data.aura_config.yaml"
@@ -280,19 +277,6 @@ def get_installed_stages() -> typing.Generator[str,None,None]:
 def get_ast_stages() -> typing.Tuple[str,...]:
     cfg_value = CFG["aura"].get("ast-stages") or DEFAULT_AST_STAGES
     return [x for x in cfg_value if x]
-
-
-def get_ast_patterns() -> tuple:
-    global AST_PATTERNS_CACHE
-    from .pattern_matching import ASTPattern
-
-    if AST_PATTERNS_CACHE is None:
-        start = time.monotonic()
-        with concurrent.futures.ThreadPoolExecutor() as e:
-            AST_PATTERNS_CACHE = tuple(e.map(ASTPattern, SEMANTIC_RULES.get("patterns", [])))
-        elapsed = round(time.monotonic() - start, 5)
-        logger.debug(f"AST Pattern compilation took {elapsed}s")
-    return AST_PATTERNS_CACHE
 
 
 def can_fork() -> bool:

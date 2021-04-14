@@ -199,7 +199,6 @@ def test_always_delete_expired(exp_mock, mock_cache, fixtures):
         assert x._deleted is True
 
 
-@pytest.mark.e2e
 @responses.activate
 def test_url_caching(mock_cache):
     payload = "Hello body"
@@ -218,7 +217,6 @@ def test_url_caching(mock_cache):
     assert len(tuple(cache.CacheItem.iter_items())) == 0
 
 
-@pytest.mark.e2e
 @responses.activate
 def test_filedownload_caching(mock_cache):
     payload = b"this is some file payload"
@@ -238,7 +236,6 @@ def test_filedownload_caching(mock_cache):
     assert len(tuple(cache.CacheItem.iter_items())) == 0
 
 
-@pytest.mark.e2e
 @mock.patch("aura.cache.PyPIPackageList._get_package_list")
 def test_pypi_cache(pkg_list_mock, mock_cache):
     pkgs = ["pkg1", "pkg2", "pkg3"]
@@ -256,6 +253,36 @@ def test_pypi_cache(pkg_list_mock, mock_cache):
     cache_items = tuple(cache.CacheItem.iter_items())
     assert len(cache_items) == 1
     assert cache_items[0].metadata["type"] == "pypi_package_list"
+
+    cache.CacheItem.cleanup()
+    assert len(tuple(cache.CacheItem.iter_items())) == 0
+
+
+@mock.patch("aura.cache.ASTPatternCache.get_patterns_hash", return_value="sig1")
+@mock.patch("aura.cache.ASTPatternCache._compile_all", return_value=[])
+def test_ast_cache(ast_compile_mock, patterns_hash_mock, mock_cache):
+    # Reset the cache status
+    cache.ASTPatternCache._AST_PATTERN_CACHE = None
+
+    assert [] == cache.ASTPatternCache.proxy()
+    assert ast_compile_mock.called is True
+    ast_compile_mock.reset_mock()
+
+    assert [] == cache.ASTPatternCache.proxy()
+    assert ast_compile_mock.called is False
+
+    cache_items = tuple(cache.CacheItem.iter_items())
+    assert len(cache_items) == 1
+    assert cache_items[0].metadata["type"] == "ast_patterns"
+
+    # Test that cache is invalidated if config hash changes
+    patterns_hash_mock.return_value = "sig2"
+    ast_compile_mock.return_value = ["changed"]
+
+    assert ["changed"] == cache.ASTPatternCache.proxy()
+
+    # Now there will be two items, the old ast patterns and new ones
+    assert len(tuple(cache.CacheItem.iter_items())) == 2
 
     cache.CacheItem.cleanup()
     assert len(tuple(cache.CacheItem.iter_items())) == 0
