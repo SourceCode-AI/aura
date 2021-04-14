@@ -622,3 +622,127 @@ strings: &default_strings
     pattern: "^sudo .*$"
     message: "Executing sudo command"
     score: 20
+
+  # Regexes for detecting leaking api tokens, secrets, etc...
+  # Source of some regexes used: https://www.ndss-symposium.org/wp-content/uploads/2019/02/ndss2019_04B-3_Meli_paper.pdf
+  - id: twitter_access_token
+    type: regex
+    pattern: "^[1-9][0-9]+-[0-9a-zA-Z]{40}$"
+    message: "Twitter access token"
+    score: 100
+    tags:
+      - secrets_leak
+
+  - id: facebook_access_token
+    type: regex
+    pattern: "^EAACEdEose0cBA[0-9A-Za-z]+$"
+    message: "Facebook access token"
+    score: 100
+    tags:
+      - secrets_leak
+
+  - id: google_api_key
+    type: regex
+    pattern: "^AIza[-0-9A-Za-z_]{35}$"
+    message: "Google API key"
+    score: 100
+    tags:
+      - secrets_leak
+
+  - id: google_oauth_id
+    type: regex
+    pattern: "^[0-9]+-[0-9A-Za-z_]{32}\\.apps\\.googleusercontent\\.com$"
+    message: "Google OAuth ID"
+    score: 100
+    tags:
+      - secrets_leak
+
+  - id: picatic_api_key
+    type: regex
+    pattern: "^sk_live_[0-9a-z]{32}$"
+    message: "Picatic API key"
+    score: 100
+    tags:
+      - secrets_leak
+
+  - id: stripe_standard_key
+    type: regex
+    pattern: "^sk_live_[0-9a-zA-Z]{24}$"
+    message: "Stripe standard key"
+    score: 100
+    tags:
+      - secrets_leak
+
+  - id: stripe_restricted_key
+    type: regex
+    pattern: "^rk_live_[0-9a-zA-Z]{24}$"
+    message: "Stripe restricted key"
+    score: 100
+    tags:
+      - secrets_leak
+
+  - id: square_access_token
+    type: regex
+    pattern: "^sq0atp-[-0-9A-Za-z_]{22}$"
+    message: "Square access token"
+    score: 100
+    tags:
+      - secrets_leak
+
+  - id: square_oauth_secret
+    type: regex
+    pattern: "^sq0csp-[-0-9A-Za-z_]{43}$"
+    message: "Square OAuth secret"
+    score: 100
+    tags:
+      - secrets_leak
+
+  - id: paypal_braintree
+    type: regex
+    pattern: "^access_token\\$production\\$[0-9a-z]{16}\\$[0-9a-f]{32}$"
+    message: "PayPal braintree access token"
+    score: 100
+    tags:
+      - secrets_leak
+
+  - id: amazon_mws_auth_token
+    type: regex
+    pattern: "^amzn\\.mws\\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    message: "Amazon MWS auth token"
+    score: 100
+    tags:
+      - secrets_leak
+
+  - id: twilio_api_key
+    type: regex
+    pattern: "^SK[0-9a-fA-F]{32}$"
+    message: "Twilio API key"
+    score: 100
+    tags:
+      - secrets_leak
+
+  - id: mailgun_api_key
+    type: regex
+    pattern: "^key-[0-9a-zA-Z]{32}$"
+    message: "Mailgun API key"
+    score: 100
+    tags:
+      - secrets_leak
+
+  - id: mailchimp_api_key
+    type: regex
+    pattern: "^[0-9a-f]{32}-us[0-9]{1,2}$"
+    message: "MailChimp API key"
+    score: 100
+    tags:
+      - secrets_leak
+
+  - id: amazon_aws_key
+    type: regex
+    pattern: "^(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[0-9A-Z]{16}$"
+    message: "Amazon AWS key"
+    score: 100
+    tags:
+      - secrets_leak
+
+

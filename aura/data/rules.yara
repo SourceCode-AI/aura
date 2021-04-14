@@ -94,38 +94,23 @@ rule PossiblePersistence: persistence
 }
 
 
-rule SecretsLeak: secrets_leak
+/*rule SecretsLeak: secrets_leak
 {
     meta:
         score = 100
     strings:
-        $aws_manager_id = /(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}/
         $aws_secret_key = /aws(.{0,20})?['\"][0-9a-zA-Z\/+]{40}['\"]/ nocase
-        $aws_mws_key = /amzn\.mws\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/
-        $facebook_secret_key = /(facebook|fb)(.{0,20})?['\"][0-9a-f]{32}['\"]/ nocase
-        $facebook_client_id = /(facebook|fb)(.{0,20})?['\"][0-9]{13,17}['\"]/ nocase
-        $twitter_secret_key = /twitter(.{0,20})?[0-9a-z]{35,44}/ nocase
-        $twitter_client_id = /twitter(.{0,20})?[0-9a-z]{18,25}/ nocase
         $github = /github(.{0,20})?[0-9a-zA-Z]{35,40}/ nocase
         $linkedin_client_id = /linkedin(.{0,20})?[0-9a-z]{12}/ nocase
         $linkedin_secret_key = /linkedin(.{0,20})?[0-9a-z]{16}/ nocase
         $slack = /xox(b|a|p|r|s)-([0-9a-z]{10,48})?/ nocase
-        $google_api_key = /AIza[0-9A-Za-z\\-_]{35}/
         $google_gcp_account = /"type": "service_account"/
         $heroku_api_key = /heroku(.{0,20})?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/ nocase
-        $mailchimp_api_key = /(mailchimp|mc)(.{0,20})?[0-9a-f]{32}-us[0-9]{1,2}/ nocase
-        $mailgun_api_key = /((mailgun|mg)(.{0,20})?)?key-[0-9a-z]{32}/ nocase
-        $paypal_braintree_access_token = /access_token\$production\$[0-9a-z]{16}\$[0-9a-f]{32}/
-        $picatic_api_key = /sk_live_[0-9a-z]{32}/
         $sendgrid_api_key = /SG\.[\w_]{16,32}\.[\w_]{16,64}/
         $slack_webhook = /https:\/\/hooks.slack.com\/services\/T[a-zA-Z0-9_]{8}\/B[a-zA-Z0-9_]{8}\/[a-zA-Z0-9_]{24}/
-        $strip_api_key = /stripe(.{0,20})?[sr]k_live_[0-9a-zA-Z]{24}/ nocase
-        $square_access_token = /sq0atp-[0-9A-Za-z\-_]{22}/
-        $square_oauth_secret = /sq0csp-[0-9A-Za-z\\-_]{43}/
-        $twilio_api_key = /twilio(.{0,20})?SK[0-9a-f]{32}/ nocase
     condition:
         any of them
-}
+}*/
 
 
 //TO-DO: https://github.com/SublimeCodeIntel/CodeIntel/blob/master/codeintel/which.py#L101

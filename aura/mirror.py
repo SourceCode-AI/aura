@@ -25,8 +25,9 @@ class LocalMirror:
 
         return cls._mirror_path
 
-    def list_packages(self) -> typing.Generator[Path, None, None]:
-        yield from (self.get_mirror_path() / "json").iterdir()
+    @classmethod
+    def list_packages(cls) -> typing.Generator[Path, None, None]:
+        yield from (cls.get_mirror_path() / "json").iterdir()
 
     def get_json(self, package_name) -> dict:
         assert package_name

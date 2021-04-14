@@ -2,7 +2,11 @@ import asyncio
 import logging
 from typing import Iterable, TextIO
 
+import tqdm
+
 from . import github
+from . import mirror
+from . import cache
 from .worker_executor import non_blocking, AsyncQueue
 from .exceptions import NoSuchPackage
 from .uri_handlers.base import URIHandler
@@ -34,6 +38,18 @@ async def fetch_package(uri_queue, github_prefetcher):
 
 
 def prefetch_mirror(uris: Iterable[str], workers=10):
+    logger.info("Caching AST patterns")
+    cache.ASTPatternCache.proxy()
+
+    logger.info("Caching list of packages on pypi")
+    cache.PyPIPackageList.proxy()
+
+    logger.info("Prefetching package JSON information")
+    lm = mirror.LocalMirror()
+    pkgs = tuple(lm.list_packages())
+    for x in tqdm.tqdm(pkgs, leave=False):
+        lm.get_json(x)
+
     loop = asyncio.get_event_loop()
 
     pf = github.GitHubPrefetcher()
