@@ -300,3 +300,32 @@ def test_ast_cache(ast_compile_mock, patterns_hash_mock, mock_cache):
 
     cache.CacheItem.cleanup()
     assert len(tuple(cache.CacheItem.iter_items())) == 0
+
+
+@responses.activate
+def test_cache_tag_filtering(mock_cache, fixtures):
+    def _cb(request):
+        return (200, {}, "Hello world")
+
+    responses.add_callback(method=responses.GET, url="http://example.com/tag_test", match_querystring=False, callback=_cb)
+
+    tags = {"tag1", "tag2", "tag3"}
+
+    for tag in tags:
+        url = f"http://example.com/tag_test?tag={tag}"
+        cache.URLCache.proxy(url=url, tags=[tag])
+
+
+    all_items = tuple(cache.CacheItem.iter_items())
+    assert len(all_items) == len(tags)
+
+    items = tuple(cache.CacheItem.iter_items(tags=["non-existing"]))
+    assert len(items) == 0
+
+    items_by_type = tuple(cache.CacheItem.iter_items(tags=["url"]))
+    assert len(items_by_type) == len(all_items)
+
+    for tag in tags:
+        items = tuple(cache.CacheItem.iter_items(tags=[tag]))
+        assert len(items) == 1
+        assert tag in items[0].tags

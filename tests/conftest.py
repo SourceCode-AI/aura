@@ -20,6 +20,9 @@ import pytest
 
 os.environ["AURA_NO_CACHE"] = "true"
 
+if "AURA_MIRROR_PATH" in os.environ:
+    os.unsetenv("AURA_MIRROR_PATH")
+
 
 # Definition used to replicate the PyPI mirror file system structure
 MIRROR_FILES = {

@@ -9,7 +9,7 @@ import xmlrpc.client
 import concurrent.futures
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional, List, Generator, Iterable, BinaryIO, Tuple
+from typing import Optional, List, Generator, Iterable, BinaryIO, Tuple, Set
 
 import click
 import requests
@@ -29,7 +29,7 @@ class CacheItem:
         self.path = path
         self.metadata = loads(path.read_text())
 
-        self.cls = CACHE_TYPES[self.metadata["type"]]
+        self.cls = CACHE_TYPES[self.type]
         self.item_path = path.parent / f"{self.cls.prefix}{self.metadata['id']}"
         self.item_stat = self.item_path.stat()
         # Used to avoid re-listing the cache content to find deleted items
@@ -37,12 +37,21 @@ class CacheItem:
         self._deleted = False
 
     @classmethod
-    def iter_items(cls) -> Generator[CacheItem, None, None]:
+    def iter_items(cls, tags=None) -> Generator[CacheItem, None, None]:
+        tags = set(tags or ())
+
         for x in Cache.get_location().iterdir():
             if not x.name.endswith(".metadata.json"):
                 continue
 
-            yield cls(x)
+            obj = cls(x)
+
+            if tags:
+                if obj.type in tags or tags.intersection(obj.tags):
+                    yield obj
+            else:
+                yield obj
+
 
     @property
     def mtime(self) -> int:
@@ -58,6 +67,14 @@ class CacheItem:
         modified = datetime.datetime.utcfromtimestamp(self.mtime)
         exp_threshold = get_expiration()
         return now > modified+exp_threshold
+
+    @property
+    def type(self) -> str:
+        return self.metadata["type"]
+
+    @property
+    def tags(self) -> Set[str]:
+        return set(self.metadata.get("tags", ()))
 
     def delete(self):
         self.item_path.unlink(missing_ok=True)
@@ -143,10 +160,6 @@ class Cache(ABC):
                 cls.__location = c
 
         return cls.__location
-
-    @classmethod
-    def proxy_url(cls, *, url, fd, cache_id=None):
-        return FileDownloadCache.proxy(url=url, fd=fd, cache_id=cache_id)
 
     def save_metadata(self):
         self.metadata_location.write_text(dumps(self.metadata))

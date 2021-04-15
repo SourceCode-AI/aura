@@ -17,11 +17,7 @@ class MirrorHandler(URIHandler):
 
         self.package_name = uri.hostname
         self.mirror_path = mirror.LocalMirror.get_mirror_path()  # Path(uri.path)
-
-        if self.package_name == "$all":
-            self.package = "$all"
-        else:
-            self.package = PypiPackage.from_cached(self.package_name)
+        self.package = PypiPackage.from_cached(self.package_name)
 
         self.opts.update(parse_qs(uri.query))
         self.comment = uri.fragment.lstrip("#")
