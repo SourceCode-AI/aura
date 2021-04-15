@@ -62,7 +62,8 @@ class GitHub:
         else:
             return 0.0
 
-    def __get_json(self, url: str) -> Union[dict, list]:
+    @staticmethod
+    def _get_json(url: str) -> Union[dict, list]:
         payload = URLCache.proxy(url=url, tags=["github_api"], session=SESSION)
         return json.loads(payload)
 
@@ -70,7 +71,7 @@ class GitHub:
         url = f"https://api.github.com/repos/{self.owner}/{self.name}"
 
         try:
-            return self.__get_json(url)
+            return self._get_json(url)
         except HTTPError as exc:
             if exc.code == 404:
                 raise NoSuchRepository(f"{self.owner}/{self.name}") from exc
@@ -84,7 +85,7 @@ class GitHub:
 
     def get_contributors(self) -> list:
         url = f"https://api.github.com/repos/{self.owner}/{self.name}/contributors"
-        return self.__get_json(url=url)
+        return self._get_json(url=url)
 
 
 class GitHubPrefetcher:
@@ -109,13 +110,13 @@ class GitHubPrefetcher:
         if (remaining := GitHub.x_api_remaining - self.safety_buffer) <= 0:
             return reset_time
 
-        return reset_time / remaining
+        return 0.0
 
     async def process(self, max_retries=3, backoff=1.0):
         while True:
             api_wait_time = self.wait_time
             if api_wait_time > 3:
-                logger.info(f"Rate limit reached, waiting for {api_wait_time}s")
+                logger.warning(f"Rate limit reached, waiting for {api_wait_time}s")
 
             await asyncio.sleep(api_wait_time)
             item: Optional[str] = await self.queue.get()

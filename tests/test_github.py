@@ -1,6 +1,8 @@
 import json
 import pytest
+import requests
 import responses
+from unittest import mock
 
 from aura import github
 from aura import cache
@@ -37,16 +39,32 @@ def test_invalid_github_repos(url, mock_github):
 @responses.activate
 def test_github_cache(mock_github, mock_cache):
     mock_github(responses)
+    repo_url = "https://api.github.com/repos/psf/requests"
+    contributors_url = "https://api.github.com/repos/psf/requests/contributors"
 
+    real_session = requests.Session()
+    mock_session = mock.Mock(wraps=real_session, spec=True)
     _ = github.GitHub.from_url("https://github.com/psf/requests")
 
-    url1_cached = cache.URLCache(url="https://api.github.com/repos/psf/requests")
+    url1_cached = cache.URLCache(url=repo_url)
     assert url1_cached.is_valid is True
     assert type(json.loads(url1_cached.fetch())) == dict
 
-    url2_cached = cache.URLCache(url="https://api.github.com/repos/psf/requests/contributors")
+    url2_cached = cache.URLCache(url=contributors_url)
     assert url2_cached.is_valid
     assert type(json.loads(url2_cached.fetch())) == list
+
+    responses.reset()
+    # Test that the data is cached and does not fire any requests
+    _ = github.GitHub.from_url("https://github.com/psf/requests")
+
+    output = cache.URLCache.proxy(url=repo_url, session=mock_session)
+    assert mock_session.called is False
+    assert type(json.loads(output)) == dict
+
+    output = cache.URLCache.proxy(url=contributors_url, session=mock_session)
+    assert mock_session.called is False
+    assert type(json.loads(output)) == list
 
 
 @responses.activate
