@@ -28,6 +28,7 @@ if [ ! -f "$OUTDIR/package_cache" ]; then
     cp $AURA_MIRROR_PATH/pypi_package_list.txt $OUTDIR/package_cache;
   else
     ls $AURA_MIRROR_PATH/json >$OUTDIR/package_cache;
+  fi
 fi
 
 
