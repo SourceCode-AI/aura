@@ -3,6 +3,8 @@ import json
 import uuid
 from unittest import mock
 from pathlib import Path
+from urllib.parse import urlparse
+from contextlib import ExitStack
 
 import pytest
 import responses
@@ -11,6 +13,7 @@ from aura import config
 from aura import cache
 from aura import mirror
 from aura import exceptions
+from aura.uri_handlers.base import URIHandler
 
 
 CACHE_ENTRIES = {
@@ -99,18 +102,24 @@ def test_mirror_cache(fixtures, simulate_mirror, mock_cache):
 ))
 def test_mirror_cache_paths(file_path, fixtures, mock_cache):
     pth = Path(fixtures.path(file_path))
+    exc = RuntimeError("failed")
     assert pth.exists()
+
+    mock_pth = mock.Mock(spec=pth, wraps=pth)
+    mock_pth.exists.side_effect = exc
+    mock_pth.name = pth.name
 
     cached = cache.MirrorFile.proxy(src=pth)
     assert cached != pth
+    assert cached != mock_pth
 
-    with mock.patch.object(cache.MirrorFile, "fetch", side_effect=RuntimeError("failed")):
-        cached2 = cache.MirrorFile.proxy(src=pth)
+    with mock.patch.object(cache.MirrorFile, "fetch", side_effect=exc):
+        cached2 = cache.MirrorFile.proxy(src=mock_pth)
 
     assert cached2 == cached
 
     cache_obj = cache.MirrorFile(src=pth)
-    assert cache_obj.is_valid
+    assert cache_obj.is_valid is True
     assert cache_obj.cache_file_location == cached
     assert cache_obj.cache_file_location.exists()
     assert cache_obj.metadata_location.exists()
@@ -118,31 +127,36 @@ def test_mirror_cache_paths(file_path, fixtures, mock_cache):
     cache_obj.delete()
     assert not cache_obj.cache_file_location.exists()
     assert not cache_obj.metadata_location.exists()
-    assert not cache_obj.is_valid
+    assert cache_obj.is_valid is False
 
 
-@mock.patch("aura.mirror.LocalMirror.get_mirror_path")
-def test_mirror_cache_no_remote_access(mirror_mock, tmp_path, mock_cache):
-    """
-    Test that if the content is fully cached, the mirror uri handler does not attempt to access the mirror but rather retrieves **all** content from cache only
-    This is mainly to test correctness of prefetching the data for global PyPI scan to ensure no further network calls are made
-    """
-    pkg = str(uuid.uuid4())
-    pkg_content = {"id": pkg}
-    mirror_path = tmp_path / "mirror"
-    mirror_mock.return_value = mirror_path
-    m = mirror.LocalMirror()
+def test_mirror_no_remote_access(simulate_mirror, mock_cache):
+    uri = "mirror://wheel"
+    exc = RuntimeError("test failed")
 
-    cache_path = cache.Cache.get_location()
-    assert m.get_mirror_path() == mirror_path
-    assert mirror_path.exists() == False
+    assert str(mirror.LocalMirror.get_mirror_path()) == simulate_mirror
+    assert cache.MirrorFile.get_location() is not None
 
-    with pytest.raises(exceptions.NoSuchPackage):
-        m.get_json(pkg)
+    handler = URIHandler.from_uri(uri)
+    paths = tuple(handler.get_paths())
+    assert len(paths) > 0
 
-    (cache_path/f"mirrorjson_{pkg}").write_text(json.dumps(pkg_content))
-    out = m.get_json(pkg)
-    assert out == pkg_content
+    for path in paths:
+        assert path.location.exists()
+        path = str(path.location)
+        assert not path.startswith(simulate_mirror)
+
+
+    with ExitStack() as stack:
+        # Mock any remote file access functionality to throw an exception
+        shutil_mock = stack.enter_context(mock.patch("aura.cache.shutil"))
+        shutil_mock.copyfile.side_effect = exc
+        fetch_mock = stack.enter_context(mock.patch("aura.cache.MirrorFile.fetch", side_effect=exc))
+
+        handler_cached = URIHandler.from_uri(uri)
+        paths_cached = tuple(handler_cached.get_paths())
+
+    assert paths == paths_cached
 
 
 @mock.patch("aura.cache.get_cache_threshold")

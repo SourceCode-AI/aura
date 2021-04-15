@@ -53,10 +53,10 @@ class MirrorHandler(URIHandler):
             meta.update(self.metadata)
             meta.setdefault("package", {})["info"] = x
             pkg_path = self.mirror_path / urlparse(x["url"]).path.lstrip("/")
-            target = cache.MirrorFile.proxy(src=pkg_path, cache_id=x['filename'])
+            target = cache.MirrorFile.proxy(src=pkg_path)
 
             if target:
                 yield ScanLocation(
-                    location=pkg_path,
+                    location=target,
                     metadata=meta
                 )

@@ -348,7 +348,7 @@ class MirrorFile(Cache):
 
     def fetch(self):
         shutil.copyfile(src=self.src, dst=self.cache_file_location, follow_symlinks=True)
-        self.metadata_location.write_text(dumps(self.metadata))
+        self.save_metadata()
 
 
 class PyPIPackageList(Cache):
