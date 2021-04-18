@@ -21,6 +21,7 @@ from . import exceptions
 from . import utils
 from . import mirror
 from . import typos
+from . import cache
 from .analyzers.detections import Detection
 from .output.base import ScanOutputBase, DiffOutputBase, InfoOutputBase, TyposquattingOutputBase
 
@@ -228,3 +229,8 @@ def generate_typosquatting(distance=2, limit=None, pkgs=None, format_uri="text",
     formatter = TyposquattingOutputBase.from_uri(format_uri)
     formatter.output_typosquatting(islice(typos.enumerator(combinations, f, extended=extended), 0, limit))
 
+
+def cleanup(cache_tags):
+    cache_items = tuple(cache.CacheItem.iter_items(tags=cache_tags))
+    click.confirm(f"You are about to delete {len(cache_items)} cache items. Proceed?", abort=True)
+    cache.CacheItem.cleanup(items=cache_items)

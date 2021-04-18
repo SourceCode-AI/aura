@@ -52,7 +52,6 @@ class CacheItem:
             else:
                 yield obj
 
-
     @property
     def mtime(self) -> int:
         return self.item_stat.st_mtime

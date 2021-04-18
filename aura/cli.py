@@ -255,6 +255,12 @@ def check_requirement():
     commands.check_requirement(payload)
 
 
+@cli.command()
+@click.option("--tag", "-t", multiple=True)
+def cleanup(tag=None):
+    commands.cleanup(cache_tags=tag)
+
+
 def main():
     if "AURA_USER" in os.environ:
         username = os.environ["AURA_USER"]
