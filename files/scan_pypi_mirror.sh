@@ -24,7 +24,7 @@ if [ ! -d "${AURA_MIRROR_PATH}/json" ]; then
 fi
 
 if [ ! -f "$OUTDIR/package_cache" ]; then
-  if [ -f $AURA_MIRROR_PATH/pypi_package_list.txt]; then
+  if [ -f $AURA_MIRROR_PATH/pypi_package_list.txt ]; then
     cp $AURA_MIRROR_PATH/pypi_package_list.txt $OUTDIR/package_cache;
   else
     ls $AURA_MIRROR_PATH/json >$OUTDIR/package_cache;
@@ -44,21 +44,10 @@ scan() {
   else
     echo $1 >>$OUTDIR/processed_packages.log
   fi
-
-  if [ -s $RESULTS_FILE ]; then
-    echo "Removing empty $RESULTS_FILE"
-    rm $RESULTS_FILE
-  fi
-
-  if [ -s $ERROR_FILE ]; then
-    echo "Removing empty $ERROR_FILE"
-    rm $ERROR_FILE
-  fi
-
 }
 
 export -f scan
 
 echo "Starting Aura scan"
 
-echo $PKGS|tr ' \r' '\n'| parallel --memfree 5G -j30 --progress --resume-failed --timeout 1200 --joblog $OUTDIR/joblog --max-args 1 scan
+echo $PKGS|tr ' \r' '\n'| parallel --memfree 5G --progress --resume-failed --timeout 1200 --joblog $OUTDIR/joblog --max-args 1 scan

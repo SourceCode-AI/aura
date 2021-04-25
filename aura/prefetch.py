@@ -44,11 +44,11 @@ def prefetch_mirror(uris: Iterable[str], workers=10):
     logger.info("Caching list of packages on pypi")
     cache.PyPIPackageList.proxy()
 
-    logger.info("Prefetching package JSON information")
-    lm = mirror.LocalMirror()
-    pkgs = tuple(lm.list_packages())
-    for x in tqdm.tqdm(pkgs, leave=False):
-        lm.get_json(x)
+    #logger.info("Prefetching package JSON information")
+    #lm = mirror.LocalMirror()
+    #pkgs = tuple(lm.list_packages())
+    #for x in tqdm.tqdm(pkgs, leave=False):
+    #    lm.get_json(x)
 
     loop = asyncio.get_event_loop()
 
