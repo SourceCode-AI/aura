@@ -88,4 +88,7 @@ def read_uris(file_input: TextIO) -> Iterable[str]:
         if line.startswith("#") or not line:
             continue
         else:
+            if (not line.startswith("mirror://")) and mirror.LocalMirror.get_mirror_path():
+                line = "mirror://" + line
+
             yield line
