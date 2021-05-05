@@ -26,6 +26,7 @@ Misc
 .. toctree::
     misc/global_pypi_scan.rst
     misc/datasets.rst
+    misc/pypi_dataset_sqlite_schema.rst
     misc/detections.rst
     python_2.rst
     misc/visitors.rst
