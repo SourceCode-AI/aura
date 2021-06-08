@@ -1,6 +1,6 @@
 [tool.poetry]
-name = "aura"
-version = "2.0a1"
+name = "aura-security"
+version = "2.1"
 description = "Security auditing and static analysis for python"
 authors = [
     "Martin Carnogursky <admin@sourcecode.ai>"
@@ -37,28 +37,28 @@ include = [
 
 [tool.poetry.dependencies]
 python = "^3.8 || ^3.9 || ^3.10"
-packaging = "~20.4"
-python-magic = "~0.4.18"
-click = "~7.1.2"
-colorama = "~0.4.3"
-requests = "~2.24"
-tqdm = "~4.49"
-pytz = "~2020.1"
-"ruamel.yaml" = "~0.15"
+packaging = "~20.9"
+python-magic = "~0.4.24"
+click = "~8.0"
+colorama = "~0.4.4"
+requests = "~2.25.1"
+tqdm = "~4.61"
+pytz = "~2021.1"
+"ruamel.yaml" = "~0.17.7"
 
 # TODO: make the following dependencies optional
 python-tlsh = "~3.17.0"
 prettyprinter = "~0.18.0"
-jinja2 = "~2.11.2"
+jinja2 = "~3.0"
 
 # TODO: Extras, autodetect their presence in aura
-jsonschema = { version = "~3.2.0", optional = true }
-GitPython = { version = "~3.1.8", optional = true }
-defusedxml = { version = "~0.6.0", optional = true }
-tomlkit = {version = "~0.7.0", optional = true }
+jsonschema = { version = "~3.2", optional = true }
+GitPython = { version = "~3.1", optional = true }
+defusedxml = { version = "~0.7", optional = true }
+tomlkit = {version = "~0.7", optional = true }
 yara-python = {version = "~4.0.5", optional = true}
 networkx = {version = "~2.5", optional = true}
-python-rapidjson = { version = "~0.9.1", optional = true }
+python-rapidjson = { version = "~1.0", optional = true }
 #pyarrow = { version = "~3.0", optional = true }
 
 [tool.poetry.extras]
@@ -149,7 +149,7 @@ build-backend = "poetry.masonry.api"
 [tool.pytest.ini_options]
 addopts = "--strict-markers"
 markers = [
-    "e2e: marks tests with end-to-end behaviour, there are relativelly slow as they test a compelte behaviour from executing the cli command to the finished results",
+    "e2e: marks tests with end-to-end behaviour, there are relativelly slow as they test a complete behaviour from executing the cli command to the finished results",
 ]
 
 [tool.black]
