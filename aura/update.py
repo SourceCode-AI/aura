@@ -6,6 +6,7 @@ from pathlib import Path
 
 from click import secho
 
+from . import config
 from . import utils
 
 
@@ -30,7 +31,12 @@ def update_dataset():
 
         archive = tarfile.open(fd.name, "r:*")
 
-        for f in ("reverse_dependencies.json", "pypi_stats.json"):
+        data_files = (
+            config.get_reverse_dependencies_path(exc=False).name,
+            config.get_pypi_stats_path(exc=False).name
+        )
+
+        for f in data_files:
             backup_file(cwd/f)
             archive.extract(f, path=cwd)
 

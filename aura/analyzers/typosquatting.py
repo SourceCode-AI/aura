@@ -4,6 +4,7 @@ from .detections import Detection
 from .. import typos
 from ..utils import Analyzer
 from ..type_definitions import AnalyzerReturnType
+from ..exceptions import MissingFile
 
 
 @Analyzer.ID("typosquatting")
@@ -11,7 +12,11 @@ def analyze(*, location: ScanLocation) -> AnalyzerReturnType:
     if not (pkg_name:=location.metadata.get("package_name")):
         return
 
-    typo_names = typos.check_name(pkg_name, full_list=True)
+    try:
+        typo_names = typos.check_name(pkg_name, full_list=True)
+    except MissingFile:
+        return
+
 
     for x in typo_names:
         yield Detection(

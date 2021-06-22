@@ -30,7 +30,7 @@ from .uri_handlers.base import ScanLocation
 from .output import table
 from .mirror import LocalMirror
 from .type_definitions import ReleaseInfo
-from .exceptions import NoSuchPackage
+from .exceptions import NoSuchPackage, MissingFile
 
 
 LOGGER = config.get_logger(__name__)
@@ -78,10 +78,10 @@ class PypiPackage:
         )
         return list(repo.list_packages())
 
-    def __contains__(self, item):
+    def __contains__(self, item: str):
         return item in self.info["releases"].keys()
 
-    def __getitem__(self, item):
+    def __getitem__(self, item: str):
         return self.info[item]
 
     @property
@@ -370,10 +370,17 @@ class PackageScore:
                     return self.Value(downloads, normalized, "PyPI downloads", explanation)
         except ValueError:
             pass
+        except MissingFile:
+            pass
+
         return PackageScore.NA("PyPI downloads")
 
     def score_reverse_dependencies(self) -> Union[Value, NA]:
-        dependencies = get_reverse_dependencies(self.package_name)
+        try:
+            dependencies = get_reverse_dependencies(self.package_name)
+        except MissingFile:
+            return PackageScore.NA("Reverse dependencies")
+
         if not dependencies:
             return PackageScore.NA("Reverse dependencies")
 
@@ -542,7 +549,7 @@ def md5_filter(release: ReleaseInfo, md5: Optional[str]=None) -> bool:
 
 def get_reverse_dependencies(pkg_name: str) -> List[str]:
     pkg_name = canonicalize_name(pkg_name)
-    dataset_path = Path("reverse_dependencies.json")
+    dataset_path = config.get_reverse_dependencies_path()
     with dataset_path.open("r") as fd:
         dataset = loads(fd.read())
 

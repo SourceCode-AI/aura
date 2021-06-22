@@ -3,6 +3,7 @@ from ..uri_handlers.base import ScanLocation
 from .detections import Detection
 from ..utils import Analyzer
 from ..type_definitions import AnalyzerReturnType
+from ..exceptions import MissingFile
 
 
 @Analyzer.ID("package_enrichment")
@@ -15,13 +16,18 @@ def analyze(*, location: ScanLocation) -> AnalyzerReturnType:
 
     pkg_score = pkg.score
 
+    try:
+        rev_dependencies = package.get_reverse_dependencies(pkg_name=pkg_name)
+    except MissingFile:
+        rev_dependencies = None
+
     extra = {
         "source_url": pkg.source_url,
         "homepage_url": pkg.homepage_url,
         "documentation_url": pkg.documentation_url,
         "latest_release": pkg.get_latest_release(),
         "score": pkg_score.get_score_matrix(),
-        "reverse_dependencies": package.get_reverse_dependencies(pkg_name=pkg_name),
+        "reverse_dependencies": rev_dependencies,
         "classifiers": pkg.info["info"].get("classifiers", []),
         "version": pkg.get_latest_release()
     }

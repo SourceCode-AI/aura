@@ -30,6 +30,10 @@ class InvalidConfiguration(AuraException, ValueError):
     pass
 
 
+class MissingFile(InvalidLocation):
+    pass
+
+
 class ASTNodeRewrite(AuraException):
     pass
 

@@ -495,7 +495,7 @@ def purge(standard: bool=False):
     if Cache.DISABLE_CACHE:
         return
 
-    mode = config.CFG.get("cache", {}).get("mode", "ask")
+    mode = config.get_cache_mode()
     if mode not in ("ask", "auto", "always"):
         raise ValueError(f"Cache mode has invalid value in the configuration: '{mode}'")
 

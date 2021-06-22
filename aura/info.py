@@ -13,7 +13,7 @@ except ImportError:
     jsonschema = None
 
 from . import __version__ as version
-from .exceptions import InvalidConfiguration
+from .exceptions import MissingFile
 from .uri_handlers.base import URIHandler
 from . import github
 from . import plugins
@@ -35,7 +35,7 @@ def check_pypi_stats() -> dict:
                 "enabled": True,
                 "description": "PyPI typosquatting protection enabled"
             }
-    except InvalidConfiguration:
+    except MissingFile:
         pass
 
     return {
@@ -51,7 +51,7 @@ def check_reverse_dependencies() -> dict:
                 "enabled": True,
                 "description": "Reverse dependencies dataset present. Package scoring feature is fully enabled"
             }
-    except InvalidConfiguration:
+    except MissingFile:
         pass
 
     return {

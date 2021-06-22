@@ -20,7 +20,7 @@ try:
 except ImportError:
     import json
 
-from .exceptions import InvalidConfiguration
+from .exceptions import InvalidConfiguration, MissingFile
 
 
 CFG: Optional[dict] = None
@@ -154,7 +154,15 @@ def find_configuration() -> Path:  # TODO: add tests
     return Path(DEFAULT_CFG_PATH)
 
 
-def get_file_location(location: str, base_path: Optional[str]=None) -> str:
+def get_file_location(location: str, base_path: Optional[str]=None, exc: bool=True) -> str:
+    """
+    Lookup a location of a file
+
+    :param location: relative or absolute file location or a filename
+    :param base_path: base path used for resolving relative paths or filenames
+    :param exc: Flag, raise an exception if the file could not be found/does not exists
+    :return: resolved path to the given file location
+    """
     if location.startswith("aura.data."):  # Load file as a resource from aura package
         return location
 
@@ -165,9 +173,14 @@ def get_file_location(location: str, base_path: Optional[str]=None) -> str:
         pth = Path(base_path) / location
         if pth.is_file():
             return str(pth)
+    else:
+        pth = location
 
-    # TODO: use custom exception here so we can log as fatal and sys.exit(1)
-    raise InvalidConfiguration(f"Can't find configuration file `{location}` using base path `{base_path}`")
+    if exc:
+        # TODO: add location and base path directoly to the exception as variables for easy extraction
+        raise MissingFile(f"Can't find configuration file `{location}` using base path `{base_path}`")
+    else:
+        return pth
 
 
 def get_file_content(location: str, base_path: Optional[str]=None) -> str:
@@ -236,14 +249,14 @@ def load_config():
         sys.setrecursionlimit(int(rec_limit))
 
 
-def get_pypi_stats_path() -> Path:
+def get_pypi_stats_path(exc=True) -> Path:
     pth = os.environ.get("AURA_PYPI_STATS", None) or CFG["aura"]["pypi_stats"]
-    return Path(get_file_location(pth, CFG_PATH))
+    return Path(get_file_location(pth, CFG_PATH, exc=exc))
 
 
-def get_reverse_dependencies_path() -> Path:
+def get_reverse_dependencies_path(exc=True) -> Path:
     pth = os.environ.get("AURA_REVERSE_DEPENDENCIES", None) or CFG["aura"]["reverse_dependencies"]
-    return Path(get_file_location(pth, CFG_PATH))
+    return Path(get_file_location(pth, CFG_PATH, exc=exc))
 
 
 def iter_pypi_stats() -> Generator[dict, None, None]:
@@ -251,6 +264,11 @@ def iter_pypi_stats() -> Generator[dict, None, None]:
     with pth.open() as fd:
         for line in fd:
             yield json.loads(line)
+
+
+def get_cache_mode() -> str:
+    fallback = CFG.get("cache", {}).get("mode", "auto")
+    return os.environ.get("AURA_CACHE_MODE", fallback)
 
 
 def get_maximum_archive_size() ->typing.Optional[int] :
