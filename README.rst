@@ -7,7 +7,7 @@
 .. class:: center
 
     |homepage_flair| |docs_flair| |docker_flair|
-    |license_flair| |travis_flair|
+    |license_flair| |travis_flair| |pypi_flair|
 
 
 
@@ -46,8 +46,12 @@ Didn't find what you are looking for? Aura's architecture is based on a robust p
 Installation
 ============
 
+
 ::
 
+    # Via pip:
+    pip install aura-security[full]
+    # or build from source/git
     poetry install --no-dev -E full
 
 Or just use a prebuild docker image ``sourcecodeai/aura:dev``
@@ -162,3 +166,7 @@ Use the following citation when using Aura or data produced by Aura in research:
 .. |license_flair| image:: https://img.shields.io/github/license/SourceCode-AI/aura?color=blue
 
 .. |travis_flair| image:: https://travis-ci.com/SourceCode-AI/aura.svg?branch=dev
+
+.. |pypi_flair| image:: https://badge.fury.io/py/aura-security.svg
+   :target: https://pypi.org/project/aura-security/
+   :align: middle
