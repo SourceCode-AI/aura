@@ -42,14 +42,9 @@ def run_with_interpreters(*, metadata=None, **kwargs):
             **kwargs
         )
 
-    interpreters = list(config.CFG["interpreters"].items())
     executor_exception = None
 
-    for name, interpreter in interpreters:
-        # If interpreter is not directly an executable, find out it's location via `witch` lookup
-        if interpreter != "native" and not os.path.isfile(interpreter):
-            interpreter = which(interpreter)
-
+    for name, interpreter in get_interpreters().items():
         try:
             output = execute_interpreter(interpreter=interpreter, **kwargs)
             if output is not None:
@@ -66,6 +61,29 @@ def run_with_interpreters(*, metadata=None, **kwargs):
         raise executor_exception
 
 
+def get_interpreters() -> dict:
+    """
+    Iterate over configured interpreters and filter out those that are not available on the system
+    By default Aura has both py2k and py3k configured, if py2k is not present on the system, this will filter it out
+    :return: dict of filtered interpreters with only items/paths that exists on the system
+    """
+    valid = {}
+
+    interpreters = list(config.CFG["interpreters"].items())
+
+    for name, interpreter in interpreters:
+        if interpreter == "native":
+            valid[interpreter] = sys.executable
+        elif os.path.isfile(interpreter):
+            valid[interpreter] = interpreter
+        elif (pth := which(interpreter)):
+            valid[interpreter] = pth
+        else:
+            LOGGER.error(f"Could not find python interpreter `{interpreter}`. Configuration is not valid or interpreter is not installed on this system")
+
+    return valid
+
+
 def execute_interpreter(*, command: List[str], interpreter: str, stdin=None, native_callback: Optional[Callable]=None):
     """
     Run script/command inside the defined interpreter and retrieve the JSON encoded output
@@ -75,7 +93,7 @@ def execute_interpreter(*, command: List[str], interpreter: str, stdin=None, nat
     :param stdin: stdin to pass to the execute program
     :return: json decoded stdout
     """
-    if interpreter == "native":
+    if (interpreter == "native" or interpreter == sys.executable) and native_callback:
         try:
             return native_callback(command)
         except Exception as exc:

@@ -155,3 +155,11 @@ markers = [
 [tool.black]
 line-length = 120
 target-version = ["py38"]
+
+
+[tool.mypy]
+ignore_missing_imports = true
+warn_unreachable = true
+show_error_codes = true
+disable_error_code = "import"
+check_untyped_defs = true

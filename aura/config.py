@@ -18,7 +18,7 @@ from ruamel.yaml import composer
 try:
     import rapidjson as json
 except ImportError:
-    import json
+    import json  # type: ignore[no-redef]
 
 from .exceptions import InvalidConfiguration, MissingFile
 

@@ -21,7 +21,7 @@ import traceback
 try:
     import rapidjson as json
 except ImportError:
-    import json
+    import json  # type: ignore[no-redef]
 
 
 BUILTIN_PURE = [int, float, bool]
@@ -56,8 +56,8 @@ if sys.version_info.major == 3:
 
 
 else:  # Python2 specific handlers
-    BUILTIN_PURE.append(long)
-    BUILTIN_STR = (str, basestring)
+    BUILTIN_PURE.append(long)  # type: ignore[name-defined]
+    BUILTIN_STR = (str, basestring)  # type: ignore[name-defined]
 
     def decode_str(value):
         return decode_bytes(value)

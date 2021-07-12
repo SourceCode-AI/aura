@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import re
 import codecs
@@ -13,7 +15,7 @@ from pathlib import Path
 from functools import partial, lru_cache
 from urllib.parse import urlparse
 from zlib import adler32
-from typing import Generator, Union, List, TypeVar, Generic, Mapping, cast, BinaryIO
+from typing import Generator, Union, List, TypeVar, Generic, Mapping, cast, BinaryIO, Dict, Type, Iterable
 
 import tqdm
 import requests
@@ -32,21 +34,21 @@ class KeepRefs(Generic[T]):
     A class that would keep references to all created instances
     https://stackoverflow.com/questions/328851/printing-all-instances-of-a-class
     """
-    __refs__ = defaultdict(list)
+    __refs__ : Dict[Type[KeepRefs], List[weakref.ReferenceType[KeepRefs]]] = defaultdict(list)
 
     def __init__(self):
         super(KeepRefs, self).__init__()
         self.__refs__[self.__class__].append(weakref.ref(self))
 
     @classmethod
-    def get_instances(cls) -> Generator[T, None, None]:
+    def get_instances(cls) -> Iterable[T]:
         for inst_ref in cls.__refs__[cls]:
             inst = inst_ref()
             if inst is not None:
-                yield inst
+                yield inst  # type: ignore[misc]
 
 
-def walk(location: Union[str, Path]) -> Generator[Path, None, None]:
+def walk(location: Union[str, Path]) -> Iterable[Path]:
     if not isinstance(location, Path):
         location = Path(location)
 
@@ -157,7 +159,7 @@ def lookup_lines(
         encoding: str="utf-8"
 ) -> Mapping[int, str]:
     line_nos = sorted(line_nos)
-    lines = {}
+    lines : Dict[int, str] = {}
     if not line_nos:
         return lines
 
@@ -258,6 +260,7 @@ def lzset(indata) -> set:
     Used for estimating similarity using LZJD
     http://conference.scipy.org/proceedings/scipy2019/pdfs/pylzjd.pdf
     """
+    s = set()
 
     with ExitStack() as stack:
         if type(indata) in (str, bytes):
@@ -269,7 +272,6 @@ def lzset(indata) -> set:
             indata.seek(0)
             slicer = stack.enter_context(mmap.mmap(indata.fileno(), 0, prot=mmap.PROT_READ))
 
-        s = set()
         start = 0
         end = 1
         while end <= size:
@@ -278,7 +280,8 @@ def lzset(indata) -> set:
                 s.add(b_s)
                 start = end
             end += 1
-        return s
+
+    return s
 
 
 def jaccard(a: set, b: set) -> float:
@@ -304,13 +307,13 @@ def convert_size(desc: Union[str, int]) -> int:
     if len(g) < 1 or len(g) > 2:
         raise ValueError(f"Could not parse the string '{desc}'")
 
-    amount: str = g[0]
-    if not amount.isdigit():
-        raise ValueError(f"'{amount}' is not a valid number")
+    amount_str: str = g[0]
+    if not amount_str.isdigit():
+        raise ValueError(f"'{amount_str}' is not a valid number")
 
-    amount: int = int(amount)
+    amount: int = int(amount_str)
 
-    if len(g) == 2 and g[1] is not None:
+    if len(g) == 2 and type(g[1]) == str:
         unit = g[1].lower()
         if not unit.endswith("b"):
             unit += "b"
@@ -322,7 +325,7 @@ def convert_size(desc: Union[str, int]) -> int:
     return amount * (1024**pos)
 
 
-def convert_time(desc: int) -> timedelta:
+def convert_time(desc: int) -> timedelta:  # type: ignore[return]
     if type(desc) == int:
         return timedelta(hours=desc)
     # TODO: add parsing from strings similar to `convert_size`
@@ -346,9 +349,11 @@ def fast_checksum(data: Union[bytes, str]) -> str:
     This function is not to be used for cryptography but rather for deduplication and similar use cases as the hashing is optimized for speed
     """
     if type(data) == str:
-        data = data.encode("utf-8")
+        payload : bytes = data.encode("utf-8")
+    else:
+        payload : bytes = data  # type: ignore[no-redef]
 
-    return hex(adler32(data))[2:]  # Omit the `0x` at the start from `hex()`
+    return hex(adler32(payload))[2:]  # Omit the `0x` at the start from `hex()`
 
 
 class Analyzer:

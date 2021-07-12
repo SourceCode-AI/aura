@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+#type: ignore
 """
 This is a a slightly modified redos detection from DLint:
 https://github.com/dlint-py/dlint/blob/master/dlint/redos/detect.py

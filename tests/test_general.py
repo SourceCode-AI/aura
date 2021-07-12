@@ -1,9 +1,14 @@
+import logging
+import sys
 from pathlib import Path
+from unittest import mock
 
 import pytest
 
 from aura import plugins
 from aura import utils
+from aura import config
+from aura import python_executor
 from aura.analyzers.archive import archive_analyzer
 from aura.analyzers.stats import analyze as  stats_analyzer
 from aura.analyzers.data_finder import StringFinder
@@ -32,3 +37,27 @@ def test_get_analyzers(spec, blacklist, whitelist):
 
     for w in whitelist:
         assert any(w == x or w == x.__class__ for x in analyzers), w
+
+
+def test_invalid_interpreters(caplog):
+    caplog.set_level(logging.ERROR)
+    valid = "python3"
+    invalid = "invalid_aura_interpreter"
+    err_msg = f"Could not find python interpreter `{invalid}`. Configuration is not valid or interpreter is not installed on this system"
+
+    int_cfg = {
+        "interpreters": {
+            "native": "native",
+            valid: valid,
+            invalid: invalid
+        }
+    }
+
+    with mock.patch.dict(config.CFG, int_cfg):
+        verified = python_executor.get_interpreters()
+
+    assert "native" in verified
+    assert verified["native"] == sys.executable
+    assert valid in verified
+    assert invalid not in verified
+    assert err_msg in caplog.text

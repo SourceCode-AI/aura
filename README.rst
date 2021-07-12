@@ -11,8 +11,8 @@
 
 
 
-Security auditing and static code analysis
-=================================================
+Source code auditing and static code analysis
+=============================================
 
 Aura is a static analysis framework developed as a response to the ever-increasing threat of malicious packages and vulnerable code published on PyPI.
 

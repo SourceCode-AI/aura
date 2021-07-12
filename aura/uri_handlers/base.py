@@ -122,7 +122,7 @@ class IdenticalName(float):
 
 @dataclass
 class ScanLocation(KeepRefs):
-    location: Union[Path, str]
+    location: Path
     metadata: dict = field(default_factory=dict)
     cleanup: Union[bool, Path, str] = False
     parent: Optional[ScanLocation] = None

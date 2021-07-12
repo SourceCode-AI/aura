@@ -48,7 +48,7 @@ class Detection:
     tags: Set[str] = field(default_factory=set)
     extra: dict = field(default_factory=dict)
     informational: bool = False
-    location: Optional[Path, str] = None
+    location: Optional[Union[Path, str]] = None
     scan_location = None
     _metadata: Optional[dict] = None
 
