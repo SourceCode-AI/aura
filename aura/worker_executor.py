@@ -2,7 +2,7 @@ import time
 import asyncio
 import sys
 from concurrent import futures
-from typing import Optional
+from typing import Optional, Iterable, Set
 
 import tqdm
 from tqdm.asyncio import tqdm as async_tqdm
@@ -20,12 +20,13 @@ class AuraExecutor:
         else:
             self.fork = fork
 
+        self.executor : futures.Executor
         if self.fork:
             self.executor = futures.ProcessPoolExecutor()
         else:
-            self.executor = futures.ThreadPoolExecutor()
+            self.executor = futures.ThreadPoolExecutor()  # type: ignore[no-redef]
 
-        self.jobs = set()
+        self.jobs : Set[futures.Future] = set()
         self.total = 0
         self.completed = 0
         self.q = job_queue
@@ -45,7 +46,7 @@ class AuraExecutor:
         """
         return len(self.jobs) != 0 and all(x.done() for x in self.jobs)
 
-    def __iter__(self) -> futures.Future:
+    def __iter__(self) -> Iterable[futures.Future]:
         for future in futures.as_completed(tuple(self.jobs)):
             self.jobs.remove(future)
             self._update_progress()
@@ -88,7 +89,7 @@ class AuraExecutor:
 
 class AsyncQueue:
     def __init__(self, maxsize=0, *, loop=None, desc=None):
-        self.q = asyncio.Queue(maxsize=maxsize, loop=loop)
+        self.q : asyncio.Queue = asyncio.Queue(maxsize=maxsize, loop=loop)
         self.total = 0
         self.completed = 0
         self.progressbar = tqdm.tqdm(

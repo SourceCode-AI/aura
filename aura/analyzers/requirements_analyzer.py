@@ -43,8 +43,8 @@ def auto_decode(data: bytes) -> str:
     try:
         # Lets check the first two lines as in PEP263
         for line in data.split(b'\n')[:2]:
-            if line[0:1] == b'#' and ENCODING_RE.search(line):
-                encoding = ENCODING_RE.search(line).groups()[0].decode('ascii')
+            if line[0:1] == b'#' and (encoding_match:=ENCODING_RE.search(line)):
+                encoding = encoding_match.groups()[0].decode('ascii')
                 return data.decode(encoding)
 
         return data.decode(
@@ -68,7 +68,8 @@ def check_unpinned(requirement: Requirement, location: ScanLocation) -> Optional
             tags={"unpinned_package"},
             location=location.location
         )
-
+    else:
+        return None
 
 def check_outdated(requirement: Requirement, location: ScanLocation) -> Optional[Detection]:
     pypi = package.PypiPackage.from_cached(requirement.name)
@@ -89,6 +90,8 @@ def check_outdated(requirement: Requirement, location: ScanLocation) -> Optional
             },
             tags={"outdated_package"}
         )
+    else:
+        return None
 
 
 @Analyzer.ID("requirements_file_analyzer")

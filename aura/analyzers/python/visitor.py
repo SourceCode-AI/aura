@@ -90,7 +90,7 @@ class Visitor:
         self.traversed = False
         self.modified = False
         self.iteration = 0
-        self.convergence = 1
+        self.convergence : Optional[int] = 1
         self.queue = deque()
         self.call_graph = CallGraph()
 

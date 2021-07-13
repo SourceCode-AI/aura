@@ -40,7 +40,7 @@ MIN_KEY_SIZES = {"rsa": 2048, "dsa": 2048}
 class CryptoGenKey(base.NodeAnalyzerV2):
     """Analyze the generation of cryptography keys"""
 
-    def node_Call(self, context):
+    def node_Call(self, context: Context):
         f_name = context.node.cached_full_name
 
         if not type(f_name) == str:

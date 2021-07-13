@@ -17,9 +17,9 @@ STORE_OPS = STORE_NAME, STORE_GLOBAL
 EXTENDED_ARG = dis.EXTENDED_ARG
 
 if hasattr(dis, "_unpack_opargs"):
-    _unpack_opargs = dis._unpack_opargs
+    _unpack_opargs = dis._unpack_opargs  # type: ignore[attr-defined]
 else:  # Python 2.7 fallback
-    _unpack_opargs = modulefinder._unpack_opargs
+    _unpack_opargs = modulefinder._unpack_opargs  # type: ignore[attr-defined]
 
 
 def find_imports(co):

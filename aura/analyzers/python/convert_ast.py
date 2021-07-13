@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 from collections import OrderedDict
 
 from .visitor import Visitor
@@ -41,6 +41,8 @@ def visit_Complex(context):
 
 
 def visit_Constant(context):
+    node: Union[String, Number, Constant]
+
     if context.node.get("kind") is None and type(context.node["value"]) == str:
         node = String(context.node["value"])
     elif context.node.get("kind") is None and type(context.node["value"]) == int:

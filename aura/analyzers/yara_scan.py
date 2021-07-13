@@ -18,7 +18,7 @@ except ImportError:
     )
 
 try:
-    rules_pth = config.CFG["aura"].get("yara-rules", "aura.data.rules.yara")
+    rules_pth = config.CFG["aura"].get("yara-rules", "aura.data.rules.yara")  # type: ignore[index]
     rules = yara.compile(source=config.get_file_content(rules_pth, config.CFG_PATH))
 except yara.Error as exc:
     raise PluginDisabled("Can't compile/find yara rules")

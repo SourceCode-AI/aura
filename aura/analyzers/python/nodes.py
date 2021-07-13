@@ -294,7 +294,7 @@ NodeType = typing.NewType(
 
 @dataclass
 class Module(ASTNode):
-    body: typing.List[NodeType, ...]
+    body: typing.List[NodeType]
 
     def _visit_node(self, context: Context):
         for idx, x in enumerate(self.body):
@@ -553,7 +553,7 @@ class Var(ASTNode):
     def full_name(self):
         if self._full_name:
             return self._full_name
-        elif hasattr(self.value, "full_name"):
+        elif self.value is not None and hasattr(self.value, "full_name"):
             return self.value.full_name
         else:
             return self.value

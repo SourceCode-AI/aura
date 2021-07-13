@@ -22,8 +22,8 @@ def analyze(*, location: ScanLocation) -> AnalyzerReturnType:
         return
 
     # Filter on these values, some pregenerated configurations use them and we don't want to generate false positives on these
-    user_blacklist = config.CFG.get("pypirc", {}).get("username_blacklist", [])
-    pwd_blacklist = config.CFG.get("pypirc", {}).get("password_blacklist", [])
+    user_blacklist = config.get_settings("pypirc.username_blacklist")
+    pwd_blacklist = config.get_settings("pypirc.password_blacklist")
 
     for section_name in pypirc.sections():
         section = pypirc[section_name]

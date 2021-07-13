@@ -156,7 +156,7 @@ def get_severity(detection: Detection) -> str:
     if detection._severity is not None:
         return detection._severity
 
-    for category, catdef in config.CFG["severities"].items():
+    for category, catdef in config.CFG["severities"].items():  # type: ignore[index]
         if "score" in catdef and detection.score >= catdef["score"]:
             return category
         if detection.name in catdef.get("detections", []):

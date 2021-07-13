@@ -7,7 +7,7 @@ from ...utils import Analyzer, fast_checksum
 from ... import config
 
 
-ENTROPY_THRESHOLD = float(config.CFG["aura"].get("shanon_entropy", 0.0))
+ENTROPY_THRESHOLD = float(config.CFG["aura"].get("shanon_entropy", 0.0))  # type: ignore[index]
 
 
 @Analyzer.ID("misc")
@@ -40,7 +40,7 @@ class MiscAnalyzer(base.NodeAnalyzerV2):
         # https://github.com/dlint-py/dlint/blob/master/dlint/linters/bad_re_catastrophic_use.py
 
         try:
-            if detect_redos.catastrophic(val):
+            if detect_redos.catastrophic(val):  # type: ignore[attr-defined]
                 hit = Detection(
                     detection_type="ReDoS",
                     message = "Possible catastrophic ReDoS",
@@ -89,7 +89,7 @@ def calculate_entropy(data: str, iterator=lambda: range(255)) -> float:
     if not data:
         return 0
 
-    entropy = 0
+    entropy : float = 0.0
     for x in iterator():
         p_x = float(data.count(chr(x))) / len(data)
         if p_x > 0:

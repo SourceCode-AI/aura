@@ -37,8 +37,9 @@ class TopologySort:
                 if best is None or rank < best[0]:
                     best = (rank, node)
 
-            topology.append(best[1])
-            g.pop(best[1])
+            if best is not None:
+                topology.append(best[1])
+                g.pop(best[1])
 
         return topology
 

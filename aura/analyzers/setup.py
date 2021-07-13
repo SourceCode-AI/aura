@@ -2,6 +2,7 @@
 Analyzer for setup.py python package files
 """
 import pprint
+from typing import Dict, Any
 
 from packaging.utils import canonicalize_name
 
@@ -35,7 +36,7 @@ class SetupPy(NodeAnalyzerV2):
         # Extract basic package identifiers
         copy_fields = ("name", "version", "description", "url")
 
-        parsed = {"packages": []}
+        parsed : Dict[str, Any] = {"packages": []}
 
         for x in copy_fields:
             # Convert basic fields into string

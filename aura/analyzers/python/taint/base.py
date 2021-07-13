@@ -1,6 +1,7 @@
 from itertools import groupby
+from typing import Optional
 
-from ..nodes import Taints, ASTNode, TaintLog
+from ..nodes import Taints, ASTNode, TaintLog, Context, NodeType
 from ...base import NodeAnalyzerV2
 from ...detections import Detection
 from ....utils import Analyzer
@@ -41,11 +42,11 @@ class TaintDetection(NodeAnalyzerV2):
             if x._taint_class == Taints.TAINTED:
                 yield self.__generate_hit(context=context)
 
-    def node_ReturnStmt(self, context):
+    def node_ReturnStmt(self, context: Context):
         if not context.node._taint_class == Taints.TAINTED:
             return
 
-        ctx = context  # type: Context
+        ctx : Optional[Context] = context
         while ctx:
             if isinstance(ctx.node, ASTNode) and "flask_route" in ctx.node.tags:
                 yield self.__generate_hit(context=context)

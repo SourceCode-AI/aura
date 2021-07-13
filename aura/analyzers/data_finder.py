@@ -28,7 +28,7 @@ class DataFinder(NodeAnalyzerV2):
     """Extracts artifacts from the source code such sa URLs or Base64 blobs"""
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)  # type: ignore[call-arg]
 
         self._no_blobs = False
 
@@ -39,15 +39,14 @@ class DataFinder(NodeAnalyzerV2):
 
     @classmethod
     def get_min_size(cls) -> int:
-        return config.get_settings("aura.min-blob-size", 100)
+        return config.get_settings("aura.min-blob-size", 100)  # type: ignore[return-value]
 
     def node_String(self, context: Context):
         val = context.node.value
 
         if BASE64_REGEX.match(val):
             try:
-                result = base64.b64decode(val)
-                result = result.decode("utf-8")
+                result = base64.b64decode(val).decode("utf-8")
 
                 yield Detection(
                     detection_type="Base64Blob",
@@ -99,9 +98,9 @@ class DataFinder(NodeAnalyzerV2):
 class StringFinder(NodeAnalyzerV2):
     """Find string patterns as defined in the signatures file"""
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)  # type: ignore[call-arg]
 
-        signatures = config.SEMANTIC_RULES.get("strings", [])
+        signatures = config.SEMANTIC_RULES.get("strings", [])  # type: ignore[union-attr]
         self.__compiled_signatures = PatternMatcher.compile_patterns(signatures=signatures)
 
     def node_String(self, context: Context):

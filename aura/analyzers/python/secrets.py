@@ -84,8 +84,8 @@ class SecretsAnalyzer(base.NodeAnalyzerV2):
             if not SECRET_REGEX.match(k):
                 continue
             if len(v) == 1:
-                v = v[0]
-                if not TOKEN_FILTER_REGEX.match(v):
+                v = v[0]  # type: ignore[assignment]
+                if not TOKEN_FILTER_REGEX.match(v):  # type: ignore[arg-type]
                     return
 
             yield from self._gen_hit(context, name=k, secret=v, type="url")

@@ -15,7 +15,7 @@ from pathlib import Path
 from functools import partial, lru_cache
 from urllib.parse import urlparse
 from zlib import adler32
-from typing import Generator, Union, List, TypeVar, Generic, Mapping, cast, BinaryIO, Dict, Type, Iterable
+from typing import Union, List, TypeVar, Generic, Mapping, cast, BinaryIO, Dict, Type, Iterable, ByteString
 
 import tqdm
 import requests
@@ -70,7 +70,9 @@ def parse_iso_8601(date_string: str) -> datetime:
 
 @lru_cache()
 def md5(
-    data: Union[str, bytes, Path], hex=True, block_size=2 ** 20
+    data: Union[str, ByteString, Path],
+    hex=True,
+    block_size=2 ** 20
 ) -> Union[str, bytes]:
     ctx = hashlib.md5()
 
@@ -84,7 +86,7 @@ def md5(
     elif type(data) == str:
         ctx.update(data.encode("utf-8"))
     else:
-        ctx.update(data)
+        ctx.update(data)  # type: ignore[arg-type]
 
     return ctx.hexdigest() if hex else ctx.digest()
 
@@ -244,7 +246,7 @@ def slotted_dataclass(dataclass_arguments=None, **kwargs):
             old_attrs[k] = getattr(cls, k)
             setattr(cls, k, v)
 
-        cls = dataclasses.dataclass(cls, **dataclass_arguments)
+        cls = dataclasses.dataclass(cls, **dataclass_arguments)  # type: ignore[call-overload]
         for k, v in old_attrs.items():
             setattr(cls, k, v)
 

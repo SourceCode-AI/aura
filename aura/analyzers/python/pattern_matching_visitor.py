@@ -17,10 +17,10 @@ class ASTPatternMatcherVisitor(Visitor):
         self.convergence = None
         self._signatures = ASTPatternCache.proxy()
         self._report_modules = (
-                config.CFG["aura"].get("always_report_module_imports", True) or
+                config.CFG["aura"].get("always_report_module_imports", True) or  # type: ignore[index]
                 os.environ.get("AURA_ALL_MODULE_IMPORTS", False) or
                 self.location.metadata.get("report_imports")
-        )
+        )  # type: ignore[index]
 
     def _visit_node(self, context: Context):
         for signature in self._signatures:  # type: ASTPattern

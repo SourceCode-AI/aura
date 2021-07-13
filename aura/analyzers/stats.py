@@ -1,3 +1,5 @@
+from typing import Optional
+
 from ..uri_handlers.base import ScanLocation
 
 from .detections import Detection
@@ -8,7 +10,7 @@ from ..utils import Analyzer, md5
 @Analyzer.ID("file_stats")
 def analyze(*, location: ScanLocation):
     """This analyzer collect stats about analyzer files"""
-    l = location
+    l : Optional[ScanLocation] = location
     while l:
         if l.metadata.get("source") == "diff":
             return

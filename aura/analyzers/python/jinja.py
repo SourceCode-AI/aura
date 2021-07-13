@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from functools import partial
 from dataclasses import dataclass
+from typing import Optional
 
 from jinja2 import Environment
 from jinja2 import nodes as jnodes
@@ -114,11 +115,11 @@ class NodeWrapper(ASTNode):
 
 class JinjaTemplateVisitor(Visitor):
     @classmethod
-    def from_template(cls, context, template_name, taints) -> JinjaTemplateVisitor:
+    def from_template(cls, context, template_name, taints) -> Optional[JinjaTemplateVisitor]:
         tpl_path = Path(context.visitor.normalized_path).parent / "templates" / template_name
         if not tpl_path.exists():
             logger.info(f"Could not find jinja template: '{template_name}'")
-            return
+            return None
 
         new_location = context.visitor.location.create_child(
             new_location=tpl_path

@@ -1,5 +1,6 @@
 import re
 import pprint
+from typing import Iterable
 
 from ..nodes import *
 from ..visitor import Visitor
@@ -251,9 +252,9 @@ class TaintAnalysis(Visitor):
                 context.node.add_taint(rt, context)
 
             if f_name in context.call_graph:
-                callers = context.call_graph[f_name]
+                callers : Iterable[Call] = context.call_graph[f_name]
                 sig = context.node.get_signature()
-                for c in callers:  # type: ASTNode
+                for c in callers:
                     c.add_taint(context.node._taint_class, context)
                     try:
                         call_params = sig.bind(*c.args, **c.kwargs)

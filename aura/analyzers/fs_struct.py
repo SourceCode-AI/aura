@@ -17,7 +17,7 @@ def get_file_patterns() -> Iterable[FilePatternMatcher]:
     global FILE_PATTERNS
 
     if FILE_PATTERNS is None:
-        FILE_PATTERNS = tuple(FilePatternMatcher(x) for x in config.SEMANTIC_RULES.get("files", []))
+        FILE_PATTERNS = tuple(FilePatternMatcher(x) for x in config.SEMANTIC_RULES.get("files", []))  # type: ignore[union-attr]
 
     return FILE_PATTERNS
 

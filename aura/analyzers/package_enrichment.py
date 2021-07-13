@@ -1,3 +1,5 @@
+from typing import List, Optional
+
 from .. import package
 from ..uri_handlers.base import ScanLocation
 from .detections import Detection
@@ -17,7 +19,7 @@ def analyze(*, location: ScanLocation) -> AnalyzerReturnType:
     pkg_score = pkg.score
 
     try:
-        rev_dependencies = package.get_reverse_dependencies(pkg_name=pkg_name)
+        rev_dependencies: Optional[List[str]] = package.get_reverse_dependencies(pkg_name=pkg_name)
     except MissingFile:
         rev_dependencies = None
 

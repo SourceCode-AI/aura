@@ -9,7 +9,7 @@ from importlib import resources
 from pathlib import Path
 from functools import lru_cache
 from logging.handlers import RotatingFileHandler
-from typing import Optional, Generator
+from typing import Optional, Generator, Any, Iterable
 
 import tqdm
 import pkg_resources
@@ -113,7 +113,7 @@ def get_logger(name: str) -> logging.Logger:
     return _log
 
 
-def get_settings(pth: str, fallback=None) -> Optional[str]:
+def get_settings(pth: str, fallback=None) -> Any:
     data = CFG
 
     for part in pth.split("."):
