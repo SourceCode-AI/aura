@@ -91,7 +91,7 @@ class TaintLog:
     line_no: typing.Optional[int]
     message: typing.Optional[str]
     extra: typing.Dict[str, typing.Any]
-    node: typing.Optional[NodeType]
+    node: typing.Optional[ASTNode]
 
     def __post_init__(self):
         self.path = Path(self.path).absolute()
@@ -197,7 +197,7 @@ class ASTNode(KeepRefs, metaclass=ABCMeta):
 
     @property
     def json(self) -> typing.Dict[str, typing.Any]:
-        data = {
+        data : typing.Dict[str, typing.Any] = {
             "AST_Type": self.__class__.__name__,
         }
         if self.full_name is not None:
@@ -274,9 +274,11 @@ class ASTNode(KeepRefs, metaclass=ABCMeta):
             return False
 
     def mark_as_sink(self, context: Context):
+        node = typing.cast(ASTNode, context.node)
+
         log = TaintLog(  # type: ignore[call-arg]
             path=context.visitor.path,
-            line_no=context.node.line_no,
+            line_no=node.line_no,
             message="AST node marked as sink using semantic rules"
         )
         self.tags.add("taint_sink")
@@ -286,9 +288,7 @@ class ASTNode(KeepRefs, metaclass=ABCMeta):
         return False
 
 
-NodeType = typing.TypeVar(
-    "NodeType", ASTNode, typing.Dict, typing.List, int, str
-)
+NodeType = typing.Union["NodeType", ASTNode, typing.Dict, typing.List, int, str]  # type: ignore[misc]
 
 
 @dataclass
@@ -345,14 +345,19 @@ class Constant(ASTNode):
 
     def __int__(self):
         if type(self.value) in (int, Number):
-            return int(self.value)
+            return int(self.value)  # type: ignore[arg-type]
         else:
             raise ValueError(f"Incompatible value type: {repr(type(self.value))}")
 
     def match(self, other, ctx) -> bool:
         if type(other) != Constant:
             return False
-        if other.value != self.value:
+
+        other = typing.cast(Constant, other)
+
+        if type(other.value) != type(self.value):
+            return False
+        elif other.value != self.value:  # type: ignore[operator]
             return False
         return True
 
@@ -546,7 +551,7 @@ class Var(ASTNode):
         if self._full_name:
             return self._full_name
         elif self.value is not None and hasattr(self.value, "full_name"):
-            return self.value.full_name
+            return self.value.full_name  # type: ignore[union-attr]
         else:
             return self.value
 
@@ -1460,7 +1465,8 @@ class Context:
 
     @property
     def signature(self) -> str:
-        return f"{self.visitor.normalized_path}:{self.node.line_no}"
+        node = typing.cast(ASTNode, self.node)
+        return f"{self.visitor.normalized_path}:{node.line_no}"
 
     def as_child(self, node: NodeType, replace=lambda x: None) -> Context:
         return Context(  # type: ignore[call-arg]

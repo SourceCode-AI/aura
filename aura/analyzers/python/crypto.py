@@ -2,6 +2,7 @@
 This plugin captures data for research of cryptography usage
 It looks up common RSA/DSA key generation functions and key sizes
 """
+from typing import cast
 
 from .nodes import *
 from .. import base
@@ -41,7 +42,8 @@ class CryptoGenKey(base.NodeAnalyzerV2):
     """Analyze the generation of cryptography keys"""
 
     def node_Call(self, context: Context):
-        f_name = context.node.cached_full_name
+        node = cast(Call, context.node)
+        f_name = node.cached_full_name
 
         if not type(f_name) == str:
             return

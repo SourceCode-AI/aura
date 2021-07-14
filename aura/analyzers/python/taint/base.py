@@ -1,7 +1,7 @@
 from itertools import groupby
-from typing import Optional
+from typing import Optional, cast
 
-from ..nodes import Taints, ASTNode, TaintLog, Context, NodeType
+from ..nodes import Taints, ASTNode, TaintLog, Context, NodeType, ReturnStmt
 from ...base import NodeAnalyzerV2
 from ...detections import Detection
 from ....utils import Analyzer
@@ -43,7 +43,9 @@ class TaintDetection(NodeAnalyzerV2):
                 yield self.__generate_hit(context=context)
 
     def node_ReturnStmt(self, context: Context):
-        if not context.node._taint_class == Taints.TAINTED:
+        node = cast(ReturnStmt, context.node)
+
+        if not node._taint_class == Taints.TAINTED:
             return
 
         ctx : Optional[Context] = context

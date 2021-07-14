@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing  import List, Union, Set, Optional, Dict, cast
+from typing  import Union, Set, Optional, Dict, cast
 from pathlib import Path
 from dataclasses import dataclass, field
 from functools import total_ordering
@@ -44,7 +44,7 @@ class Detection:
     # If the rule is tied to the AST tree detections, then set the node pointer appropriately
     # Set to None to hide or for rules that are not tied to the AST tree
     detection_type: Optional[str] = None
-    node: Optional[NodeType] = None
+    node: Optional[ASTNode] = None
     tags: Set[str] = field(default_factory=set)
     extra: dict = field(default_factory=dict)
     informational: bool = False
@@ -57,7 +57,7 @@ class Detection:
         self._diff_hash = None
         self._severity = None
 
-        if isinstance(self.node, ASTNode) and self.line_no is None:
+        if self.node and self.line_no is None:
             self.line_no = self.node.line_no
 
     def _asdict(self) -> Dict:

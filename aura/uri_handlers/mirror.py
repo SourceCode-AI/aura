@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from urllib.parse import urlparse, ParseResult, parse_qs
-from typing import Optional, Generator
+from typing import Optional, Generator, Dict, Any
 
 from .base import URIHandler, ScanLocation
 from .. import cache
@@ -13,7 +13,7 @@ class MirrorHandler(URIHandler):
 
     def __init__(self, uri: ParseResult):
         self.uri = uri
-        self.opts = {"release": "latest"}
+        self.opts : Dict[str, Any] = {"release": "latest"}
 
         self.package_name = uri.hostname
         self.mirror_path = mirror.LocalMirror.get_mirror_path()  # Path(uri.path)

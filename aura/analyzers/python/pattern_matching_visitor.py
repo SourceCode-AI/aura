@@ -1,4 +1,5 @@
 import os
+from typing import cast
 
 from ..detections import Detection
 from .nodes import Context, Import
@@ -31,15 +32,17 @@ class ASTPatternMatcherVisitor(Visitor):
             self.gen_module_import(context)
 
     def gen_module_import(self, context: Context):
-        for module_name in context.node.get_modules():
+        node = cast(Import, context.node)
+
+        for module_name in node.get_modules():
             hit = Detection(
                 detection_type="ModuleImport",
                 message=f"Module '{module_name}' import in a source code",
                 extra={
                     "name": module_name
                 },
-                node=context.node,
+                node=node,
                 signature=f"module_import#{module_name}#{context.signature}",
-                tags=context.node.tags
+                tags=node.tags
             )
             self.hits.append(hit)

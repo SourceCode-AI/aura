@@ -15,7 +15,7 @@ from pathlib import Path
 from functools import partial, lru_cache
 from urllib.parse import urlparse
 from zlib import adler32
-from typing import Union, List, TypeVar, Generic, Mapping, cast, BinaryIO, Dict, Type, Iterable, ByteString
+from typing import Union, List, TypeVar, Generic, Mapping, cast, Dict, Type, Iterable, ByteString, IO
 
 import tqdm
 import requests
@@ -91,7 +91,7 @@ def md5(
     return ctx.hexdigest() if hex else ctx.digest()
 
 
-def download_file(url: str, fd: BinaryIO, session=None) -> None:
+def download_file(url: str, fd: IO[bytes], session=None) -> None:
     """
     Download data from given URL and write it to the file descriptor
     This function is designed for speed as other approaches are not able to utilize full network speed
@@ -313,7 +313,7 @@ def convert_size(desc: Union[str, int]) -> int:
     if len(g) < 1 or len(g) > 2:
         raise ValueError(f"Could not parse the string '{desc}'")
 
-    amount_str: str = g[0]
+    amount_str: str = g[0]  # type: ignore[assignment]
     if not amount_str.isdigit():
         raise ValueError(f"'{amount_str}' is not a valid number")
 

@@ -2,7 +2,7 @@
 import pathlib
 from itertools import product
 from urllib.parse import ParseResult
-from typing import Optional, Iterable
+from typing import Optional, Iterable, Dict
 
 from .base import URIHandler, ScanLocation
 from ..exceptions import UnsupportedDiffLocation
@@ -28,7 +28,7 @@ class LocalFileHandler(URIHandler):
 
         self.uri = uri
         self.path = pathlib.Path(uri.path)
-        self.opts = {}
+        self.opts : Dict[str, str] = {}
 
     def get_paths(self, metadata: Optional[dict]=None) -> Iterable[ScanLocation]:
         yield ScanLocation(

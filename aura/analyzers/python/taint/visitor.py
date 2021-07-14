@@ -58,7 +58,7 @@ class TaintAnalysis(Visitor):
                 isinstance(dec, Call)
                 and dec.full_name == "flask.Flask.route"
             ):
-                log = TaintLog(
+                log = TaintLog(  # type: ignore[call-arg]
                     path = self.path,
                     line_no=context.node.line_no,
                     message="AST node marked as a Flask route"
@@ -102,7 +102,7 @@ class TaintAnalysis(Visitor):
                         if arg in parsed_url and parsed_url[arg] in ("int",):
                             continue
                         else:
-                            log = TaintLog(
+                            log = TaintLog(  # type: ignore[call-arg]
                                 path = self.path,
                                 node = arg,
                                 line_no = context.node.line_no,
@@ -172,7 +172,7 @@ class TaintAnalysis(Visitor):
                 getattr(context.node.value, "_taint_class", Taints.UNKNOWN),
             )
 
-            log = TaintLog(
+            log = TaintLog(  # type: ignore[call-arg]
                 path=self.path,
                 taint_level=var_taint,
                 node=context.node.value,
@@ -187,7 +187,7 @@ class TaintAnalysis(Visitor):
             if not isinstance(context.node.value, ASTNode):
                 return
 
-            log = TaintLog(
+            log = TaintLog(  # type: ignore[call-arg]
                 path=self.path,
                 taint_level=context.node.value._taint_class,
                 node=context.node.value,
@@ -200,7 +200,7 @@ class TaintAnalysis(Visitor):
 
         elif isinstance(context.node, (ReturnStmt, Yield, YieldFrom)):
             if isinstance(context.node.value, ASTNode):
-                log = TaintLog(
+                log = TaintLog(  # type: ignore[call-arg]
                     path = self.path,
                     taint_level=context.node.value._taint_class,
                     node=context.node.value,
@@ -273,7 +273,7 @@ class TaintAnalysis(Visitor):
         if parent != Taints.TAINTED:
             return
 
-        log = TaintLog(
+        log = TaintLog(  # type: ignore[call-arg]
             path=self.path,
             taint_level=parent,
             line_no=context.node.line_no,

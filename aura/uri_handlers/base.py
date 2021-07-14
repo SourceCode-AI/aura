@@ -14,7 +14,7 @@ from itertools import product
 from dataclasses import dataclass, field
 from pathlib import Path
 from difflib import SequenceMatcher
-from typing import Union, Optional, Generator, Tuple, Iterable
+from typing import Union, Optional, Tuple, Iterable
 from warnings import warn
 
 import tlsh
@@ -95,10 +95,10 @@ class URIHandler(ABC):
         return True
 
     @abstractmethod
-    def get_paths(self, metadata: Optional[dict]=None) -> Generator[ScanLocation, None, None]:
+    def get_paths(self, metadata: Optional[dict]=None) -> Iterable[ScanLocation]:
         ...
 
-    def get_diff_paths(self, other: URIHandler) -> Generator[Tuple[ScanLocation, ScanLocation], None, None]:
+    def get_diff_paths(self, other: URIHandler) -> Iterable[Tuple[ScanLocation, ScanLocation]]:
         raise UnsupportedDiffLocation()
 
     def cleanup(self):
@@ -212,8 +212,8 @@ class ScanLocation(KeepRefs):
     def __hash__(self):
         return hash(self.location)
 
-    def __eq__(self, other: ScanLocation):
-        if type(other) != ScanLocation:
+    def __eq__(self, other: object):
+        if not isinstance(other, ScanLocation):
             return NotImplemented
         else:
             return self.location == other.location
@@ -311,10 +311,10 @@ class ScanLocation(KeepRefs):
         :return: normalized path
         """
         if type(target) == str:
-            target = Path(target)
+            target : Path = Path(target)  # type: ignore[no-redef]
 
         try:
-            target = target.relative_to(self.strip_path)
+            target = target.relative_to(self.strip_path)  # type: ignore[union-attr]
         except ValueError:  # strip_path is not a prefix of target
             pass
 
@@ -336,7 +336,7 @@ class ScanLocation(KeepRefs):
 
         :return: True if the processing should continue otherwise an instance of Rule that would halt the processing
         """
-        max_depth = int(config.CFG["aura"].get("max-depth", 5))
+        max_depth = int(config.CFG["aura"].get("max-depth", 5))  #type: ignore[index]
         if self.metadata["depth"] > max_depth:
             d = DataProcessing(
                 message = f"Maximum processing depth reached",
@@ -373,7 +373,7 @@ class ScanLocation(KeepRefs):
             if d.scan_location is None:
                 d.scan_location = self
 
-            if d.line is None:
+            if d.line is None and d.line_no is not None:
                 line = lines.get(d.line_no)
                 d.line = line
 
@@ -409,7 +409,7 @@ class ScanLocation(KeepRefs):
         else:
             return ratio
 
-    def list_recursive(self) -> Generator[ScanLocation, None, None]:
+    def list_recursive(self) -> Iterable[ScanLocation]:
         for f in walk(self.location):
             yield self.create_child(
                 new_location=f,

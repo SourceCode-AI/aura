@@ -2,7 +2,7 @@ import tempfile
 import pathlib
 import shutil
 from urllib.parse import ParseResult
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from .. import config
 from ..exceptions import PluginDisabled
@@ -27,7 +27,7 @@ class GitRepoHandler(URIHandler):
     def __init__(self, uri: ParseResult):
         super().__init__(uri)
         self.uri = uri
-        self.opts = {}
+        self.opts : Dict[str, Any] = {}
 
     @classmethod
     def is_supported(cls, parsed_uri: ParseResult):
@@ -54,7 +54,7 @@ class GitRepoHandler(URIHandler):
         git.Repo.clone_from(url=self.uri.geturl(), to_path=p)
 
         yield ScanLocation(
-            location=p,
+            location=pathlib.Path(p),
             metadata=metadata or {"depth": 0}
         )
 

@@ -8,7 +8,7 @@ import time
 from functools import partial, wraps
 from collections import deque, OrderedDict
 from warnings import warn
-from typing import Optional, Tuple, Union, Dict
+from typing import Optional, Tuple, Union, Dict, cast
 
 import pkg_resources
 
@@ -201,7 +201,7 @@ class Visitor:
             if type(root) == dict and "ast_tree" in root:
                 root = root["ast_tree"]
 
-            new_ctx = Context(
+            new_ctx = Context(  # type: ignore[call-arg]
                 node=root, parent=None, replace=self._replace_root, visitor=self
             )
             self.queue.append(new_ctx)
@@ -270,11 +270,13 @@ class Visitor:
         elif _type(context.node) == _list:
             _list(map(lambda x: self.__visit_list(x[0], x[1], context), enumerate(context.node)))
         elif _isinstance(context.node, ASTNode):
-            if context.node.line_no in config.DEBUG_LINES:
+            node = cast(ASTNode, context.node)
+
+            if node.line_no in config.DEBUG_LINES:
                 breakpoint()
 
-            if not context.node.converged:
-                context.node._visit_node(context)
+            if not node.converged:
+                node._visit_node(context)
 
     def __visit_dict(self, key: str, context: Context):
         value = context.node[key]

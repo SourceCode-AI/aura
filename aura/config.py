@@ -23,9 +23,9 @@ except ImportError:
 from .exceptions import InvalidConfiguration, MissingFile
 
 
-CFG: Optional[dict] = None
+CFG : dict
 CFG_PATH = None
-SEMANTIC_RULES: Optional[dict] = None
+SEMANTIC_RULES : dict
 LOG_FMT = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 LOG_ERR = None
 # This is used to trigger breakpoint during AST traversing of specific lines
@@ -117,7 +117,7 @@ def get_settings(pth: str, fallback=None) -> Any:
     data = CFG
 
     for part in pth.split("."):
-        if part in data:
+        if type(data) == dict and part in data:
             data = data[part]
         else:
             return fallback
@@ -255,7 +255,7 @@ def get_pypi_stats_path(exc=True) -> Path:
 
 
 def get_reverse_dependencies_path(exc=True) -> Path:
-    pth = os.environ.get("AURA_REVERSE_DEPENDENCIES", None) or CFG["aura"]["reverse_dependencies"]
+    pth = os.environ.get("AURA_REVERSE_DEPENDENCIES", None) or CFG["aura"]["reverse_dependencies"]  # type: ignore[index]
     return Path(get_file_location(pth, CFG_PATH, exc=exc))
 
 
@@ -267,7 +267,7 @@ def iter_pypi_stats() -> Generator[dict, None, None]:
 
 
 def get_cache_mode() -> str:
-    fallback = CFG.get("cache", {}).get("mode", "auto")
+    fallback = CFG.get("cache", {}).get("mode", "auto")  # type: ignore[union-attr]
     return os.environ.get("AURA_CACHE_MODE", fallback)
 
 
