@@ -90,14 +90,14 @@ class TaintLog:
     taint_level: typing.Optional[Taints]
     line_no: typing.Optional[int]
     message: typing.Optional[str]
-    extra: dict
+    extra: typing.Dict[str, typing.Any]
     node: typing.Optional[NodeType]
 
     def __post_init__(self):
         self.path = Path(self.path).absolute()
 
     def json(self) -> dict:
-        d = {
+        d : typing.Dict[str, typing.Any] = {
             'line_no': self.line_no,
             'message': self.message
         }
@@ -131,7 +131,6 @@ class TaintLog:
         return log
 
 
-
 class ASTNode(KeepRefs, metaclass=ABCMeta):
     def __post_init__(self, *args, previous_node=None, **kwargs):
         self._full_name = None
@@ -146,7 +145,7 @@ class ASTNode(KeepRefs, metaclass=ABCMeta):
         if previous_node is not None:
             self.enrich_from_previous(previous_node)
 
-        self.tags = set()
+        self.tags : typing.Set[str] = set()
         self._hash = None
         self._taint_class: Taints = Taints.UNKNOWN
         self._taint_locked: bool = False
@@ -255,7 +254,7 @@ class ASTNode(KeepRefs, metaclass=ABCMeta):
             return False
         elif self._taint_locked:
             return False
-        if taint <= self._taint_class:
+        if taint <= self._taint_class:  # type: ignore[operator]
             return False
 
         self._taint_class = taint
@@ -275,7 +274,7 @@ class ASTNode(KeepRefs, metaclass=ABCMeta):
             return False
 
     def mark_as_sink(self, context: Context):
-        log = TaintLog(
+        log = TaintLog(  # type: ignore[call-arg]
             path=context.visitor.path,
             line_no=context.node.line_no,
             message="AST node marked as sink using semantic rules"
@@ -287,8 +286,8 @@ class ASTNode(KeepRefs, metaclass=ABCMeta):
         return False
 
 
-NodeType = typing.NewType(
-    "NodeType", typing.Union[ASTNode, typing.Dict, typing.List, int, str]
+NodeType = typing.TypeVar(
+    "NodeType", ASTNode, typing.Dict, typing.List, int, str
 )
 
 
@@ -409,7 +408,7 @@ class Number(ASTNode):
         return self.value
 
     def _visit_node(self, context: Context):
-        if type(self.value) == dict:
+        if type(self.value) not in (int, float):
             context.visit_child(
                 node = self.value,
                 replace=partial(self.__replace_value, visitor=context.visitor)
@@ -479,17 +478,10 @@ class String(ASTNode):
 class Bytes(ASTNode):
     value: bytes
 
-    def __post_init__(self):
-        super().__post_init__()
-
-        if type(self.value) == str:
-            self.value = self.value.encode()
-
     def _visit_node(self, context: Context):
         pass
 
     def __str__(self):
-
         try:
             return self.value.decode()
         except UnicodeDecodeError:
@@ -1087,19 +1079,16 @@ class Arguments(ASTNode):  # TODO: not used yet
 
         return inspect.Signature(parameters=params)
 
-    def set_taint(self, name, taint_level, context, taint_log=None):
+    def set_taint(self, name: typing.Union[str, int], taint_level, context, taint_log=None):
         if type(name) == int and name < len(self.args):
-            name = self.args[name]
-
-        if not isinstance(name, Hashable):
-            return
+            name : str = self.args[name]  # type: ignore[no-redef]
 
         if taint_log is None:
             warn("Attempting to modify argument taint but log is not set", stacklevel=2)
 
         if name in self.taints:
-            t = self.taints[name]
-            if taint_level > t:
+            taint = self.taints[name]
+            if taint_level > taint:
                 self.taints[name] = taint_level
                 if taint_log:
                     self.taint_logs[name].append(taint_log)
@@ -1474,7 +1463,7 @@ class Context:
         return f"{self.visitor.normalized_path}:{self.node.line_no}"
 
     def as_child(self, node: NodeType, replace=lambda x: None) -> Context:
-        return Context(
+        return Context(  # type: ignore[call-arg]
             parent=self,
             node=node,
             depth=self.depth + 1,

@@ -29,13 +29,13 @@ from pip._internal.req import InstallRequirement
 
 # Polyfill for compatibility (Py2k & Py3k) to retrieve user input
 try:
-    text_input = raw_input  # pylint: disable
+    text_input = raw_input  # type: ignore[name-defined]
 except NameError:
     text_input = input
 
 
 SUPPORTED_PIP_VERSIONS = ("19.*", "10.*", "20.*", "18.*", "21.*")
-AURA_PATH = None
+AURA_PATH = None  # type: Optional[str]
 logger = logging.getLogger("apip")
 
 

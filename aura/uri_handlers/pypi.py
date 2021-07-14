@@ -4,7 +4,7 @@ import shutil
 import tempfile
 import pathlib
 import urllib.parse
-from typing import Generator, Tuple, Optional
+from typing import Generator, Tuple, Optional, Dict, Any
 
 from .base import URIHandler, PackageProvider, ScanLocation
 from ..exceptions import UnsupportedDiffLocation
@@ -30,7 +30,7 @@ class PyPiHandler(URIHandler, PackageProvider):
         self.package_name = uri.netloc
         self.pkg = PypiPackage.from_cached(name=self.package_name)
         self.file_name = uri.path.lstrip("/")
-        self.opts = {"release": "latest", "cleanup": False}
+        self.opts : Dict[str, Any] = {"release": "latest", "cleanup": False}
 
         if self.opts.get("download_dir"):
             self.opts["download_dir"] = pathlib.Path(self.opts["download_dir"])

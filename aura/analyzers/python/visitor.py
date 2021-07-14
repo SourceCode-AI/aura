@@ -51,7 +51,7 @@ def get_ast_tree(location: Union[ScanLocation, bytes], metadata=None) -> dict:
         }
     else:
         kwargs = {
-            "command": [INSPECTOR_PATH, location.str_location]
+            "command": [INSPECTOR_PATH, location.str_location]  # type: ignore[union-attr]
         }
 
     if metadata is None:
@@ -82,7 +82,7 @@ class Visitor:
     when nodes are visited as well as modification via the passed context
     """
 
-    stage_name = None
+    stage_name : Optional[str] = None
 
     def __init__(self, *, location: ScanLocation):
         self.location: ScanLocation = location
@@ -91,7 +91,7 @@ class Visitor:
         self.modified = False
         self.iteration = 0
         self.convergence : Optional[int] = 1
-        self.queue = deque()
+        self.queue : deque = deque()
         self.call_graph = CallGraph()
 
         self.hits = []

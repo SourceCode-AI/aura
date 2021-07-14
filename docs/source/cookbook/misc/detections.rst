@@ -132,6 +132,32 @@ A string was found in the source code (post-processed AST) that is a valid base6
       "location": "/mnt/pypi_mirror/packages/7f/e3/46ed3fa11eb08ca42e88ef7f26567f317778c717ebace5e4c021b1dd1eef/tiky-1.0.6.tar.gz$tiky-1.0.6/tiky.py"
     }
 
+
+HighEntropyString
+^^^^^^^^^^^^^^^^^
+
+Detection of a string inside the source with an entropy exceeding the configured threshold. Useful in detecting potential malware payloads or other hidden payloads.
+
+::
+
+    {
+      "score": 0,
+      "type": "HighEntropyString",
+      "slug": "highentropystring",
+      "severity": "unknown",
+      "extra": {
+        "type": "high_entropy_string",
+        "entropy": 5.664622269382654,
+        "string": "R0lGODlhIAAgAPYAAAsLC... output stripped"
+      },
+      "line": "working_encoded = \"\"\"R0lGODlhIAAgAPYAAAsLC... output stripped\"\"\"",
+      "line_no": 1,
+      "signature": "misc#high_entropy#bc7018f3#/home/user/.aura_cache/mirror_tikitiki-0.2.zip$tikitiki-0.2/tikitiki/working_gif.py:1",
+      "message": "A string with high shanon entropy was found",
+      "location": "/home/user/.aura_cache/mirror_tikitiki-0.2.zip$tikitiki-0.2/tikitiki/working_gif.py"
+    }
+
+
 Binwalk
 ^^^^^^^
 
@@ -224,6 +250,30 @@ Generic detection for semantic signatures that have not defined their custom nam
       "message": "A string with high shanon entropy was found",
       "location": "/mnt/pypi_mirror/packages/2f/ee/6ad696ef6e59d46b26def2fe92ef17519047b9f24dc1443a84a9fa8ff85d/django_markdown_messaging-0.1.0-py3-none-any.whl$django_markdown_messaging/models.py"
     }
+
+
+Typosquatting
+^^^^^^^^^^^^^
+
+These detections list all packages found on pypi with a similar name (typosquatting)
+
+::
+
+    {
+      "score": 0,
+      "type": "Typosquatting",
+      "slug": "typosquatting",
+      "severity": "unknown",
+      "tags": [
+        "typosquatting"
+      ],
+      "extra": {
+        "package_name": "lime"
+      },
+      "signature": "tile#typosquatting#lime",
+      "message": "Located a PyPI package with a similar name",
+    }
+
 
 
 InvalidRequirement
@@ -661,6 +711,71 @@ Problem encountered during the AST analysis
       "location": "/mnt/pypi_mirror/packages/94/25/63519ece651e2849b3c9b66d88f2a189c1a75889382015abab1393e4fef1/retki-0.12.1.tar.gz$retki-0.12.1/retki/compiler.py"
     }
 
+PackageInformation
+^^^^^^^^^^^^^^^^^^
+
+Dump of information about the package from pypi. These include: title, urls (homepage, vcs, etc...), specifiers and more. On top of that there is also a package scoring matrix as computed by aura.
+
+::
+
+    {
+      "score": 0,
+      "type": "PackageInformation",
+      "slug": "packageinformation",
+      "severity": "unknown",
+      "tags": [
+        "package_info"
+      ],
+      "extra": {
+        "source_url": "https://github.com/tightai/tightai",
+        "homepage_url": "https://github.com/tightai/tightai",
+        "documentation_url": null,
+        "latest_release": "1.0.14",
+        "score": {
+          "total": 7,
+          "entries": [
+            {
+              "value": 8,
+              "normalized": 1,
+              "label": "PyPI downloads",
+              "explanation": "8 (+1)",
+              "slug": "pypi_downloads"
+            },
+            {
+              "value": 1,
+              "normalized": 0,
+              "label": "GitHub stars",
+              "explanation": "1 (+0)",
+              "slug": "github_stars"
+            },
+            {
+              "value": 0,
+              "normalized": 0,
+              "label": "GitHub forks",
+              "explanation": "0 (+0)",
+              "slug": "github_forks"
+            },
+            ...
+          ]
+        },
+        "reverse_dependencies": [],
+        "classifiers": [
+          "Development Status :: 3 - Alpha",
+          "Intended Audience :: Developers",
+          "License :: OSI Approved :: Apache Software License",
+          "Natural Language :: English",
+          "Programming Language :: Python :: 3.6",
+          "Programming Language :: Python :: 3.7",
+          "Programming Language :: Python :: 3.8"
+        ],
+        "version": "1.0.14"
+      },
+      "signature": "package_enrichment#tightai",
+      "message": "Package information",
+    }
+
+
+
 ASTParseError
 ^^^^^^^^^^^^^
 
@@ -682,23 +797,86 @@ A problem encountered when attempting to parse the input as a python source code
     }
 
 
-Misc
-^^^^
+ReDoS
+^^^^^
 
-Uncategorized detections
+Detection of a regex that may be vulnerable to the ReDoS attack
 
 ::
 
     {
       "score": 0,
-      "type": "Misc",
+      "type": "ReDoS",
+      "slug": "redos",
       "severity": "unknown",
+      "tags": [
+        "redos"
+      ],
       "extra": {
-        "regex": "<... very long data ...>"
+        "type": "redos",
+        "regex": "(.*)MergeTree(\\(([^\\)]*)\\))*(.*)"
       },
-      "line": "<... very long data ...>",
-      "line_no": 23,
-      "signature": "misc#redos_recursion_error#/mnt/pypi_mirror/packages/8e/14/9ba339b75c6741764f206aa44d9a04cdace9670b6f54b2002a58c12024ac/ms_api-0.8.125-py3-none-any.whl$ms/protocol_pb2.py#23",
-      "message": "Recursion limit exceeded when scanning regex pattern for ReDoS",
-      "location": "/mnt/pypi_mirror/packages/8e/14/9ba339b75c6741764f206aa44d9a04cdace9670b6f54b2002a58c12024ac/ms_api-0.8.125-py3-none-any.whl$ms/protocol_pb2.py"
+      "line": "return re.sub(r\"(.*)MergeTree(\\(([^\\)]*)\\))*(.*)\", _replace, engine.strip())",
+      "line_no": 439,
+      "signature": "misc#redos#9621086d#/home/intense/.aura_cache/mirror_tinybird-cli-1.0.0b32.post2.tar.gz$tinybird-cli-1.0.0b32.post2/tinybird/sql.py:439",
+      "message": "Possible catastrophic ReDoS",
+      "location": "/home/intense/.aura_cache/mirror_tinybird-cli-1.0.0b32.post2.tar.gz$tinybird-cli-1.0.0b32.post2/tinybird/sql.py",
     }
+
+
+ASTPattern
+^^^^^^^^^^
+
+Uncategorized detection of an AST pattern from semantic signatures
+
+::
+
+    {
+      "score": 20,
+      "type": "ASTPattern",
+      "slug": "astpattern",
+      "severity": "low",
+      "tags": [
+        "deprecated"
+      ],
+      "line": "hasher = hashlib.sha256() if algo is 'sha256' else hashlib.md5()",
+      "line_no": 117,
+      "signature": "ast_pattern#md5_deprecated/117#/home/intense/.aura_cache/mirror_tinyenv-0.1.0-py2.py3-none-any.whl$tinyenv/utils/fileutil.py",
+      "message": "Usage of MD5 for cryptographic purposes is very dangerous and no longer recommended",
+      "location": "/home/intense/.aura_cache/mirror_tinyenv-0.1.0-py2.py3-none-any.whl$tinyenv/utils/fileutil.py",
+      "package": "tinyenv"
+    }
+
+
+LeakingPyPIrc
+^^^^^^^^^^^^^
+
+Detection of an exposed PyPI credentials inside the pypirc file
+
+::
+
+    {
+      "score": 100,
+      "type": "LeakingPyPIrc",
+      "slug": "leakingpypirc",
+      "severity": "critical",
+      "tags": [
+        "secrets_leak",
+        "pypirc",
+        "sensitive_file"
+      ],
+      "extra": {
+        "section": "pypi",
+        "username": "...",
+        "password": "..."
+      },
+      "signature": "pypirc#935b09ce",
+      "message": "Leaking credentials in the `.pypirc` file",
+      "location": "/home/user/.aura_cache/mirror_.../.pypirc",
+    }
+
+
+Misc
+^^^^
+
+Various uncategorized detections

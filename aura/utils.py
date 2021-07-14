@@ -303,7 +303,11 @@ def convert_size(desc: Union[str, int]) -> int:
     if type(desc) == int:
         return desc
 
-    parsed = re.match(r"^(\d+)([kmgtp]b?)?$", desc, flags=re.I)
+    parsed = re.match(r"^(\d+)([kmgtp]b?)?$", desc, flags=re.I)  # type: ignore[type-var]
+
+    if parsed is None:
+        raise ValueError(f"Invalid size value specified: `{desc}`")
+
     g = parsed.groups()
 
     if len(g) < 1 or len(g) > 2:

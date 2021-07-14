@@ -190,14 +190,31 @@ def test_base64_payload_finder(tmp_path, fixtures):
 
 
 @pytest.mark.parametrize("size,expected", (
+        ("0", 0),
         ("1", 1),
         ("42", 42),
         ("1GB", 1024**3),
-        ("1G", 1024**3)
+        ("1G", 1024**3),
+        (0, 0),
+        (123, 123),
+        (666, 666),
+        (-5, -5)
 ))
 def test_size_conversion(size: str, expected: int):
     output = utils.convert_size(size)
     assert output == expected
+
+
+@pytest.mark.parametrize("num,error_type,error_msg", (
+    ("", ValueError, "Invalid size value specified"),
+    ("19s", ValueError, "Invalid size value specified"),
+    ("k19", ValueError, "Invalid size value specified")
+))
+def test_invalid_size_conversion(num, error_type, error_msg):
+    with pytest.raises(error_type) as exc_info:
+        utils.convert_size(num)
+
+    assert error_msg in str(exc_info.value)
 
 
 

@@ -54,7 +54,7 @@ class CacheItem:
 
     @property
     def mtime(self) -> int:
-        return self.item_stat.st_mtime
+        return int(self.item_stat.st_mtime)
 
     @property
     def size(self) -> int:

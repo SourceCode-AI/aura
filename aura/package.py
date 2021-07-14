@@ -94,6 +94,8 @@ class PypiPackage:
             if parsed_src.netloc == "github.com":
                 return src
 
+        return None
+
     @property
     def homepage_url(self) -> Optional[str]:
         return self.info["info"].get("home_page")
@@ -153,7 +155,7 @@ class PypiPackage:
         packagetype: Optional[str] = None,
         filename: Optional[str] =None,
         md5: Optional[str] =None,
-    ) -> List[ReleaseInfo, ...]:
+    ) -> List[ReleaseInfo]:
         if release == "latest":
             release = self.get_latest_release()
 
