@@ -290,19 +290,17 @@ class TextBase:
 
 @dataclass()
 class TextScanOutput(TextBase, ScanOutputBase):
-    _fd: Any = None
-
     def __enter__(self):
         if self.output_location == "-":
             self._formatter = PrettyReport(fd=sys.stdout)
             return
 
-        self._fd = open(self.output_location, "w")
-        self._formatter = PrettyReport(fd=self._fd)
+        self.out_fd = open(self.output_location, "w")
+        self._formatter = PrettyReport(fd=self.out_fd)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if self._fd:
-            self._fd.close()
+        if self.out_fd:
+            self.out_fd.close()
 
     def output(self, hits, scan_metadata: dict):
         hits = set(hits)
@@ -320,7 +318,7 @@ class TextScanOutput(TextBase, ScanOutputBase):
         if score < self.min_score:
             return
 
-        secho("\n", file=self._fd, color=TTY_COLORS)  # Empty line for readability
+        secho("\n", file=self.out_fd, color=TTY_COLORS)  # Empty line for readability
         self._formatter.print_top_separator()
         self._formatter.print_heading(style(f"Scan results for {scan_metadata.get('name', 'N/A')}", fg="bright_green"))
         score_color = "bright_green" if score == 0 else "bright_red"
@@ -448,22 +446,20 @@ class TextTyposquattingOutput(TyposquattingOutputBase):
 
 @dataclass()
 class TextDiffOutput(TextBase, DiffOutputBase):
-    _fd: Any = None
-
     def __enter__(self):
         if self.output_location == "-":
             self._formatter = PrettyReport(fd=sys.stdout)
             return
 
-        self._fd = open(self.output_location, "w")
-        self._formatter = PrettyReport(fd=self._fd)
+        self.out_fd = open(self.output_location, "w")
+        self._formatter = PrettyReport(fd=self.out_fd)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if self._fd:
-            self._fd.close()
+        if self.out_fd:
+            self.out_fd.close()
 
     def output_diff(self, diff_analyzer):
-        out = PrettyReport(fd=self._fd)
+        out = PrettyReport(fd=self.out_fd)
 
         if diff_analyzer.tables:
             out.print_tables(*diff_analyzer.tables)

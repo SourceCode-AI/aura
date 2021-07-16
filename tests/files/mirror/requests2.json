@@ -30,7 +30,7 @@
     },
     "home_page": "http://python-requests.org",
     "keywords": "",
-    "license": "Apache 2.0",
+    "license": null,
     "maintainer": "",
     "maintainer_email": "",
     "name": "requests2",

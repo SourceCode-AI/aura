@@ -92,7 +92,7 @@ class SARIFOutput(JSONScanOutput):
         run["artifacts"].extend(locations.values())
         tpl["runs"].append(run)
 
-        print(dumps(tpl), file=self._fd)
+        print(dumps(tpl), file=self.out_fd)
 
     @staticmethod
     def _convert_to_artifact(detection) -> dict:

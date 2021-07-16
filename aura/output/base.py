@@ -4,7 +4,7 @@ import os.path
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass, field
 from urllib import parse
-from typing import List, Union, Mapping, Optional, Iterable
+from typing import List, Union, Mapping, Optional, Iterable, Any
 
 import pkg_resources
 
@@ -14,10 +14,9 @@ from ..type_definitions import DiffType, DiffAnalyzerType
 
 OUTPUT_HANDLER_CACHE = {}
 
-
+@dataclass()
 class OutputBase(metaclass=ABCMeta):
-    def __init__(self, *args, **kwargs):
-        pass
+    out_fd: Any = None
 
     @classmethod
     @abstractmethod

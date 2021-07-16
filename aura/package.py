@@ -40,10 +40,10 @@ class PypiPackage:
     mirror = LocalMirror()
 
     def __init__(self, name: str, info: dict, source: Optional[str]=None, opts: Optional[dict]=None):
-        self.name: str = name
+        self.name: str = name.lower()
         self.info: dict = info
         self.source: Optional[str] = source
-        self.opts: dict = opts or {}  # TODO: check if this attribute is used anywhere
+        self.opts: dict = opts or {}
         # normalize missing data
         self.info["info"].setdefault("project_urls", {})
         if self.info["info"]["project_urls"] is None:
@@ -104,8 +104,14 @@ class PypiPackage:
     def documentation_url(self) -> Optional[str]:
         return self.info["info"]["project_urls"].get("Documentation")
 
-    def get_latest_release(self) -> str:
-        return self.info["info"]["version"]
+    @property
+    def version(self) -> str:
+        if v := self.opts.get("version"):
+            return v
+        return self.get_latest_release()
+
+    def get_latest_release(self) -> Optional[str]:
+        return self.info["info"].get("version")
 
     def get_dependencies(self) -> Generator[Requirement, None, None]:
         deps = self.info["info"].get("requires_dist", [])

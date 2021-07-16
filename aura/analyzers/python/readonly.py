@@ -14,7 +14,7 @@ class ReadOnlyAnalyzer(Visitor):
         super().__init__(location=location)
         self.convergence = None
 
-    def __call__(self) -> typing.Generator[Detection, None, None]:
+    def __call__(self) -> typing.Iterable[Detection]:
         if not self.hooks:
             return
         elif not self.location.is_python_source_code:

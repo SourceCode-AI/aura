@@ -8,11 +8,11 @@ import time
 from functools import partial, wraps
 from collections import deque, OrderedDict
 from warnings import warn
-from typing import Optional, Tuple, Union, Dict, cast
+from typing import Optional, Tuple, Union, Dict, cast, List
 
 import pkg_resources
 
-from .nodes import Context, ASTNode
+from .nodes import Context, ASTNode, NodeType
 from ..detections import Detection
 from ...stack import CallGraph
 from .. import python_src_inspector
@@ -86,7 +86,7 @@ class Visitor:
 
     def __init__(self, *, location: ScanLocation):
         self.location: ScanLocation = location
-        self.tree = None
+        self.tree : Optional[NodeType] = None
         self.traversed = False
         self.modified = False
         self.iteration = 0
@@ -94,7 +94,7 @@ class Visitor:
         self.queue : deque = deque()
         self.call_graph = CallGraph()
 
-        self.hits = []
+        self.hits : List[Detection] = []
         self.path = location.location
         self.normalized_path: str = str(location)
         self.max_iterations = int(config.get_settings("aura.max-ast-iterations", 500))
@@ -279,7 +279,8 @@ class Visitor:
                 node._visit_node(context)
 
     def __visit_dict(self, key: str, context: Context):
-        value = context.node[key]
+        node = cast(dict, context.node)
+        value = node[key]
 
         if type(value) == dict and len(value) == 1 and value.get("_type") == "Load":
             return
@@ -287,7 +288,7 @@ class Visitor:
             return
 
         context.visit_child(
-            node=context.node[key],
+            node=value,
             replace=partial(self._replace_generic, key=key, context=context),
         )
 

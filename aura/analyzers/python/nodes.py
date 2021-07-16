@@ -1091,6 +1091,8 @@ class Arguments(ASTNode):  # TODO: not used yet
         if taint_log is None:
             warn("Attempting to modify argument taint but log is not set", stacklevel=2)
 
+        name = typing.cast(str, name)
+
         if name in self.taints:
             taint = self.taints[name]
             if taint_level > taint:
@@ -1156,7 +1158,7 @@ class Arguments(ASTNode):  # TODO: not used yet
 @dataclass
 class Import(ASTNode):
     names: dict = field(default_factory=dict)
-    level = None
+    level : typing.Optional[int] = None
 
     def _visit_node(self, context: Context):
         for name, target in self.names.items():

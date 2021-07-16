@@ -221,6 +221,9 @@ cache: &cache
   expiration:
     default: 72  # 3 days
 
+sbom: &sbom
+  enabled: true
+  licenses: "aura.data.license_specifiers.json"
 
 interpreters: &interpreters
   # Configure python interpreters for parsing AST code

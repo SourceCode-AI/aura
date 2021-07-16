@@ -28,25 +28,23 @@ def check_sqlite_support():
 
 @dataclass()
 class DiffBase(metaclass=ABCMeta):
-    _db: Any = None
-
     def __enter__(self):
         if self.output_location == "-":
             raise InvalidOutput("SQLite format can't output to stdout")
 
-        self._db = sqlite3.connect(self.output_location)
+        self.out_fd = sqlite3.connect(self.output_location)
         self._initialize_db()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self._db.close()
+        self.out_fd.close()
 
     @abstractmethod
     def _create_tables(self):
         ...
 
     def _initialize_db(self):
-        self._db.enable_load_extension(True)
-        opts = [x[0] for x in self._db.execute("PRAGMA compile_options").fetchall()]
+        self.out_fd.enable_load_extension(True)
+        opts = [x[0] for x in self.out_fd.execute("PRAGMA compile_options").fetchall()]
         if "ENABLE_JSON1" not in opts:
             raise EnvironmentError(
                 f"SQLite doesn't have support for JSON1, compile opts: {', '.join(opts)}"
@@ -94,13 +92,13 @@ class SQLiteScanOutput(DiffBase, ScanOutputBase):
         """
 
 
-        with self._db:
-            self._db.execute(INPUT_SCHEMA)
-            self._db.execute(LOCATION_SCHEMA)
-            self._db.execute(DETECTION_SCHEMA)
+        with self.out_fd:
+            self.out_fd.execute(INPUT_SCHEMA)
+            self.out_fd.execute(LOCATION_SCHEMA)
+            self.out_fd.execute(DETECTION_SCHEMA)
 
     def output(self, hits: List[Detection], scan_metadata: dict):
-        cur = self._db.cursor()
+        cur = self.out_fd.cursor()
         try:
             location_ids = {}
             cur.execute("""
@@ -150,10 +148,10 @@ class SQLiteScanOutput(DiffBase, ScanOutputBase):
                     location_id
                 ])
         except:
-            self._db.rollback()
+            self.out_fd.rollback()
             raise
         else:
-            self._db.commit()
+            self.out_fd.commit()
 
 
 @dataclass()
@@ -198,10 +196,10 @@ class SQLiteDiffOutput(DiffBase, DiffOutputBase):
             )
         """
 
-        with self._db:
-            self._db.execute(DIFF_SCHEMA)
-            self._db.execute(PATCH_SCHEMA)
-            self._db.execute(DETECTION_SCHEMA)
+        with self.out_fd:
+            self.out_fd.execute(DIFF_SCHEMA)
+            self.out_fd.execute(PATCH_SCHEMA)
+            self.out_fd.execute(DETECTION_SCHEMA)
 
     def __insert_detection(self, cur, diff_id, detection, status):
         assert status in ("new", "removed")
@@ -227,7 +225,7 @@ class SQLiteDiffOutput(DiffBase, DiffOutputBase):
         ])
 
     def output_diff(self, diffs_analyzer):
-        cur = self._db.cursor()
+        cur = self.out_fd.cursor()
         try:
             for d in self.filtered(diffs_analyzer.diffs):
                 data = d.as_dict()
@@ -283,10 +281,10 @@ class SQLiteDiffOutput(DiffBase, DiffOutputBase):
                         )
 
         except:
-            self._db.rollback()
+            self.out_fd.rollback()
             raise
         else:
-            self._db.commit()
+            self.out_fd.commit()
 
 
 check_sqlite_support()

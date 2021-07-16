@@ -1,6 +1,6 @@
 import re
 import pprint
-from typing import Iterable
+from typing import Iterable, cast
 
 from ..nodes import *
 from ..visitor import Visitor
@@ -158,6 +158,9 @@ class TaintAnalysis(Visitor):
                 for idx, x in enumerate(context.node.args):
                     if not isinstance(x, ASTNode):
                         continue
+
+                    x = cast(ASTNode, x)
+
                     if x.cached_full_name is None:
                         arg_index = idx
                     elif type(x.cached_full_name) == str:
@@ -283,7 +286,7 @@ class TaintAnalysis(Visitor):
 
     def _post_analysis(self):
         return #TODO
-        external_taints = {}
+        external_taints = {}  # type: ignore[unreachable]
 
         for name, callers in self.call_graph.references.items():
             if not name.startswith('.'):  # TODO

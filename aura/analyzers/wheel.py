@@ -4,7 +4,7 @@ import csv
 import base64
 import hashlib
 from pathlib import Path
-from typing import Generator
+from typing import cast
 
 import chardet
 
@@ -59,8 +59,8 @@ def analyze_wheel(*, location: ScanLocation) -> AnalyzerReturnType:
         with record_path.open(mode="r", newline=os.linesep) as rfd:
             records_content = rfd.read()
     except UnicodeDecodeError:
-        with record_path.open(mode="rb") as rfd:
-            records_raw: bytes = rfd.read()
+        with record_path.open(mode="rb") as rfd:  # type: ignore[assignment]
+            records_raw: bytes = rfd.read()  # type: ignore[assignment]
             try:
                 records_encoding = chardet.detect(records_raw)["encoding"]
                 records_content = records_raw.decode(records_encoding)
@@ -145,6 +145,7 @@ def analyze_wheel(*, location: ScanLocation) -> AnalyzerReturnType:
                 )
 
     for x in wheel_root.glob("*/setup.py"):
+        x = cast(Path, x)
         hit_path = normalize_path(wheel_root / x)
         hit = Detection(
             detection_type="Wheel",
@@ -157,6 +158,7 @@ def analyze_wheel(*, location: ScanLocation) -> AnalyzerReturnType:
         yield hit
 
     for x in wheel_root.glob("**/*"):
+        x = cast(Path, x)
         # Ignore files under the *.dist-info directory
         if dist_info in x.parents or x.is_dir():
             continue

@@ -3,7 +3,7 @@ import re
 import codecs
 import sys
 import locale
-from typing import Optional, Generator, List, Tuple, Text
+from typing import List, Tuple, Text, Iterable
 
 import chardet
 from packaging.requirements import Requirement, InvalidRequirement
@@ -14,6 +14,7 @@ from ..uri_handlers.base import ScanLocation
 from ..config import get_score_or_default
 from ..exceptions import NoSuchPackage
 from .. import package
+from .. import sbom
 
 
 FILENAME = re.compile(r"^.*requirements.*\.txt$")
@@ -55,9 +56,9 @@ def auto_decode(data: bytes) -> str:
         return data.decode(encoding)
 
 
-def check_unpinned(requirement: Requirement, location: ScanLocation) -> Optional[Detection]:
+def check_unpinned(requirement: Requirement, location: ScanLocation) -> Iterable[Detection]:
     if len(requirement.specifier) == 0:
-        return Detection(
+        yield Detection(
             detection_type="UnpinnedPackage",
             message=f"Package {requirement.name} is unpinned",
             signature=f"req_unpinned#{str(location)}#{requirement.name}",
@@ -68,16 +69,28 @@ def check_unpinned(requirement: Requirement, location: ScanLocation) -> Optional
             tags={"unpinned_package"},
             location=location.location
         )
-    else:
-        return None
 
-def check_outdated(requirement: Requirement, location: ScanLocation) -> Optional[Detection]:
+
+def check_outdated(requirement: Requirement, location: ScanLocation) -> Iterable[Detection]:
     pypi = package.PypiPackage.from_cached(requirement.name)
     latest = pypi.get_latest_release()
     spec_set = requirement.specifier
 
+    component = sbom.get_component(pypi)
+    purl = sbom.get_package_purl(pypi)
+
+    if sbom.is_enabled():
+        yield Detection(
+            detection_type="SbomComponent",
+            message=f"SBOM data",
+            signature=f"sbom_component#{str(location)}#{purl}",
+            extra=component,
+            tags={"sbom_component"},
+            location=location.location
+        )
+
     if latest not in spec_set:
-        return Detection(
+        yield Detection(
             detection_type="OutdatedPackage",
             message=f"Package {requirement.name}{str(spec_set)} is outdated, newest version is {latest}",
             signature=f"req_outdated#{str(location)}#{requirement.name}#{str(spec_set)}#{latest}",
@@ -90,12 +103,10 @@ def check_outdated(requirement: Requirement, location: ScanLocation) -> Optional
             },
             tags={"outdated_package"}
         )
-    else:
-        return None
 
 
 @Analyzer.ID("requirements_file_analyzer")
-def analyze_requirements_file(*, location: ScanLocation) -> Generator[Detection, None, None]:
+def analyze_requirements_file(*, location: ScanLocation) -> Iterable[Detection]:
     """
     Analyzer the requirements.txt file and lookup for outdated packages
     """
@@ -150,13 +161,8 @@ def analyze_requirements_file(*, location: ScanLocation) -> Generator[Detection,
         try:
             req = Requirement(req_line)
 
-            hit = check_unpinned(req, location)
-            if hit:
-                yield hit
-
-            hit = check_outdated(req, location)
-            if hit:
-                yield hit
+            yield from check_unpinned(req, location)
+            yield from check_outdated(req, location)
         except (ValueError, NoSuchPackage, InvalidRequirement) as exc:
             yield Detection(
                 detection_type="InvalidRequirement",

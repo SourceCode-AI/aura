@@ -56,4 +56,4 @@ class GitlabSASTOutput(JSONScanOutput):
             }
             tpl["vulnerabilities"].append(data)
 
-        print(dumps(tpl), file=self._fd)
+        print(dumps(tpl), file=self.out_fd)
