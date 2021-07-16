@@ -20,7 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3 :: Only",
     "Topic :: Security",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)"
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)"
 ]
 packages = [
     { include = "aura" },
@@ -101,6 +101,7 @@ sqlite = "aura.output.sqlite:SQLiteScanOutput"
 json = "aura.output.json:JSONScanOutput"
 gitlab-sast = "aura.output.gitlab:GitlabSASTOutput"
 sarif = "aura.output.sarif:SARIFOutput"
+sbom = "aura.output.sbom:SBOMOutput"
 
 [tool.poetry.plugins."aura.diff_output_handlers"]
 text = "aura.output.text:TextDiffOutput"
