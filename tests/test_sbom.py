@@ -47,7 +47,7 @@ def test_get_package_purl(package_name, purl, mock_pypi_rest_api):
 
 
 @responses.activate
-def test_get_component(mock_pypi_rest_api):
+def test_get_component(mock_pypi_rest_api, fuzzy_rule_match):
     mock_pypi_rest_api(responses)
     expected = {
         "name": "wheel",
@@ -64,4 +64,5 @@ def test_get_component(mock_pypi_rest_api):
     pkg = package.PypiPackage.from_cached("wheel")
     pkg.opts["version"] = "0.2"
     component = sbom.get_component(pkg)
-    assert component == expected
+    assert fuzzy_rule_match(component, expected), component
+

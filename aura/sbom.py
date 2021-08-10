@@ -114,7 +114,8 @@ def get_component(pkg: package.PypiPackage) -> Dict[str, Any]:
     data = {
         "type": "library",
         "name": pkg.name,
-        "purl": get_package_purl(pkg)
+        "purl": get_package_purl(pkg),
+        "description": pkg.info["info"]["description"]
     }
 
     version = pkg.version
@@ -147,6 +148,12 @@ def get_component(pkg: package.PypiPackage) -> Dict[str, Any]:
 
     if licenses:
         data["licenses"] = licenses
+
+    if (author:=pkg.info["info"].get("author_email")):
+        data["author"] = author
+
+    if (publisher:=pkg.info["info"].get("author")):
+        data["publisher"] = publisher
 
     return data
 

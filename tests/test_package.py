@@ -2,8 +2,7 @@ import uuid
 import os
 import datetime
 import tempfile
-from unittest.mock import Mock, patch
-from xmlrpc import client as xml_client
+from unittest.mock import patch
 
 import responses
 import pytz

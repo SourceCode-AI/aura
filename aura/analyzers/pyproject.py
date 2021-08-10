@@ -30,7 +30,7 @@ def analyze_pyproject(*, location: ScanLocation):
 def analyzer_poetry_lock(*, location: ScanLocation):
     lock = parse_toml(location.location.read_text())
 
-    for pkg in lock["package"]:
+    for pkg in lock["package"]:  # type: ignore[union-attr]
         pkg_version = Version(pkg["version"])
         pkg_name = str(pkg["name"])
 

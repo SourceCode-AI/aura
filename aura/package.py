@@ -110,6 +110,13 @@ class PypiPackage:
             return v
         return self.get_latest_release()
 
+    @property
+    def author(self) -> str:
+        if (author:=self.info["info"].get("author_email")):
+            return author
+
+        return self.info["info"]["author"]
+
     def get_latest_release(self) -> Optional[str]:
         return self.info["info"].get("version")
 
