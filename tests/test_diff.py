@@ -356,17 +356,6 @@ def test_is_rename_different_depths(l_name, r_name, expected):
     assert sc1.is_renamed_file(sc2) == expected
 
 
-def test_derive_similar(random_text):
-    original = random_text(200)
-
-    for x in range(0, 100, 5):
-        similarity = x/100.0
-        modified = derive_similar(original, similarity)
-        result = difflib.SequenceMatcher(None, original, modified).ratio()
-        assert result > (similarity-0.1)
-        assert result < (similarity+0.1)
-
-
 def disabled_test_is_rename_ratios(random_text):
     original = random_text(1000)
     orig_location = ScanLocation(location="pytest_orig_location.txt", size=len(original))
