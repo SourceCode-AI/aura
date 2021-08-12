@@ -15,7 +15,9 @@ from aura import exceptions
 REQUESTS_DEPS = [str(uuid.uuid4()) for _ in range(2896)]  # Mock `requests` reverse dependencies for pacakge score matrix
 
 
-def test_non_existing_package():
+@responses.activate
+def test_non_existing_package(mock_pypi_rest_api):
+    mock_pypi_rest_api(responses)
     with pytest.raises(exceptions.NoSuchPackage):
         package.PypiPackage.from_cached(f"does_not_exists_{str(uuid.uuid4())}")
 

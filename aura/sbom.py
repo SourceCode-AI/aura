@@ -3,6 +3,7 @@ Module functionality related to SBOMs - Software bill of materials
 """
 
 import uuid
+from importlib import metadata
 from typing import Optional, Dict, List, Any, Set
 
 from . import config
@@ -154,6 +155,13 @@ def get_component(pkg: package.PypiPackage) -> Dict[str, Any]:
 
     if (publisher:=pkg.info["info"].get("author")):
         data["publisher"] = publisher
+
+    external_refs = {
+        "package_url": pkg.info["info"]["package_url"]
+    }
+
+    for url_name, url in pkg.info["info"]["project_urls"].items():
+        external_refs[url_name.lower()] = url
 
     return data
 

@@ -86,7 +86,8 @@ def check_outdated(requirement: Requirement, location: ScanLocation) -> Iterable
             signature=f"sbom_component#{str(location)}#{purl}",
             extra=component,
             tags={"sbom_component"},
-            location=location.location
+            location=location.location,
+            informational=True
         )
 
     if latest not in spec_set:

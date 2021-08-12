@@ -323,13 +323,19 @@ def mock_github(fixtures):
 
 @pytest.fixture()
 def mock_pypi_rest_api(fixtures):
-    mirror_pth = Path(fixtures.path("mirror/"))
+    pkg_url = re.compile(r"https://pypi.org/pypi/(?P<pkg_name>[-a-z0-9_]+)/json")
 
-    mock_data = {}
+    def _pkg_json_callback(request):
+        m = pkg_url.match(request.url)
+        if (not m) or len(m.groups()) == 0:
+            return (404, {"Content-length": "0"}, "")
 
-    for x in mirror_pth.glob("*.json"):
-        mock_data[f"https://pypi.org/pypi/{x.name.split('.')[0]}/json"] = json.loads(x.read_text())
-
+        file_pth = fixtures.path(f"mirror/{m.group('pkg_name')}.json")
+        if os.path.exists(file_pth):
+            with open(file_pth, "rb") as fd:
+                return (200, {'Content-length': str(os.stat(file_pth).st_size)}, fd.read())
+        else:
+            return (404, {"Content-length": "0"}, "")
 
     def _callback_download(request):
         filename = request.url.split("/")[-1]
@@ -338,21 +344,14 @@ def mock_pypi_rest_api(fixtures):
             with open(file_pth, "rb") as fd:
                 return (200, {'Content-length': str(os.stat(file_pth).st_size)}, fd.read())
         else:
-            return (404, {"Content-length": 0}, "")
-
-
-    def _callback(request):
-        resp = json.dumps(mock_data[request.url])
-        return (200, {}, resp)
-
+            return (404, {"Content-length": "0"}, "")
 
     def _activate_mock(rsps):
-        for url in mock_data.keys():
-            rsps.add_callback(
-                responses.GET,
-                url=url,
-                callback=_callback
-            )
+        rsps.add_callback(
+            responses.GET,
+            url=pkg_url,
+            callback=_pkg_json_callback
+        )
 
         rsps.add_callback(
             responses.GET,

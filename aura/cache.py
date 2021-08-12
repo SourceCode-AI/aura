@@ -9,7 +9,7 @@ import xmlrpc.client
 import concurrent.futures
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional, List, Generator, Iterable, BinaryIO, Tuple, Set
+from typing import Optional, List, Generator, Iterable, BinaryIO, Tuple, Set, Dict, Type
 
 import click
 import requests
@@ -37,10 +37,13 @@ class CacheItem:
         self._deleted = False
 
     @classmethod
-    def iter_items(cls, tags=None) -> Generator[CacheItem, None, None]:
+    def iter_items(cls, tags=None) -> Iterable[CacheItem]:
         tags = set(tags or ())
 
-        for x in Cache.get_location().iterdir():
+        if (cache_location:=Cache.get_location()) is None:
+            return
+
+        for x in cache_location.iterdir():
             if not x.name.endswith(".metadata.json"):
                 continue
 
@@ -129,12 +132,14 @@ class Cache(ABC):
         ...
 
     @property
-    def cache_file_location(self) -> Path:
-        return self.get_location() / f"{self.prefix}{self.cid}"
+    def cache_file_location(self) -> Optional[Path]:
+        if location:=self.get_location():
+            return location / f"{self.prefix}{self.cid}"
 
     @property
-    def metadata_location(self) -> Path:
-        return self.get_location() / f"{self.prefix}{self.cid}.metadata.json"
+    def metadata_location(self) -> Optional[Path]:
+        if location:=self.get_location():
+            return location / f"{self.prefix}{self.cid}.metadata.json"
 
     @property
     def is_valid(self) -> bool:
@@ -476,7 +481,7 @@ class ASTPatternCache(Cache):
         }
 
 
-CACHE_TYPES = {
+CACHE_TYPES: Dict[str, Type[Cache]] = {
     "url": URLCache,
     "filedownload": FileDownloadCache,
     "mirror": MirrorFile,

@@ -1,5 +1,5 @@
 # Unpinned
-six
+requests
 # Outdated version
 wheel==0.34.1
 # Non existing package on Pypi

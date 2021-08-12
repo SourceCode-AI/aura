@@ -738,4 +738,11 @@ strings: &default_strings
     tags:
       - secrets_leak
 
+  - id: pypi_api_key
+    type: regex
+    pattern: "^pypi-AgEIcHlwaS5vcmc[A-Za-z0-9-_]{50,1000}$"
+    message: "PyPI upload token"
+    score: 100
+    tags:
+      - secrets_leak
 

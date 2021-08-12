@@ -1,4 +1,5 @@
 import pytest
+import responses
 
 from urllib.parse import urlparse
 
@@ -47,7 +48,9 @@ def test_mirror_suspicious_file_trigger(simulate_mirror):
         assert fs_struct.enable_suspicious_files(loc) is True
 
 
-def test_mirror_uri_variations(simulate_mirror):
+@responses.activate
+def test_mirror_uri_variations(simulate_mirror, mock_pypi_rest_api):
+    mock_pypi_rest_api(responses)
     # Does not exists
     with pytest.raises(exceptions.NoSuchPackage):
         _ = umirror.MirrorHandler(urlparse("mirror://does_not_exists"))

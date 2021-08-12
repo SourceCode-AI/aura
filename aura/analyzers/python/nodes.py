@@ -696,9 +696,9 @@ class Compare(ASTNode):
 class FunctionDef(ASTNode):
     name: str
     args: typing.Any
-    body: typing.List[ASTNode]
-    decorator_list: typing.List[ASTNode]
-    returns: ASTNode
+    body: typing.List[NodeType]
+    decorator_list: typing.List[NodeType]
+    returns: NodeType
 
     def __post_init__(self):
         super().__post_init__()
@@ -724,10 +724,12 @@ class FunctionDef(ASTNode):
         return self.args.get_signature()
 
     def get_flask_routes(self):
-        for d in self.decorator_list:  # type: Call
-            if not isinstance(d, ASTNode):
+        for d in self.decorator_list:
+            if type(d) != Call:
                 continue
             elif d.full_name != "flask.Flask.route":
+                continue
+            elif not d.args:
                 continue
 
             yield str(d.args[0])
@@ -812,7 +814,7 @@ class ClassDef(ASTNode):
 class Call(ASTNode):
     func: NodeType
     args: list
-    kwargs: dict
+    kwargs: typing.Union[Dictionary, dict]
     taints: dict = field(default_factory=dict)
 
     def __post_init__(self):
@@ -963,7 +965,7 @@ class Call(ASTNode):
         return self.bind(sig)
 
     def bind(self, signature) -> inspect.BoundArguments:
-        if isinstance(self.kwargs, Dictionary):
+        if type(self.kwargs) == Dictionary:
             kw = self.kwargs.to_dict()
         else:
             kw = self.kwargs

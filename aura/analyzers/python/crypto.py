@@ -50,7 +50,7 @@ class CryptoGenKey(base.NodeAnalyzerV2):
 
         if f_name in CRYPTO_GEN_KEYS:
             target = CRYPTO_GEN_KEYS.get(f_name)
-            yield from getattr(self, f'_lib_{target["lib"]}')(context, target)
+            yield from getattr(self, f'_lib_{target["lib"]}')(context, target)  # type: ignore[index]
             return
 
     def _lib_cryptography(self, context, info):

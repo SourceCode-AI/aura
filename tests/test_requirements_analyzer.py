@@ -1,4 +1,10 @@
-def test_requirements_generic(fixtures):
+import responses
+
+
+@responses.activate
+def test_requirements_generic(fixtures, mock_pypi_rest_api):
+    mock_pypi_rest_api(responses)
+
     matches = [
         {
             'type': 'OutdatedPackage',
@@ -9,9 +15,9 @@ def test_requirements_generic(fixtures):
         },
         {
             'type': "UnpinnedPackage",
-            "message": "Package six is unpinned",
+            "message": "Package requests is unpinned",
             "extra": {
-                "package": "six"
+                "package": "requests"
             },
             "tags": ["unpinned_package"]
         },
