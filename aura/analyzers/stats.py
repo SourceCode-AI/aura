@@ -33,5 +33,6 @@ def analyze(*, location: ScanLocation):
         informational=True,
         extra=info,
         location=loc,
-        signature=f"file_stats#{loc}"
+        signature=f"file_stats#{loc}",
+        tags={"misc:file_stats"}
     )

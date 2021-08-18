@@ -50,7 +50,7 @@ def analyze_wheel(*, location: ScanLocation) -> AnalyzerReturnType:
             location=location.location,
             score = get_score_or_default("wheel-records-missing", 100),
             message = f"Wheel anomaly, RECORD file is missing in dist-info",
-            tags = {"anomaly", "wheel", "wheel_missing_records"},
+            tags = {"anomaly:wheel:missing_record"},
             signature = f"wheel#missing_records#{location.strip(record_path)}"
         )
         return
@@ -69,7 +69,7 @@ def analyze_wheel(*, location: ScanLocation) -> AnalyzerReturnType:
                     detection_type="Wheel",
                     location=location.location,
                     message="Unable to decode the wheel RECORDs file",
-                    tags={"anomaly", "wheel", "unicode_decode_error"},
+                    tags={"anomaly:wheel:record_encoding_error"},
                     signature=f"wheel#record_decode_err#{location.strip(record_path)}"
                 )
                 return
@@ -85,7 +85,7 @@ def analyze_wheel(*, location: ScanLocation) -> AnalyzerReturnType:
                 detection_type="Wheel",
                 score=get_score_or_default("wheel-missing-file", 100),
                 message = "Wheel anomaly detected, file listed in RECORDs but not present in wheel",
-                tags = {"anomaly", "wheel", "wheel_missing_file"},
+                tags = {"anomaly:wheel:missing_file"},
                 extra = {
                     "record": record[0]
                 },
@@ -109,7 +109,7 @@ def analyze_wheel(*, location: ScanLocation) -> AnalyzerReturnType:
                 extra = {
                     "record": record
                 },
-                tags = {"anomaly", "wheel"},
+                tags = {"anomaly:wheel:malformed_record"},
                 signature = f"wheel#malformed_record#{full_pth}#{record}"
             )
             continue
@@ -121,7 +121,7 @@ def analyze_wheel(*, location: ScanLocation) -> AnalyzerReturnType:
                 location=location.location,
                 score=get_score_or_default("wheel-invalid-record-checksum", 100),
                 message=f"Wheel anomaly detected, {exc.args[0]}",
-                tags={"anomaly", "wheel"},
+                tags={"anomaly:wheel:checksum_error"},
                 extra={
                     "exception_type": type(exc).__name__,
                     "exception_message": exc.args[0]
@@ -135,7 +135,7 @@ def analyze_wheel(*, location: ScanLocation) -> AnalyzerReturnType:
                     location=location.location,
                     score=get_score_or_default("wheel-invalid-record-checksum", 100),
                     message="Wheel anomaly detected, invalid record checksum",
-                    tags={"anomaly", "wheel"},
+                    tags={"anomaly:wheel:invalid_checksum"},
                     extra={
                         "real_checksum": target_checksum,
                         "record_checksum": checksum,
@@ -152,7 +152,7 @@ def analyze_wheel(*, location: ScanLocation) -> AnalyzerReturnType:
             location=location.location,
             score=get_score_or_default("wheel-contain-setup-py", 100),
             message="Found setup.py in a wheel archive",
-            tags={"wheel", "anomaly", "setup.py"},
+            tags={"anomaly:wheel:setup.py"},
             signature=f"wheel#setup.py#{location.strip(hit_path)}",
         )
         yield hit
@@ -172,7 +172,7 @@ def analyze_wheel(*, location: ScanLocation) -> AnalyzerReturnType:
                 extra={
                     "record": location.strip(x)  #TODO: normalize path
                 },
-                tags={"wheel", "anomaly", "missing_record_file"},
+                tags={"anomaly:wheel:unlisted_file"},
                 signature=f"wheel#missing_record_file#{location.strip(x)}",
             )
             yield hit

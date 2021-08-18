@@ -38,6 +38,7 @@ class SecretsAnalyzer(base.NodeAnalyzerV2):
             extra={"name": name, "secret": secret},
             line_no=context.node.line_no,
             signature=f"leaking_secret#{context.visitor.normalized_path}#{context.node.line_no}",
+            tags = {"leak:hardcoded_secret"}
         )
 
         hit.extra.update(extra)

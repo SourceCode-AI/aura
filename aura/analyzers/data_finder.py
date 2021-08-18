@@ -55,7 +55,7 @@ class DataFinder(NodeAnalyzerV2):
                     message="Base64 data blob found",
                     node=node,
                     score=config.get_score_or_default("base-64-blob", 0),
-                    tags={"base64",},
+                    tags={"behavior:obfuscation", "behavior:base64_payload"},
                     extra={"base64_decoded": result},
                     signature=f"data_finder#base64_blob#{utils.fast_checksum(result)}#{context.signature}",
                 )

@@ -48,7 +48,7 @@ def scan(location: ScanLocation, **mode) -> Generator[Detection, None, None]:
             },
             location=location.location,
             signature = f"malformed_xml#entities#{str(location)}",
-            tags = {"malformed_xml", "xml_entities"}
+            tags = {"anomaly:xml:entities"}
         )
     except DTDForbidden:
         yield Detection(
@@ -60,7 +60,7 @@ def scan(location: ScanLocation, **mode) -> Generator[Detection, None, None]:
             },
             location=location.location,
             signature = f"malformed_xml#dtd#{str(location)}",
-            tags = {"malformed_xml", "xml_dtd"}
+            tags = {"anomaly:xml:dtd"}
         )
     except ExternalReferenceForbidden:
         yield Detection(
@@ -72,7 +72,7 @@ def scan(location: ScanLocation, **mode) -> Generator[Detection, None, None]:
             },
             location=location.location,
             signature = f"malformed_xml#external_reference#{str(location)}",
-            tags = {"malformed_xml", "xml_external_reference"}
+            tags = {"anomaly:xml:external_reference"}
         )
     except NotSupportedError:
         pass

@@ -51,6 +51,7 @@ class SQLi(base.NodeAnalyzerV2):
             signature=f"vuln#{context.signature}",
             node = context.node,
             line_no=context.node.line_no,
+            tags = {"vuln:sqli"}
         )
 
     def node_Call(self, context):
@@ -77,4 +78,5 @@ class SQLi(base.NodeAnalyzerV2):
             signature=f"vuln#sqli#{context.signature}",
             node = context.node,
             line_no=context.node.line_no,
+            tags = {"vuln:sqli"}
         )

@@ -47,6 +47,7 @@ class JinjaAnalyzer(base.NodeAnalyzerV2):
                 score=100,
                 line_no=context.node.line_no,
                 signature=f"jinja#xss#{context.visitor.normalized_path}#{context.node.line_no}",
+                tags = {"vuln:jinja:disabled_autoescape"}
             )
             yield hit
 
@@ -198,6 +199,7 @@ class JinjaTemplateVisitor(Visitor):
                 line_no=lineno,
                 signature=f"jinja#taint_analysis#{str(self.location)}#{lineno}",
                 location=self.location.location,
+                tags = {"vuln:jinja:taint"}
             )
             hit.tags |= {
                 "jinja",

@@ -61,7 +61,7 @@ def analyze(*, location: ScanLocation):
             message=exc.args[0],
             signature=f"yara_error#{str(location)}",
             location=location.location,
-            tags = {"yara_error"}
+            tags = {"aura:error:yara"}
         )
 
     end = time.time() - start

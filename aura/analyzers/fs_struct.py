@@ -54,7 +54,7 @@ def analyze(*, location: ScanLocation) -> AnalyzerReturnType:
                 "file_name": location.location.name,
             },
             location=location.location,
-            tags = set(location.metadata["tags"])
+            tags = {"leak:sensitive_file"}
         )
 
     if enable_suspicious_files(location):
@@ -81,5 +81,5 @@ def analyze(*, location: ScanLocation) -> AnalyzerReturnType:
                     "file_type": f_type
                 },
                 location=location.location,
-                tags={f_type} | location.metadata["tags"]
+                tags={f"anomaly:{f_type}"}
             )

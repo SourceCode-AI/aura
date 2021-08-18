@@ -5,72 +5,96 @@ patterns: &default_patterns
       message: Debug mode enabled in Flask
       score: 10
     tags:
-      - flask_debug
+      - vuln:flask:debug_enabled
 
   - id: ctypes_memory_allocation
     pattern: "ctypes.windll.kernel32.VirtualAlloc"
     detection:
       message: Memory allocation using ctypes
+    tags:
+      - behavior:ctypes:memory_alloc
 
   - id: ctypes_create_thread
     pattern: "ctypes.windll.kernel32.CreateThread"
     detection:
       message: Creating thread using ctypes
+    tags:
+      - behavior:ctypes:create_thread
 
   - id: ctypes_create_remote_thread
     pattern: "ctypes.windll.kernel32.CreateRemoteThread"
     detection:
       message: Creating remote thread using ctypes
+    tags:
+      - behavior:ctypes:create_thread
 
   - id: ctypes_write_process_memory
     pattern: "ctypes.windll.kernel32.WriteProcessMemory"
     detection:
       message: Ctypes writing directly into the process memory
       score: 100
+    tags:
+      - behavior:ctypes:write_process_memory
 
   - id: ctypes_window_hook
     pattern: "ctypes.windll.user32.SetWindowsHookExA"
     detection:
       message: Ctypes creating a hook for the window. Possible sign of keylogger
       score: 100
+    tags:
+      - behavior:ctypes:window_hook
 
   - id: ctypes_lock_screen
     pattern: "ctypes.windll.user32.LockWorkStation"
     detection:
       message: Ctypes locks windows screen
       score: 50
+    tags:
+      - behavior:ctypes:lock_workstation
 
   - id: ctypes_is_admin
     pattern: "ctypes.windll.shell32.IsUserAnAdmin"
     detection:
       message: Ctypes determining if user is an admin
       score: 100
+    tags:
+      - behavior:ctypes:is_admin
 
   - id: ctypes_enum_windows
     pattern: "ctypes.windll.user32.EnumWindows"
     detection:
       message: "Ctypes is enumerating over windows"
       score: 10
+    tags:
+      - behavior:ctypes:enum_windows
 
   - id: ctypes_page_execute_read_write
     pattern: "ctypes.c_int(64)"
     detection:
       message: Flag PAGE_EXECUTE_READ_WRITE for allocated memory page
+    tags:
+      - behavior:ctypes:rwx_memory_page
 
   - id: ctypes_kernel32_rtlmovememory
     pattern: "ctypes.windll.kernel32.RtlMoveMemory(...)"
     detection:
       message: "Copying memory between allocated pages"
+    tags:
+      - behavior:ctypes:rtl_move_memory
 
   - id: ctypes_kernel32_waitforsingleobject
     pattern: "ctypes.windll.kernel32.WaitForSingleObject"
     detection:
       message: Wait until the object is in signaled state or timed-out
+    tags:
+      - behavior:ctypes:wait_for_single_object
 
   - id: ctypes_kernel32_getvolumeinformationw
     pattern: "ctypes.windll.kernel32.GetVolumeInformationW"
     detection:
       message: Get volume information via ctypes
+    tags:
+      - behavior:ctypes:volume_information
 
   - id: ctypes_cfunc_type
     pattern: "ctypes.CFUNCTYPE"
@@ -78,21 +102,24 @@ patterns: &default_patterns
       message: CFUNCTYPE allows creating a pointer to memory location containing executable code
       score: 100
     tags:
-      - ctypes_cfunc_type
-      - possible_malware
+      - behavior:ctypes:function_pointer
+      - behavior:possible_malware
 
   - id: mktemp_racecond
     pattern: "tempfile.mktemp(...)"
     detection:
       score: 20
       message: "Usage of tempfile.mktemp is susceptible to race conditions!"
+    tags:
+      - vuln:mktemp
+      - behavior:tempfile
 
   - id: open_file
     pattern: "open(...)"
     detection:
       message: Code is accessing files via open
     tags:
-      - file_access
+      - behavior:opening_files
     taint: sink
 
   - id: md5_deprecated
@@ -101,7 +128,7 @@ patterns: &default_patterns
       message: Usage of MD5 for cryptographic purposes is very dangerous and no longer recommended
       score: 20
     tags:
-      - deprecated
+      - deprecated:hash
 
   - id: requests_unverified
     pattern:
@@ -115,6 +142,8 @@ patterns: &default_patterns
     detection:
       message: SSL/TLS verification disabled when doing a request
       score: 10
+    tags:
+      - vuln:unverified_request
 
   - id: shell_injection
     pattern:
@@ -127,7 +156,7 @@ patterns: &default_patterns
       score: 20
       message: "Setting shell=True is dangerous and allows a shell injection attack"
     tags:
-      - shell_injection
+      - vuln:shell_injection
     taint: sink
 
   - id: dangerous_pickle
@@ -140,7 +169,7 @@ patterns: &default_patterns
       message: Usage of pickle is very dangerous and easily exploitable
       score: 50
     tags:
-      - pickle_usage
+      - behavior:pickle
     taint: sink
 
   - id: os_system_execution
@@ -170,7 +199,7 @@ patterns: &default_patterns
       score: 50
       message: Code is performing system command execution
     tags:
-      - system_execution
+      - behavior:system_execution
     taint: sink
 
   - id: yaml_load_unsafe
@@ -179,7 +208,7 @@ patterns: &default_patterns
       message: yaml.load is considered unsafe as it can execute python commands via directive. Use yaml.safe_load instead
       score: 100
     tags:
-      - yaml_load
+      - vuln:yaml_unsafe_load
     taint: sink
 
   - id: python_code_execution
@@ -190,8 +219,8 @@ patterns: &default_patterns
       score: 100
       message: eval/exec usage found in a source code
     tags:
-      - obfuscation
-      - code_execution
+      - behavior:obfuscation
+      - behavior:code_execution
     taint: sink
 
   - id: get_variables
@@ -202,7 +231,7 @@ patterns: &default_patterns
       score: 100
       message: Usage of locals() or globals() found in a source code
     tags:
-      - obfuscation
+      - behavior:accessing_variables
 
   - id: inline_import
     pattern:
@@ -213,8 +242,8 @@ patterns: &default_patterns
       message: Inline import
       score: 50
     tags:
-      - import
-      - obfuscation
+      - behavior:inline_import
+      - behavior:obfuscation
     taint: sink
 
   - pattern: "getpass.getuser"
@@ -222,7 +251,7 @@ patterns: &default_patterns
       message: Local username lookup, could be used for exploit to determine if running under the root/admin
       score: 10
     tags:
-      - information_gathering
+      - behavior:getuser
 
   # Taint cleaners
   - pattern: "int(...)"
@@ -353,7 +382,7 @@ patterns: &default_patterns
       - "import httplib"
       - "import ftplib"
     tags:
-      - network
+      - behavior:network
 
   - id: code_execution_modules
     pattern:
@@ -369,24 +398,24 @@ patterns: &default_patterns
       - "import popen2"
       - "import commands"
     tags:
-      - "code_execution"
+      - behavior:code_execution
 
   - id: obfuscation_modules
     pattern: "import base64"
     tags:
-      - obfuscation
+      - behavior:obfuscation
 
   - id: windows_modules
     pattern:
       - "import winreg"
       - "import _winreg"
     tags:
-      - "windows"
+      - behavior:windows
 
   - id: django_modules
     pattern: "import django.shortcuts.render"
     tags:
-      - "django"
+      - misc:django
 
 
 files: &default_files
@@ -395,160 +424,160 @@ files: &default_files
     pattern: "^test(_.+|s)?$"
     target: part
     tags:
-      - test_code
+      - misc:test_code
 
   - type: regex
     pattern: "^id_[rd]sa$"
     target: filename
     tags:
-      - sensitive_file
-      - private_key
+      - leak:sensitive_file
+      - leak:private_key
 
   - type: exact
     pattern: ".bash_history"
     target: filename
     tags:
-      - sensitive_file
-      - bash_history
+      - leak:sensitive_file
+      - leak:bash_history
 
   - type: exact
     pattern: ".htpasswd"
     target: filename
     tags:
-      - sensitive_file
+      - leak:sensitive_file
 
   - type: contains
     pattern: ".ssh/known_keys"
     target: full
     tags:
-      - sensitive_file
+      - leak:sensitive_file
 
   - type: contains
     pattern: ".ssh/authorized_keys"
     target: full
     tags:
-      - sensitive_file
+      - leak:sensitive_file
 
   - type: exact
     pattern: "wallet.dat"
     target: filename
     tags:
-      - senstivive_file
-      - crypto_wallet
+      - leak:senstivive_file
+      - misc:crypto_wallet
 
   - type: contains
     pattern: "etc/shadow"
     target: full
     tags:
-      - sensitive_file
+      - leak:sensitive_file
 
   - type: contains
     pattern: "etc/sudoers"
     target: full
     tags:
-      - sensitive_file
+      - leak:sensitive_file
 
   - type: contains
     pattern: "Local/Google/Chrome/"
     target: full
     tags:
-      - sensitive_file
+      - leak:sensitive_file
 
   - type: exact
     pattern: "secret_token.rb"
     target: filename
     tags:
-      - sensitive_file
+      - leak:sensitive_file
 
   - type: exact
     pattern: kwallet
     target: filename
     tags:
-      - sensitive_file
+      - leak:sensitive_file
 
   - type: contains
     pattern: ".docker/config.json"
     target: full
     tags:
-      - sensitive_file
+      - leak:sensitive_file
 
   - type: contains
     pattern: ".kube/config"
     target: full
     tags:
-      - sensitive_file
+      - leak:sensitive_file
 
   - type: exact
     pattern: ".bash_login"
     target: filename
     tags:
-      - sensitive_file
+      - leak:sensitive_file
 
   - type: exact
     pattern: ".bash_history"
     target: filename
     tags:
-      - sensitive_file
+      - leak:sensitive_file
 
   - type: exact
     pattern: ".sh_history"
     target: filename
     tags:
-      - sensitive_file
+      - leak:sensitive_file
 
   - type: exact
     pattern: ".mysql_history"
     target: filename
     tags:
-      - sensitive_file
+      - leak:sensitive_file
 
   - type: exact
     pattern: ".dbshell"
     target: filename
     tags:
-      - sensitive_file
+      - leak:sensitive_file
 
   - type: exact
     pattern: ".rediscli_history"
     target: filename
     tags:
-      - sensitive_file
+      - leak:sensitive_file
 
   - type: contains
     pattern: ".aws/credentials"
     target: full
     tags:
-      - sensitive_file
+      - leak:sensitive_file
 
   - type: exact
     pattern: ".viminfo"
     target: filename
     tags:
-      - sensitive_file
+      - leak:sensitive_file
 
   - type: exact
     pattern: ".fetchmailrc"
     target: filename
     tags:
-      - sensitive_file
+      - leak:sensitive_file
 
   - type: exact
     pattern: "database.yml"
     target: filename
     tags:
-      - sensitive_file
+      - leak:sensitive_file
 
   - type: exact
     pattern: ".gitignore"
     target: filename
     tags:
-      - ignore
+      - misc:ignore_file
 
   - type: exact
     pattern: ".travis.yml"
     target: filename
     tags:
-      - ignore
+      - misc:ignore_file
 
 
 strings: &default_strings
@@ -557,12 +586,16 @@ strings: &default_strings
     pattern: "^0\\.0\\.0\\.0(:\\d{2,6})?$"
     message: "Binding to all interfaces may unwillingly expose non-protected interface"
     score: 10
+    tags:
+      - behavior:public_network_interface
 
   - id: tmp_folder
     type: regex
     pattern: "^(/tmp|/var/tmp|/dev/shm|C:\\\\{1,2}Windows\\\\Temp\\\\).*$"
     message: "Hardcoded tmp folder in the source code"
     score: 10
+    tags:
+      - behavior:temp_file
 
   - id: url
     type: regex
@@ -571,7 +604,7 @@ strings: &default_strings
     score: 0
     informational: false
     tags:
-      - url
+      - behavior:url
 
   - id: netsh_firewall
     type: regex
@@ -579,14 +612,14 @@ strings: &default_strings
     message: "Windows netsh firewall command"
     score: 10
     tags:
-      - windows
+      - behavior:windows:firewall
 
   - id: mac_firewall
     type: regex
     pattern: "^(pfctl|/usr/libexec/ApplicationFirewall/socketfilterfw).*"
     message: "Mac os firewall command (packet filtering)"
     tags:
-      - macos
+      - behavior:macos:firewall
 
   - id: windows_service
     type: contains
@@ -594,7 +627,7 @@ strings: &default_strings
     message: "Windows system folder for services"
     score: 10
     tags:
-      - windows
+      - behavior:windows:system_service_folder
 
   - id: windows_task_scheduler
     type: contains
@@ -602,19 +635,23 @@ strings: &default_strings
     message: "Windows task scheduler"
     score: 10
     tags:
-      - windows
+      - behavior:windows:task_scheduler
 
   - id: hosts_file
     type: regex
     pattern: "^(C:\\\\{1,2}Windows\\\\System32\\\\drivers\\\\etc\\\\hosts|/etc/hosts)$"
     message: "Location of hosts file"
     score: 5
+    tags:
+      - behavior:accessing_host_file
 
   - id: sudo_command
     type: regex
     pattern: "^sudo .*$"
     message: "Executing sudo command"
     score: 20
+    tags:
+    - behavior:unix:sudo
 
   # Regexes for detecting leaking api tokens, secrets, etc...
   # Source of some regexes used: https://www.ndss-symposium.org/wp-content/uploads/2019/02/ndss2019_04B-3_Meli_paper.pdf
@@ -624,7 +661,7 @@ strings: &default_strings
     message: "Twitter access token"
     score: 100
     tags:
-      - secrets_leak
+      - leak:access_token
 
   - id: facebook_access_token
     type: regex
@@ -632,7 +669,7 @@ strings: &default_strings
     message: "Facebook access token"
     score: 100
     tags:
-      - secrets_leak
+      - leak:access_token
 
   - id: google_api_key
     type: regex
@@ -640,7 +677,7 @@ strings: &default_strings
     message: "Google API key"
     score: 100
     tags:
-      - secrets_leak
+      - leak:access_token
 
   - id: google_oauth_id
     type: regex
@@ -648,7 +685,7 @@ strings: &default_strings
     message: "Google OAuth ID"
     score: 100
     tags:
-      - secrets_leak
+      - leak:access_token
 
   - id: picatic_api_key
     type: regex
@@ -656,7 +693,7 @@ strings: &default_strings
     message: "Picatic API key"
     score: 100
     tags:
-      - secrets_leak
+      - leak:access_token
 
   - id: stripe_standard_key
     type: regex
@@ -664,7 +701,7 @@ strings: &default_strings
     message: "Stripe standard key"
     score: 100
     tags:
-      - secrets_leak
+      - leak:access_token
 
   - id: stripe_restricted_key
     type: regex
@@ -672,7 +709,7 @@ strings: &default_strings
     message: "Stripe restricted key"
     score: 100
     tags:
-      - secrets_leak
+      - leak:access_token
 
   - id: square_access_token
     type: regex
@@ -680,7 +717,7 @@ strings: &default_strings
     message: "Square access token"
     score: 100
     tags:
-      - secrets_leak
+      - leak:access_token
 
   - id: square_oauth_secret
     type: regex
@@ -688,7 +725,7 @@ strings: &default_strings
     message: "Square OAuth secret"
     score: 100
     tags:
-      - secrets_leak
+      - leak:access_token
 
   - id: paypal_braintree
     type: regex
@@ -696,7 +733,7 @@ strings: &default_strings
     message: "PayPal braintree access token"
     score: 100
     tags:
-      - secrets_leak
+      - leak:access_token
 
   - id: amazon_mws_auth_token
     type: regex
@@ -704,7 +741,7 @@ strings: &default_strings
     message: "Amazon MWS auth token"
     score: 100
     tags:
-      - secrets_leak
+      - leak:access_token
 
   - id: twilio_api_key
     type: regex
@@ -712,7 +749,7 @@ strings: &default_strings
     message: "Twilio API key"
     score: 100
     tags:
-      - secrets_leak
+      - leak:access_token
 
   - id: mailgun_api_key
     type: regex
@@ -720,7 +757,7 @@ strings: &default_strings
     message: "Mailgun API key"
     score: 100
     tags:
-      - secrets_leak
+      - leak:access_token
 
   - id: mailchimp_api_key
     type: regex
@@ -728,7 +765,7 @@ strings: &default_strings
     message: "MailChimp API key"
     score: 100
     tags:
-      - secrets_leak
+      - leak:access_token
 
   - id: amazon_aws_key
     type: regex
@@ -736,7 +773,7 @@ strings: &default_strings
     message: "Amazon AWS key"
     score: 100
     tags:
-      - secrets_leak
+      - leak:access_token
 
   - id: pypi_api_key
     type: regex
@@ -744,5 +781,5 @@ strings: &default_strings
     message: "PyPI upload token"
     score: 100
     tags:
-      - secrets_leak
+      - leak:access_token
 

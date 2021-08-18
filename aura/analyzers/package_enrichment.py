@@ -40,5 +40,5 @@ def analyze(*, location: ScanLocation) -> AnalyzerReturnType:
         informational=True,
         extra=extra,
         signature=f"package_enrichment#{pkg_name}",
-        tags={"package_info"}
+        tags={"sbom:package_metadata"}
     )

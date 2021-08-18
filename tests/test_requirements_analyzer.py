@@ -11,7 +11,7 @@ def test_requirements_generic(fixtures, mock_pypi_rest_api):
             'extra': {
                 'package': 'wheel'
             },
-            'tags': ['outdated_package']
+            'tags': ['sbom:outdated_package']
         },
         {
             'type': "UnpinnedPackage",
@@ -19,7 +19,7 @@ def test_requirements_generic(fixtures, mock_pypi_rest_api):
             "extra": {
                 "package": "requests"
             },
-            "tags": ["unpinned_package"]
+            "tags": ["sbom:unpinned_package"]
         },
         {
             "type": "InvalidRequirement",

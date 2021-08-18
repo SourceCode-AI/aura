@@ -24,7 +24,8 @@ class TaintDetection(NodeAnalyzerV2):
             signature=f"taint_anomaly#{context.visitor.normalized_path}#{context.node.line_no}",
             extra={
                 'taint_log': log
-            }
+            },
+            tags = {"vuln:taint"}
         )
 
     def node_Call(self, context):

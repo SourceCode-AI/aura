@@ -3,7 +3,7 @@ import tempfile
 import tarfile
 import zipfile
 from pathlib import Path
-from typing import Generator, Union
+from typing import Optional, Union, Iterable
 
 from .detections import Detection
 from ..uri_handlers.base import ScanLocation
@@ -38,10 +38,11 @@ class ArchiveAnomaly(Detection):
                 "exc_type": exc.__class__.__name__,
                 "mime": location.metadata["mime"]
             },
+            tags = {"anomaly:package_archive_error"}
         )
 
 
-def is_suspicious(pth, location):
+def is_suspicious(pth: Path, location) -> Optional[Detection]:
     norm = utils.normalize_path(pth)
 
     if pth.startswith("/"):
@@ -52,6 +53,7 @@ def is_suspicious(pth, location):
             signature=f"suspicious_archive_entry#absolute_path#{norm}#{location}",
             extra={"entry_type": "absolute_path", "entry_path": norm},
             score=config.get_score_or_default("suspicious-archive-entry-absolute-path", 50),
+            tags = {"anomaly:package_content"}
         )
 
     elif any(x == ".." for x in Path(pth).parts):
@@ -62,6 +64,7 @@ def is_suspicious(pth, location):
             signature=f"suspicious_archive_entry#parent_reference#{norm}#{location}",
             extra={"entry_type": "parent_reference", "entry_path": norm},
             score=config.get_score_or_default("suspicious-archive-entry-parent-reference", 50),
+            tags = {"anomaly:package_content"}
         )
 
     return None
@@ -69,7 +72,7 @@ def is_suspicious(pth, location):
 
 def filter_zip(
     arch: zipfile.ZipFile, path, max_size=None
-) -> Generator[Union[zipfile.ZipInfo, Detection], None, None]:
+) -> Iterable[Union[zipfile.ZipInfo, Detection]]:
     if max_size is None:
         max_size = config.get_maximum_archive_size()
 
@@ -91,6 +94,7 @@ def filter_zip(
                     "size": x.file_size,
                     "limit": max_size
                 },
+                tags = {"anomaly:package_content"}
             )
             yield hit
         else:
@@ -99,7 +103,7 @@ def filter_zip(
 
 def filter_tar(
     arch: tarfile.TarFile, path, max_size=None
-) -> Generator[Union[tarfile.TarInfo, Detection], None, None]:
+) -> Iterable[Union[tarfile.TarInfo, Detection]]:
     if max_size is None:
         config.get_maximum_archive_size()
 
@@ -121,7 +125,8 @@ def filter_tar(
                 extra = {
                     "archive_path": pth,
                     "reason": "member_is_link"
-                }
+                },
+                tags = {"anomaly:package_content"}
             )
             continue
         elif member.isfile():
@@ -138,6 +143,7 @@ def filter_tar(
                         "size": member.size,
                         "limit": max_size
                     },
+                    tags = {"anomaly:package_content"}
                 )
                 yield hit
                 continue

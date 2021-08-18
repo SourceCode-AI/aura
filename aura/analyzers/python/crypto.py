@@ -91,6 +91,7 @@ class CryptoGenKey(base.NodeAnalyzerV2):
                 "key_size": key_size,
             },
             node=context.node,
+            tags = {"misc:crypto_keygen"}
         )
 
         if key_size is not None and key_size < MIN_KEY_SIZES.get(info["type"], 0):

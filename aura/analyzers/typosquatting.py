@@ -27,5 +27,5 @@ def analyze(*, location: ScanLocation) -> AnalyzerReturnType:
                 "package_name": x
             },
             signature=f"{pkg_name}#typosquatting#{x}",
-            tags={"typosquatting"}
+            tags={"misc:typosquatting"}
         )

@@ -66,7 +66,7 @@ def check_unpinned(requirement: Requirement, location: ScanLocation) -> Iterable
             extra={
                 "package": requirement.name
             },
-            tags={"unpinned_package"},
+            tags={"sbom:unpinned_package"},
             location=location.location
         )
 
@@ -82,18 +82,13 @@ def check_outdated(requirement: Requirement, location: ScanLocation) -> Iterable
     latest = pypi.get_latest_release()
     spec_set = requirement.specifier
 
-    component = sbom.get_component(pypi)
-    purl = sbom.get_package_purl(pypi)
-
     if sbom.is_enabled():
-        yield Detection(
-            detection_type="SbomComponent",
-            message=f"SBOM data",
-            signature=f"sbom_component#{str(location)}#{purl}",
-            extra=component,
-            tags={"sbom_component"},
-            location=location.location,
-            informational=True
+        component = sbom.get_component(pypi)
+
+        yield from sbom.yield_sbom_component(
+            component=component,
+            location=location,
+            tags={"sbom:package_requirement"}
         )
 
     if latest not in spec_set:
@@ -108,7 +103,7 @@ def check_outdated(requirement: Requirement, location: ScanLocation) -> Iterable
                 "specs": str(spec_set),
                 "latest": latest
             },
-            tags={"outdated_package"}
+            tags={"sbom:outdated_package"}
         )
 
 
@@ -133,7 +128,7 @@ def analyze_requirements_file(*, location: ScanLocation) -> Iterable[Detection]:
             extra = {
                 "reason": "unicode_decode_error"
             },
-            tags = {"invalid_requirement", "unicode_decode_error"},
+            tags = {"sbom:invalid_requirement", "error:unicode_decode"},
             location=location.location
         )
         return
@@ -158,7 +153,7 @@ def analyze_requirements_file(*, location: ScanLocation) -> Iterable[Detection]:
                     "reason": "remote_url"
                 },
                 score = get_score_or_default("requirement-remote-url", 20),
-                tags = {"invalid_requirement", "remote_url"},
+                tags = {"sbom:invalid_requirement", "sbom:remote_url"},
                 location = location.location,
                 line_no=idx,
                 line=req_line
@@ -183,5 +178,5 @@ def analyze_requirements_file(*, location: ScanLocation) -> Iterable[Detection]:
                     "exc_type": exc.__class__.__name__
                 },
                 score = get_score_or_default("requirement-invalid", 0),
-                tags = {"invalid_requirement", "cant_parse"}
+                tags = {"sbom:invalid_requirement", "error:cant_parse"}
             )

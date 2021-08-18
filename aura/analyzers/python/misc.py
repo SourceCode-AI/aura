@@ -28,7 +28,8 @@ class MiscAnalyzer(base.NodeAnalyzerV2):
                     "string": val,
                 },
                 signature=f"misc#high_entropy#{fast_checksum(val)}#{context.signature}",
-                node=context.node
+                node=context.node,
+                tags={"misc:high_entropy_string"}
             )
             hit.line_no = context.node.line_no
             yield hit
@@ -50,7 +51,7 @@ class MiscAnalyzer(base.NodeAnalyzerV2):
                     },
                     signature = f"misc#redos#{fast_checksum(val)}#{context.signature}",
                     node=context.node,
-                    tags={"redos"}
+                    tags={"vuln:redos"}
                 )
                 yield hit
         except RecursionError:
@@ -61,7 +62,8 @@ class MiscAnalyzer(base.NodeAnalyzerV2):
                     "regex": val
                 },
                 signature=f"misc#redos_recursion_error#{fast_checksum(val)}#{context.signature}",
-                node=context.node
+                node=context.node,
+                tags={"aura:error:redos_recursion_error"}
             )
 
     def node_FunctionDef(self, context):
@@ -77,7 +79,7 @@ class MiscAnalyzer(base.NodeAnalyzerV2):
             signature = f"misc#pickleploit#{context.signature}",
             node = context.node,
             score = 100,
-            tags = {context.node.cached_full_name, "pickleploit"}
+            tags = {"behavior:pickle"}
         )
         yield hit
 

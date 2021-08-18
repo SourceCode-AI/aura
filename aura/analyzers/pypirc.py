@@ -50,6 +50,6 @@ def analyze(*, location: ScanLocation) -> AnalyzerReturnType:
                     "username": username,
                     "password": password
                 },
-                tags = {"sensitive_file", "secrets_leak", "pypirc"}
+                tags = {"leak:pypirc"}
             )
 

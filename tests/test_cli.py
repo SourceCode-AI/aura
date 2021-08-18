@@ -58,7 +58,7 @@ def test_simple_cli_analysis(exec_mode, fixtures):
     output = fixtures.scan_test_file("basic_ast.py", args=[exec_mode])
 
     assert output["name"].endswith(pth.split("/")[-1])
-    assert "url" in output["tags"]
+    assert "behavior:url" in output["tags"]
 
 
 @pytest.mark.e2e

@@ -3,11 +3,14 @@ Module functionality related to SBOMs - Software bill of materials
 """
 
 import uuid
-from importlib import metadata
-from typing import Optional, Dict, List, Any, Set
+from importlib.metadata import Distribution
+from typing import Optional, Dict, List, Any, Set, Union, Iterable
+
+from packaging.utils import canonicalize_name
 
 from . import config
 from . import package
+from .analyzers.detections import Detection
 from .json_proxy import loads as load_json
 
 
@@ -35,7 +38,6 @@ class Sbom:
             data["components"].append(get_component(pkg))
 
         return data
-
 
 
 def load_licenses() -> Dict[str, str]:
@@ -96,27 +98,53 @@ def get_package_licenses(pkg: package.PypiPackage) -> Set[str]:
     return licenses
 
 
-def get_package_purl(pkg: package.PypiPackage) -> str:
+def get_dist_licenses(dist: Distribution) -> Set[str]:
+    licenses = set()
+
+    if (main_license := dist.metadata.get("License")) and main_license != "UNKNOWN":
+        if license_ := get_license_identifier(main_license):
+            licenses.add(license_)
+
+    for classifier in dist.metadata.get_all("Classifier", []):
+        if classifier.startswith("License"):
+            if license_ := get_license_identifier(classifier):
+                licenses.add(license_)
+
+    return licenses
+
+
+def get_package_purl(pkg: Union[package.PypiPackage, Distribution]) -> str:
     """
     Create a package url (purl) specifier from a given PyPI package
 
     :param pkg: pypi package
     :return: generated purl
     """
-    purl = f"pkg:pypi/{pkg.name}"
+    if isinstance(pkg, package.PypiPackage):
+        purl = f"pkg:pypi/{canonicalize_name(pkg.name)}"
 
-    if version := pkg.version:
-        purl += "@" + version
+        if version := pkg.version:
+            purl += "@" + version
+    elif isinstance(pkg, Distribution):
+        purl = f"pkg:pypi/{canonicalize_name(pkg.metadata['Name'])}"
+
+        if (version:=pkg.metadata["Version"]) and version.lower != "unknown":
+            purl += "@" + version
+    else:
+        raise TypeError(f"Unsupported type `{type(pkg)}`")
 
     return purl
 
 
 def get_component(pkg: package.PypiPackage) -> Dict[str, Any]:
+    if not (desc:=pkg.info["info"].get("description", "").strip()):
+        desc = pkg.info["info"]["summary"]
+
     data = {
         "type": "library",
         "name": pkg.name,
         "purl": get_package_purl(pkg),
-        "description": pkg.info["info"]["description"]
+        "description": desc
     }
 
     version = pkg.version
@@ -166,5 +194,51 @@ def get_component(pkg: package.PypiPackage) -> Dict[str, Any]:
     return data
 
 
+def dist_to_component(dist: Distribution) -> dict:
+    if not (desc:=dist.metadata.get("Description", "")):
+        desc = dist.metadata.get("Summary", "N/A")
+
+    data = {
+        "type": "library",
+        "name": dist.metadata["Name"],
+        "purl": get_package_purl(dist),
+        "version": dist.metadata.get("Version", "UNKNOWN"),
+        "description": desc
+    }
+
+    licenses = []
+
+    for l in get_dist_licenses(dist):
+        licenses.append({
+            "license": {"id": l}
+        })
+
+    if licenses:
+        data["licenses"] = licenses
+
+    if (author:=dist.metadata.get("Author-email")) and author != "UNKNOWN":
+        data["author"] = author
+
+    if (publisher:=dist.metadata.get("Author")) and publisher != "UNKNOWN":
+        data["publisher"] = publisher
+
+    return data
+
+
 def is_enabled() -> bool:
     return config.CFG["sbom"].get("enabled", False)
+
+
+def yield_sbom_component(component, location, tags:Optional[set]=None) -> Iterable:
+    tags = tags or set()
+
+    if is_enabled():
+        yield Detection(
+            detection_type="SbomComponent",
+            message=f"SBOM data",
+            signature=f"sbom_component#{str(location)}#{component['purl']}",
+            extra=component,
+            tags={"sbom:component"} | tags,
+            location=location.location,
+            informational=True
+        )

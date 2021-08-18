@@ -63,6 +63,7 @@ class SetupPy(NodeAnalyzerV2):
                     score=100,
                     message=f"Package '{parsed['name']}' is installed under different name: '{pkg}'",
                     signature=f"setup_analyzer#pkg_name_mismatch#{parsed['name']}#{pkg}",
+                    tags = {"behavior:setup_py:name_shadowing"}
                 )
                 self.hits.append(sig)
 
@@ -93,27 +94,29 @@ class SetupPy(NodeAnalyzerV2):
             elif x.name == "SetupScript":
                 continue
 
-            if "code_execution" in x.tags:
+            if "behavior:code_execution" in x.tags:
                 sig = Detection(
                     detection_type="SetupScript",
                     score=100,
                     message="Code execution capabilities found in a setup.py script",
-                    tags=x.tags,
+                    node=x.node,
                     line=x.line,
                     line_no=x.line_no,
                     signature=f"setup_analyzer#code_execution#{x.signature}",
+                    tags={"behavior:setup_py:code_execution"} | x.tags
                 )
 
                 analyzer.hits.append(sig)
-            if "network" in x.tags:
+            if "behavior:network" in x.tags:
                 sig = Detection(
                     detection_type="SetupScript",
                     score=100,
                     message="Found code with network communication capabilities in a setup.py script",
-                    tags=x.tags,
+                    node=x.node,
                     line=x.line,
                     line_no=x.line_no,
                     signature=f"setup_analyzer#network_communication#{x.signature}",
+                    tags = {"behavior:setup_py:network_access"} | x.tags
                 )
                 analyzer.hits.append(sig)
 
@@ -129,9 +132,9 @@ class SetupPy(NodeAnalyzerV2):
                     detection_type="SetupScript",
                     score=500,
                     message="Setup script hooks to the `setup.py install` command.",
-                    tags={"setup.py", "install_hook"},
                     signature=f"setup_analyzer#install_hook#{context.visitor.normalized_path}#{context.node.line_no}",
-                    node=context.node
+                    node=context.node,
+                    tags = {"behavior:setup_py:install_hook"}
                 )
 
                 self.hits.append(sig)
