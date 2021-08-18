@@ -1,4 +1,4 @@
-.. image:: files/logo/logotype.png
+.. image:: https://cdn.sourcecode.ai/imgs/logotype.png
    :target: https://aura.sourcecode.ai/
 
 

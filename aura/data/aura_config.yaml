@@ -158,19 +158,19 @@ score: &scores
 
   # You can Adjust the following default values for other built-in analyzers here
 
-  # Wheel contains a file which checksum doesn't match with the one listed in RECORDs
-  # wheel-invalid-record-checksum: 100
+  # Distribution contains a file which checksum doesn't match with the one listed in RECORDs
+  # dist-invalid-record-checksum: 100
 
-  # wheel-records-missing: 100
+  # dist-records-missing: 100
 
-  # Wheel contains a setup.py file
-  # wheel-contain-setup-py: 100
+  # Distribution contains a setup.py file
+  # dist-contain-setup-py: 100
 
-  # Wheel contains a file that is not listed in RECORDs
-  # wheel-file-not-listed-in-records: 10
+  # Distribution contains a file that is not listed in RECORDs
+  # dist-file-not-listed-in-records: 10
 
-  # There is a file listed in RECORDs but missing inside the wheel archive
-  # wheel-missing-file: 100
+  # There is a file listed in RECORDs but missing inside the distribution
+  # dist-missing-file: 100
 
   # Valid base 64 blob was found as a string in a source code
   # base-64-blob: 0

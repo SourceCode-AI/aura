@@ -240,5 +240,4 @@ def yield_sbom_component(component, location, tags:Optional[set]=None) -> Iterab
             extra=component,
             tags={"sbom:component"} | tags,
             location=location.location,
-            informational=True
         )

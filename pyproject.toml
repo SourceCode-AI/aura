@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "aura-security"
-version = "2.1"
+version = "2.2"
 description = "Security auditing and static analysis for python"
 authors = [
     "Martin Carnogursky <admin@sourcecode.ai>"
@@ -134,7 +134,6 @@ python_dists = "aura.analyzers.dists:analyze"
 setup_py = "aura.analyzers.setup:SetupPy"
 data_finder = "aura.analyzers.data_finder:DataFinder"
 string_finder = "aura.analyzers.data_finder:StringFinder"
-wheel = "aura.analyzers.wheel:analyze_wheel"
 jinja = "aura.analyzers.python.jinja:JinjaAnalyzer"
 sqli = "aura.analyzers.python.sqli:SQLi"
 misc = "aura.analyzers.python.misc:MiscAnalyzer"

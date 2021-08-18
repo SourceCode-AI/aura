@@ -22,7 +22,7 @@ class SBOMOutput(json.JSONScanOutput):
         components = []
 
         for x in hits:
-            if "sbom_component" in x.tags:
+            if "sbom:component" in x.tags:
                 components.append(x.extra)
 
         now = datetime.datetime.utcnow()

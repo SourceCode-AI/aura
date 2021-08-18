@@ -231,3 +231,26 @@ def test_invalid_size_conversion(num, error_type, error_msg):
 def test_suspicious_file_trigger(metadata, expected):
     loc = ScanLocation("does_not_exists", metadata=metadata)
     assert fs_struct.enable_suspicious_files(location=loc) is expected
+
+
+def test_dist_detections(fixtures):
+    matches = [
+        {
+            'type': 'PythonDistribution',
+            'message': "Python distribution contains a file not listed in the RECORDs file",
+            'tags': ['anomaly:dist:unlisted_file']
+        },
+        {
+            'type': 'PythonDistribution',
+            'message': "Python distribution anomaly, invalid checksum for a file record",
+            'tags': ['anomaly:dist:invalid_checksum']
+        },
+        {
+            'type': 'PythonDistribution',
+            'message': "PythonDistribution",
+            'tags': ['anomaly:dist:setup.py']
+        }
+    ]
+
+    fixtures.scan_and_match("djamgo-0.0.1-py3-none-any.whl", matches)
+
