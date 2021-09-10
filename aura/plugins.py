@@ -7,7 +7,7 @@ import pkg_resources
 
 from . import exceptions
 from .type_definitions import AnalyzerType, ScanLocation
-from .analyzers.base import NodeAnalyzerV2
+from .analyzers.base import NodeAnalyzerV2, PostAnalysisHook
 from .analyzers.detections import Detection
 from .analyzers.python.visitor import Visitor
 from .analyzers.python.readonly import ReadOnlyAnalyzer
@@ -25,7 +25,10 @@ def initialize_analyzer(analyzer: AnalyzerType, name: Optional[str]=None) -> Ana
 
     if inspect.isclass(analyzer) and issubclass(analyzer, NodeAnalyzerV2):
         analyzer = analyzer()
-        ReadOnlyAnalyzer.hooks.append(analyzer)
+        ReadOnlyAnalyzer.hooks.append(analyzer)  # TODO: rename to use underscore like PostAnalysisHook
+    elif inspect.isclass(analyzer) and issubclass(analyzer, PostAnalysisHook):
+        analyzer = analyzer()
+        PostAnalysisHook._hooks.append(analyzer)
     elif callable(analyzer):
         pass
     else:
@@ -123,6 +126,8 @@ def get_analyzers(names: Optional[List[str]]=None) -> List[AnalyzerType]:
                 # AST node analyzer is a subclass of ``NodeAnalyzerV2``
                 elif inspect.isclass(obj) and obj is not NodeAnalyzerV2 and issubclass(obj, NodeAnalyzerV2):
                     analyzers.append(initialize_analyzer(obj, name=None))
+                elif inspect.isclass(obj) and obj is not PostAnalysisHook and issubclass(obj, PostAnalysisHook):
+                    initialize_analyzer(obj, name=None)
 
     return analyzers
 
@@ -135,6 +140,8 @@ def get_analyzer_group(names: Optional[List[str]]):
         for x in analyzers:
             if isinstance(x, NodeAnalyzerV2):
                 ast_analysis = True
+            elif isinstance(x, PostAnalysisHook):
+                continue
             else:
                 yield from x(location=location)
 

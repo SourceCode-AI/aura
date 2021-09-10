@@ -10,10 +10,9 @@ from ..exceptions import NoSuchPackage, PluginDisabled
 
 
 try:
-    from tomlkit import parse as parse_toml
+    import tomli
 except ImportError:
-    raise PluginDisabled("`tomlkit` python package is not installed")
-
+    raise PluginDisabled("`tomli` python package is not installed")
 
 
 @Analyzer.ID("pyproject_toml")
@@ -25,11 +24,11 @@ def analyze_pyproject(*, location: ScanLocation) -> Iterable[Detection]:
     if location.location.name != "pyproject.toml":
         return
 
-    # pyproject = parse_toml(location.location.read_text())  # TODO
+    # pyproject = tomli.loads(location.location.read_text())  # TODO
 
 
 def analyzer_poetry_lock(*, location: ScanLocation):
-    lock = parse_toml(location.location.read_text())
+    lock = tomli.loads(location.location.read_text())
 
     for pkg in lock["package"]:  # type: ignore[union-attr]
         req_specifier = f"{pkg['name']}=={pkg['version']}"

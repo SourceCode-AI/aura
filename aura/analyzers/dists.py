@@ -23,9 +23,11 @@ def analyze(*, location: ScanLocation) -> AnalyzerReturnType:
     """
     Analyze integrity of python distributions and generate their SBOM
     """
+    dist_info = location.location.parent
+
     if location.location.name != "METADATA":
         return
-    elif not (pth := location.location.parent).name.endswith(".dist-info"):
+    elif not dist_info.name.endswith(".dist-info"):
         return
 
     if not (location.location.parent / "RECORD").exists():
@@ -39,7 +41,7 @@ def analyze(*, location: ScanLocation) -> AnalyzerReturnType:
         )
         return
 
-    dist = metadata.PathDistribution(pth)
+    dist = metadata.PathDistribution(dist_info)
 
     if sbom.is_enabled():
         component = sbom.dist_to_component(dist)

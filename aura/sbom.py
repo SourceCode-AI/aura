@@ -2,6 +2,7 @@
 Module functionality related to SBOMs - Software bill of materials
 """
 
+import os
 import uuid
 from importlib.metadata import Distribution
 from typing import Optional, Dict, List, Any, Set, Union, Iterable
@@ -226,6 +227,8 @@ def dist_to_component(dist: Distribution) -> dict:
 
 
 def is_enabled() -> bool:
+    if os.environ.get("AURA_SBOM", None):
+        return True
     return config.CFG["sbom"].get("enabled", False)
 
 

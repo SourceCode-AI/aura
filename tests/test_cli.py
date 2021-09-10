@@ -25,7 +25,7 @@ OBFUSCATED_DEFAULT_MATCHES = [
             "signature_id": "url",
             "string": "https://example.com/index.html",
         },
-        "tags": ["url"]
+        "tags": ["behavior:url"]
     },
     {
         "type": "StringMatch",
@@ -33,21 +33,23 @@ OBFUSCATED_DEFAULT_MATCHES = [
             "signature_id": "url",
             "string": "http://malware.com/CnC"
         },
-        "tags": ["url"]
+        "tags": ["behavior:url"]
     },
     {
         "type": "YaraMatch",
         "location": re.compile(r".*obfuscated\.py$"),
         "extra": {
             "rule": "eicar_substring_test"
-        }
+        },
+        "tags": ["misc:eicar"]
     },
     {
         "type": "YaraMatch",
         "location": re.compile(r".*obfuscated\.py:\d+\$blob$"),
         "extra": {
             "rule": "eicar_substring_test"
-        }
+        },
+        "tags": ["misc:eicar"]
     }
 ]
 

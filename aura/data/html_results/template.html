@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script src="https://kit.fontawesome.com/e8cebbd9ee.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-KyZXEAg3QhqLMpG8r+8fhAXLRk2vvoC2f3B09zVXn8CA5QIVfZOJ3BCsw2P0p/We" crossorigin="anonymous">
+    <style>
+        .badge {
+            margin-left: 2px;
+        }
+        .code-border {
+            padding-right: 5px;
+            padding-left: 5px;
+            border: 1px gray dashed;
+        }
+
+        ul.tree-view {
+            list-style-type: none;
+            padding-left: 1em;
+        }
+    </style>
+</head>
+<body>
+<div id="app" class="container-fluid p-3">
+    <div class="row">
+        <tabs v-bind:results="results"></tabs>
+    </div>
+</div>
+
+<!-- The element below contains base64 JSON encoded scan results that are used to render the view -->
+<div id="scan-data" style="display:none; visibility: hidden; width: 0px; height: 0px;">
+{scan_data}
+</div>
+
+<script>
+{js_renderer}
+</script>
+</body>
+</html>

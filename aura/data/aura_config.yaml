@@ -131,6 +131,83 @@ pypirc: &pypirc
     - "<your test password goes here>"
     - "<your production password goes here>"
 
+
+behavioral_analysis: &behavioral_analysis
+  - name: Network access
+    id: network_access
+    description: "Code is accessing network and/or establishing network connections"
+    tags:
+      anyOf:
+        - "behavior:public_network_interface"
+        - "behavior:network"
+        - "vuln:unverified_request"
+
+  - name: System execution
+    id: system_execution
+    description: "Code is performing system commands execution"
+    tags:
+      "behavior:system_execution"
+
+  - name: Code execution
+    id: code_execution
+    description: "Code is able to execute a python (byte)code from a payload or external location"
+    tags:
+      "behavior:code_execution"
+
+  - name: Accessing files and directories
+    id: file_access
+    description: "Code is accessing/reading files and directories on a user computer"
+    tags:
+      "behavior:opening_files"
+
+  - name: Windows OS
+    id: windows
+    description: "Code contains functionality specific to the Microsoft Windows OS"
+    tags:
+      "behavior:windows"
+
+  - name: MacOS
+    id: macos
+    description: "Code contains functionality specific to the Apple Mac OS"
+    tags:
+      "behavior:macos"
+
+  - name: Unix
+    id: unix
+    description: "Code contains functionality specific to the Unix/Posix style OS"
+    tags:
+      - "behavior:unix"
+
+  - name: Low-level OS access
+    id: low_level_access
+    description: "Code is accessing low level OS functionalities using the ctypes interface"
+    tags:
+      - "behavior:ctypes"
+
+  - name: Obfuscation
+    id: obfuscation
+    description: "Code contains functionality that is commonly used to obfuscate the behavior"
+    tags:
+      anyOf:
+        - "behavior:obfuscation"
+        - "behavior:accessing_variables"
+
+  - name: Vulnerability
+    id: vulnerability
+    description: "Code may have one or more possible vulnerabilities or security problematic behavior"
+    tags:
+      allOf:
+        - not:
+            - "misc:test_code"
+        - "vuln"
+
+  - name: Possible Malware
+    id: possible_malware
+    description: "Code contains strong indications of a possible malware"
+    tags:
+      - "behavior:possible_malware"
+
+
 severities: &severities
   critical:
     score: 100

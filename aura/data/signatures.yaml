@@ -243,6 +243,7 @@ patterns: &default_patterns
       score: 50
     tags:
       - behavior:inline_import
+      - behavior:code_execution
       - behavior:obfuscation
     taint: sink
 
@@ -381,6 +382,7 @@ patterns: &default_patterns
       - "import urllib3"
       - "import httplib"
       - "import ftplib"
+      - "import twisted"
     tags:
       - behavior:network
 

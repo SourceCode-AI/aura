@@ -105,3 +105,4 @@ quarantine/
 aura_mirror_scan
 *.pyc
 !tests/files/fs/bytecode.pyc
+aura/data/html_results/dev*

@@ -148,6 +148,11 @@ CASES = (
         True
     ),
     (
+        "from requests import get",
+        "import requests",
+        True
+    ),
+    (
         "subprocess.check_call(venv_cmd)",
         "subprocess.check_call(..., shell=True)",
         False

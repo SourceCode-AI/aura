@@ -26,7 +26,7 @@ from .exceptions import InvalidConfiguration, MissingFile
 CFG : dict
 CFG_PATH = None
 SEMANTIC_RULES : dict
-LOG_FMT = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+LOG_FMT = logging.Formatter("%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s")
 LOG_ERR = None
 # This is used to trigger breakpoint during AST traversing of specific lines
 DEBUG_LINES = set()

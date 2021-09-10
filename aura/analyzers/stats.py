@@ -1,10 +1,16 @@
-from typing import Optional
+import re
+from typing import Optional, List
 
+from .base import PostAnalysisHook
 from ..uri_handlers.base import ScanLocation
 
-from .detections import Detection
-from ..utils import Analyzer, md5
 
+from .detections import Detection
+from ..utils import Analyzer
+
+
+PATH_SPLIT_CHARS = re.compile("[$/]")
+AGGREGATION_EXCLUDE_TAGS = {"misc:file_stats"}  # TODO: make this configurable
 
 
 @Analyzer.ID("file_stats")
@@ -36,3 +42,53 @@ def analyze(*, location: ScanLocation):
         signature=f"file_stats#{loc}",
         tags={"misc:file_stats"}
     )
+
+
+class DirectoryTreeStats(PostAnalysisHook):
+    def __init__(self):
+        self.tree = {"children": {}}
+
+    def post_analysis(self, detections: List[Detection], metadata: dict) -> List[Detection]:
+        for d in detections:
+            if not d.location:
+                continue
+
+            l = self.location_to_tree_item(d.location)
+
+            if d.detection_type == "FileStats":
+                l["mime"] = d.extra["mime"]
+                l["size"] = d.extra["size"]
+
+            l["tags"] = l.get("tags", set()) | (d.tags - AGGREGATION_EXCLUDE_TAGS)
+            l["score"] = l.get("score", 0) + d.score
+
+        for name in tuple(self.tree["children"].keys()):
+            self.collapse(name, self.tree)
+
+        metadata["directory_tree_stats"] = self.tree
+        return detections
+
+    def collapse(self, name, parent):
+        tree_item = parent["children"][name]
+
+        if len(tree_item["children"]) == 1 and not( tree_item.get("mime") or tree_item.get("score")):
+            sub_name, sub_children = tuple(tree_item["children"].items())[0]
+            new_name = f"{name}/{sub_name}"
+            del parent["children"][name]
+            parent["children"][new_name] = sub_children
+            return self.collapse(new_name, parent)
+        else:
+            for sub_name in tuple(tree_item["children"].keys()):
+                self.collapse(sub_name, tree_item)
+
+    def location_to_tree_item(self, location: str):
+        item = self.tree
+
+        for subpath in self.split_location(location):
+            next_item = item["children"].setdefault(subpath, {"children": {}})
+            item = next_item
+
+        return item
+
+    def split_location(self, location: str) -> List[str]:
+        return PATH_SPLIT_CHARS.split(location)

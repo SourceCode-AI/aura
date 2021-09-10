@@ -4,15 +4,17 @@ import os.path
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass, field
 from urllib import parse
-from typing import List, Union, Mapping, Optional, Iterable, Any
+from typing import List, Union, Mapping, Optional, Iterable, Any, Type
 
 import pkg_resources
 
 from .. import exceptions
+from ..analyzers.detections import Detection
 from ..type_definitions import DiffType, DiffAnalyzerType
 
 
 OUTPUT_HANDLER_CACHE = {}
+
 
 @dataclass()
 class OutputBase(metaclass=ABCMeta):
@@ -33,7 +35,7 @@ class OutputBase(metaclass=ABCMeta):
         return parsed_uri.scheme == cls.protocol()
 
     @classmethod
-    def get_all_output_formats(cls) -> Mapping[str, OutputBase]:
+    def get_all_output_formats(cls) -> Mapping[str, Type[OutputBase]]:
         handlers = OUTPUT_HANDLER_CACHE.setdefault(cls.entrypoint(), {})
 
         if not handlers:
@@ -44,7 +46,7 @@ class OutputBase(metaclass=ABCMeta):
         return handlers
 
     @classmethod
-    def get_format(cls, uri: str, parsed=None) -> OutputBase:
+    def get_format(cls, uri: str, parsed=None) -> Type[OutputBase]:
         if not parsed:
             parsed = parse.urlparse(uri)
 
@@ -126,10 +128,10 @@ class ScanOutputBase(OutputBase, metaclass=ABCMeta):
                 self.tag_filters.append(lambda x: t in x)
 
     @abstractmethod
-    def output(self, hits, scan_metadata: dict):
+    def output(self, hits: List[Detection], scan_metadata: dict):
         ...
 
-    def filtered(self, hits):
+    def filtered(self, hits: List[Detection]) -> List[Detection]:
         """
         Helper function get a list of filtered results regardless of the output type
         This list of results should then be serialized by a specific output format
@@ -141,7 +143,7 @@ class ScanOutputBase(OutputBase, metaclass=ABCMeta):
 
         processed = []
 
-        for x in hits:
+        for x in hits:  # type: Detection
             # normalize tags
             tags = [t.lower().replace('-', '_') for t in x.tags]
 
@@ -156,7 +158,7 @@ class ScanOutputBase(OutputBase, metaclass=ABCMeta):
             else:
                 processed.append(x)
 
-        total_score = sum(x.score for x in processed)
+        total_score : int = sum(x.score for x in processed)
 
         if self.min_score and self.min_score > total_score:
             raise exceptions.MinimumScoreNotReached(f"Score of {total_score} did not meet the minimum {self.min_score}")

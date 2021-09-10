@@ -1,4 +1,4 @@
-rule eicar_substring_test {
+rule eicar_substring_test: misc__eicar {
     meta:
         description = "Standard AV test, checking for an EICAR substring"
         author = "Austin Byers | Airbnb CSIRT"
@@ -11,7 +11,7 @@ rule eicar_substring_test {
 }
 
 
-rule SuspiciousStrings: suspicious_strings
+rule SuspiciousStrings: misc__suspicious_strings
 {
     meta:
         score = 10
@@ -56,7 +56,7 @@ rule SuspiciousStrings: suspicious_strings
 }
 
 
-rule DeterminingIP: determining_ip
+rule DeterminingIP: behavior__determining_ip
 {
     meta:
         score = 50
@@ -70,7 +70,7 @@ rule DeterminingIP: determining_ip
 }
 
 
-rule SuspiciousFile: suspicious_file
+rule SuspiciousFile: misc__suspicious_file
 {
     meta:
         score = 10
@@ -82,7 +82,7 @@ rule SuspiciousFile: suspicious_file
         any of them
 }
 
-rule PossiblePersistence: persistence
+rule PossiblePersistence: mics__persistence_files
 {
     meta:
         score = 20
@@ -94,27 +94,8 @@ rule PossiblePersistence: persistence
 }
 
 
-/*rule SecretsLeak: secrets_leak
-{
-    meta:
-        score = 100
-    strings:
-        $aws_secret_key = /aws(.{0,20})?['\"][0-9a-zA-Z\/+]{40}['\"]/ nocase
-        $github = /github(.{0,20})?[0-9a-zA-Z]{35,40}/ nocase
-        $linkedin_client_id = /linkedin(.{0,20})?[0-9a-z]{12}/ nocase
-        $linkedin_secret_key = /linkedin(.{0,20})?[0-9a-z]{16}/ nocase
-        $slack = /xox(b|a|p|r|s)-([0-9a-z]{10,48})?/ nocase
-        $google_gcp_account = /"type": "service_account"/
-        $heroku_api_key = /heroku(.{0,20})?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/ nocase
-        $sendgrid_api_key = /SG\.[\w_]{16,32}\.[\w_]{16,64}/
-        $slack_webhook = /https:\/\/hooks.slack.com\/services\/T[a-zA-Z0-9_]{8}\/B[a-zA-Z0-9_]{8}\/[a-zA-Z0-9_]{24}/
-    condition:
-        any of them
-}*/
-
-
 //TO-DO: https://github.com/SublimeCodeIntel/CodeIntel/blob/master/codeintel/which.py#L101
-rule RegistryKey: registry_key
+rule RegistryKey: misc__registry_key
 {
     meta:
         score = 20
@@ -125,7 +106,7 @@ rule RegistryKey: registry_key
         any of them
 }
 
-rule CryptoMiner: crypto_miner
+rule CryptoMiner: misc__crypto_miner
 {
     meta:
         score = 50
@@ -139,7 +120,7 @@ rule CryptoMiner: crypto_miner
         any of them
 }
 
-/*rule BitcoinAddr: bitcoin_address
+/*rule BitcoinAddr: misc__bitcoin_address
 {
     strings:
         $addr = /\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b/
@@ -148,7 +129,7 @@ rule CryptoMiner: crypto_miner
 }*/
 
 
-rule RSAKey: rsa_key
+rule RSAKey: misc__crypto_key
 {
     strings:
         $header = /-----BEGIN[\w ]{,20}? (PUBLIC|PRIVATE) KEY-----.{20,}?-----END[\w ]{,20}? (PUBLIC|PRIVATE) KEY-----/
@@ -157,7 +138,7 @@ rule RSAKey: rsa_key
 }
 
 
-rule WindowsExecutable: windows_executable
+rule WindowsExecutable: misc__windows_executable
 {
     condition:
         // MZ and PE header
@@ -165,7 +146,7 @@ rule WindowsExecutable: windows_executable
 }
 
 
-rule WindowsExecutable2: windows_executable
+rule WindowsExecutable2: misc__windows_executable
 {
     strings:
         $a = "This program cannot" xor
@@ -174,7 +155,7 @@ rule WindowsExecutable2: windows_executable
 }
 
 
-rule ChromePath: chrome_path
+rule ChromePath: misc__chrome_path
 {
     strings:
         $s1 = "\\Google\\Chrome\\User Data\\Default\\"
@@ -185,7 +166,7 @@ rule ChromePath: chrome_path
 }
 
 
-rule meterpreter_reverse_tcp_shellcode {
+rule meterpreter_reverse_tcp_shellcode: misc__meterpreter misc__metasploit {
     meta:
         author = "FDD @ Cuckoo sandbox"
         description = "Rule for metasploit's  meterpreter reverse tcp raw shellcode"
@@ -203,7 +184,7 @@ rule meterpreter_reverse_tcp_shellcode {
         all of them and filesize < 5KB
 }
 
-rule meterpreter_reverse_tcp_shellcode_rev1 {
+rule meterpreter_reverse_tcp_shellcode_rev1: misc__meterpreter misc__metasploit {
     meta:
         author = "FDD @ Cuckoo sandbox"
         description = "Meterpreter reverse TCP shell rev1"
@@ -217,7 +198,7 @@ rule meterpreter_reverse_tcp_shellcode_rev1 {
         meterpreter_reverse_tcp_shellcode and $s1 in (270..filesize)
 }
 
-rule meterpreter_reverse_tcp_shellcode_rev2 {
+rule meterpreter_reverse_tcp_shellcode_rev2: misc__meterpreter misc__metasploit {
     meta:
         author = "FDD @ Cuckoo sandbox"
         description = "Meterpreter reverse TCP shell rev2"
@@ -231,7 +212,7 @@ rule meterpreter_reverse_tcp_shellcode_rev2 {
         meterpreter_reverse_tcp_shellcode and $s1 in (270..filesize)
 }
 
-rule meterpreter_reverse_tcp_shellcode_domain {
+rule meterpreter_reverse_tcp_shellcode_domain: misc__meterpreter misc__metasploit {
     meta:
         author = "FDD @ Cuckoo sandbox"
         description = "Variant used if the user specifies a domain instead of a hard-coded IP"
@@ -244,7 +225,7 @@ rule meterpreter_reverse_tcp_shellcode_domain {
         meterpreter_reverse_tcp_shellcode and all of them
 }
 
-rule metasploit_download_exec_shellcode_rev1 {
+rule metasploit_download_exec_shellcode_rev1: misc__meterpreter misc__metasploit {
     meta:
         author = "FDD @ Cuckoo Sandbox"
         description = "Rule for metasploit's download and exec shellcode"
@@ -266,7 +247,7 @@ rule metasploit_download_exec_shellcode_rev1 {
         all of them and filesize < 5KB
 }
 
-rule metasploit_download_exec_shellcode_rev2 {
+rule metasploit_download_exec_shellcode_rev2: misc__meterpreter misc__metasploit {
     meta:
         author = "FDD @ Cuckoo Sandbox"
         description = "Rule for metasploit's download and exec shellcode"
@@ -287,7 +268,7 @@ rule metasploit_download_exec_shellcode_rev2 {
         all of them and filesize < 5KB
 }
 
-rule metasploit_bind_shell {
+rule metasploit_bind_shell: misc__metasploit {
     meta:
         author = "FDD @ Cuckoo Sandbox"
         description = "Rule for metasploit's bind shell shellcode"

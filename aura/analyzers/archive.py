@@ -42,7 +42,7 @@ class ArchiveAnomaly(Detection):
         )
 
 
-def is_suspicious(pth: Path, location) -> Optional[Detection]:
+def is_suspicious(pth: str, location: Path) -> Optional[Detection]:
     norm = utils.normalize_path(pth)
 
     if pth.startswith("/"):

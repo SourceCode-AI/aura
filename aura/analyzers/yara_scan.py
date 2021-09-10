@@ -9,6 +9,8 @@ from ..utils import Analyzer
 from ..exceptions import PluginDisabled
 from .. import config
 
+logger = config.get_logger(__name__)
+
 
 try:
     import yara
@@ -17,14 +19,16 @@ except ImportError:
         "Yara for python is not installed or can't be imported, see docs."
     )
 
+
 try:
     rules_pth = config.CFG["aura"].get("yara-rules", "aura.data.rules.yara")  # type: ignore[index]
     rules = yara.compile(source=config.get_file_content(rules_pth, config.CFG_PATH))
 except yara.Error as exc:
+    logger.warning("Can not compile or find the yara rules")
     raise PluginDisabled("Can't compile/find yara rules")
 
 
-logger = config.get_logger(__name__)
+
 
 
 @Analyzer.ID("yara")
@@ -53,7 +57,7 @@ def analyze(*, location: ScanLocation):
                     "strings": strings,
                     "meta": m.meta,
                 },
-                tags = set(m.tags)
+                tags = set(x.replace("__", ":") for x in m.tags)
             )
     except yara.Error as exc:
         yield Detection(

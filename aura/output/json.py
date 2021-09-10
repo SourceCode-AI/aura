@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from .base import ScanOutputBase, DiffOutputBase, TyposquattingOutputBase
+from .. import __version__
 from ..type_definitions import DiffType, DiffAnalyzerType
 from ..json_proxy import dumps
 
@@ -23,7 +24,7 @@ class JSONScanOutput(JSONOutputBase, ScanOutputBase):
         if self.out_fd:
             self.out_fd.close()
 
-    def output(self, hits, scan_metadata: dict):
+    def output(self, hits, scan_metadata: dict, fd=None):
         score = 0
         tags = set()
 
@@ -40,9 +41,11 @@ class JSONScanOutput(JSONOutputBase, ScanOutputBase):
             "metadata": scan_metadata,
             "score": score,
             "name": scan_metadata["name"],
+            "version": __version__
         }
 
-        print(dumps(data), file=self.out_fd)
+        fd = fd or self.out_fd
+        print(dumps(data), file=fd)
 
 
 @dataclass()

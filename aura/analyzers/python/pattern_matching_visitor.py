@@ -10,6 +10,7 @@ from ... import config
 
 
 LOGGER = config.get_logger(__name__)
+DEFAULT_EXCLUDE_TAGS = {"misc:test_code", "misc:stats"}
 
 
 class ASTPatternMatcherVisitor(Visitor):
@@ -28,7 +29,7 @@ class ASTPatternMatcherVisitor(Visitor):
             if signature.match(context.node):
                 signature.apply(context)
 
-        if self._report_modules and type(context.node) == Import:
+        if type(context.node) == Import and (self._report_modules or (context.node.tags - DEFAULT_EXCLUDE_TAGS)):
             self.gen_module_import(context)
 
     def gen_module_import(self, context: Context):

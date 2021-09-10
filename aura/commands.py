@@ -4,11 +4,12 @@ import sys
 import os
 import json
 import time
+import datetime
 import traceback
 from pathlib import Path
 from functools import partial
 from itertools import islice
-from typing import Union, Optional, Tuple, Generator, List, TextIO
+from typing import Union, Optional, Tuple, Generator, List, TextIO, Iterable
 
 import click
 from prettyprinter import pprint
@@ -22,6 +23,7 @@ from . import utils
 from . import mirror
 from . import typos
 from . import cache
+from .analyzers.base import PostAnalysisHook
 from .analyzers.detections import Detection
 from .output.base import ScanOutputBase, DiffOutputBase, InfoOutputBase, TyposquattingOutputBase
 
@@ -65,7 +67,7 @@ def check_requirement(pkg):
     sys.exit(1)
 
 
-def scan_worker(item: ScanLocation) -> Generator[Detection, None, None]:
+def scan_worker(item: ScanLocation) -> Iterable[Detection]:
     if not item.location.exists():
         logger.error(f"Location '{item.str_location}' does not exists. Skipping")
         yield []
@@ -80,6 +82,8 @@ def scan_uri(uri, metadata: Union[list, dict]=None, download_only: bool=False) -
         metadata = metadata or {}
         output_format = metadata.get("format", "text")
         all_hits = []
+
+        metadata["start_time"] = datetime.datetime.utcnow().timestamp()
 
         if type(output_format) not in (list, tuple):
             output_format = (output_format,)
@@ -107,6 +111,11 @@ def scan_uri(uri, metadata: Union[list, dict]=None, download_only: bool=False) -
                     continue
                 else:
                     all_hits.extend(scan_worker(x))
+
+            metadata["end_time"] = datetime.datetime.utcnow().timestamp()
+
+            # Run postprocessing hooks
+            all_hits = PostAnalysisHook.run_hooks(all_hits, metadata)
 
             for formatter in formatters:
                 try:
