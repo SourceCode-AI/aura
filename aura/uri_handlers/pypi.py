@@ -35,8 +35,12 @@ class PyPiHandler(URIHandler, PackageProvider):
         if self.opts.get("download_dir"):
             self.opts["download_dir"] = pathlib.Path(self.opts["download_dir"])
 
-        self.release = self.opts["release"]
         self.opts.update(urllib.parse.parse_qs(uri.query))
+        self.release = self.opts["release"]
+
+        if type(self.release) == list:  # FIXME: parse_qs returns values as list
+            self.release = self.release[0]
+
         self.comment = uri.fragment.lstrip("#")
 
     @property
