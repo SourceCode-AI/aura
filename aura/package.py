@@ -130,12 +130,16 @@ class PypiPackage:
         self,
         dest,
         all=True,
+        filtered: Optional[List[ReleaseInfo]] = None,
         **filters  # TODO: add tests for the filters
-    ):
+    ):  # TODO: check if we can remove this method
         dest = Path(dest)
         files = []
 
-        filtered = self.filter_package_types(**filters)
+        if filtered and filters:
+            raise RuntimeError("You can't specify both pre-`filtered` list and filters")
+
+        filtered = filtered or self.filter_package_types(**filters)
 
         if not all:
             filtered = filtered[:1]

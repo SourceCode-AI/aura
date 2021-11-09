@@ -4,11 +4,13 @@ import shutil
 import tempfile
 import pathlib
 import urllib.parse
-from typing import Generator, Tuple, Optional, Dict, Any
+from typing import Generator, Tuple, Optional, Dict, Any, List
 
 from .base import URIHandler, PackageProvider, ScanLocation
+from ..cache import FileDownloadCache
 from ..exceptions import UnsupportedDiffLocation
 from ..package import PypiPackage
+from ..type_definitions import ReleaseInfo
 
 
 class PyPiHandler(URIHandler, PackageProvider):
@@ -57,6 +59,17 @@ class PyPiHandler(URIHandler, PackageProvider):
         }
         return m
 
+    def list_releases(self, all=True) -> List[ReleaseInfo]:
+        filtered = self.package.filter_package_types(
+            release=self.release
+        )
+
+        if not all:
+            filtered = filtered[:1]
+
+        return filtered
+
+
     def get_paths(self, metadata: Optional[dict]=None):
         if self.opts.get("download_dir") is None:
             self.opts["download_dir"] = pathlib.Path(
@@ -64,10 +77,13 @@ class PyPiHandler(URIHandler, PackageProvider):
             )
             self.opts["cleanup"] = True
 
-        for f in self.package.download_release(
-            dest=self.opts["download_dir"], release=self.release
-        ):
-            loc = self.opts["download_dir"] / f["filename"]
+        #for f in self.package.download_release(dest=self.opts["download_dir"], filtered=filtered):
+
+        for release in self.list_releases():
+            loc = self.opts["download_dir"] / release["filename"]
+
+            with loc.open("wb") as fd:
+                FileDownloadCache.proxy(url=release["url"], fd=fd)
 
             if metadata:
                 meta = metadata.copy()
@@ -75,7 +91,7 @@ class PyPiHandler(URIHandler, PackageProvider):
                 meta = {"depth": 0, "report_imports": True, "package_instance": self.package}
 
             meta.update(self.metadata)
-            meta.setdefault("package", {})["info"] = f
+            meta.setdefault("package", {})["info"] = release
 
             yield ScanLocation(
                 location=loc,

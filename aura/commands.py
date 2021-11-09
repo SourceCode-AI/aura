@@ -23,6 +23,7 @@ from . import utils
 from . import mirror
 from . import typos
 from . import cache
+from .scan_data import ScanData
 from .analyzers.base import PostAnalysisHook
 from .analyzers.detections import Detection
 from .output.base import ScanOutputBase, DiffOutputBase, InfoOutputBase, TyposquattingOutputBase
@@ -102,6 +103,7 @@ def scan_uri(uri, metadata: Union[list, dict]=None, download_only: bool=False) -
                 "name": uri,
                 "uri_scheme": handler.scheme,
                 "uri_input": handler.metadata,
+                "paths": [],
                 "depth": 0
             })
 
@@ -110,12 +112,15 @@ def scan_uri(uri, metadata: Union[list, dict]=None, download_only: bool=False) -
                 if download_only:
                     continue
                 else:
-                    all_hits.extend(scan_worker(x))
+                    input_data = ScanData(x)
+                    input_data.scan()
+
+                    all_hits.extend(input_data.hits)
 
             metadata["end_time"] = datetime.datetime.utcnow().timestamp()
 
             # Run postprocessing hooks
-            all_hits = PostAnalysisHook.run_hooks(all_hits, metadata)
+            #all_hits = PostAnalysisHook.run_hooks(all_hits, metadata)
 
             for formatter in formatters:
                 try:

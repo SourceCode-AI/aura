@@ -362,6 +362,18 @@ def fast_checksum(data: Union[bytes, str]) -> str:
     return hex(adler32(payload))[2:]  # Omit the `0x` at the start from `hex()`
 
 
+def isascii(s: str) -> bool:  # TODO: use this to check for non-ascii string definitions and variable names
+    """
+    Check if string contains only ascii characters
+
+    Inspired by https://stackoverflow.com/questions/196345/how-to-check-if-a-string-in-python-is-in-ascii
+    This method was chosen over try-except as it should be faster in our use cases:
+    - source code mostly contains short strings which makes `all` faster that correlate with string length
+    - try except when fail generates whole stack as part of exception which can be very large when doing SAST analysis and prone to memory leaks
+    """
+    return all(ord(c) < 128 for c in s)
+
+
 class Analyzer:
     """
     Helper class to set the analyzer metadata
