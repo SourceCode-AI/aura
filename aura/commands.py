@@ -124,7 +124,7 @@ def scan_uri(uri, metadata: Union[list, dict]=None, download_only: bool=False) -
 
             for formatter in formatters:
                 try:
-                    filtered_hits = formatter.filtered(all_hits)
+                    filtered_hits = formatter.filter_config.filter_detections(all_hits)
                 except exceptions.MinimumScoreNotReached:
                     pass
                 else:

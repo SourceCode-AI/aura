@@ -8,6 +8,7 @@ from typing import List, Union, Mapping, Optional, Iterable, Any, Type
 
 import pkg_resources
 
+from . import filtering
 from .. import exceptions
 from ..analyzers.detections import Detection
 from ..type_definitions import DiffType, DiffAnalyzerType
@@ -46,7 +47,7 @@ class OutputBase(metaclass=ABCMeta):
         return handlers
 
     @classmethod
-    def get_format(cls, uri: str, parsed=None) -> Type[OutputBase]:
+    def get_format(cls, uri: str, parsed: Optional[parse.ParseResult] = None) -> Type[OutputBase]:
         if not parsed:
             parsed = parse.urlparse(uri)
 
@@ -65,6 +66,7 @@ class ScanOutputBase(OutputBase, metaclass=ABCMeta):
     output_location: str = "-"
     tag_filters: list = field(default_factory=list)
     verbosity: int = 1
+    filter_config: filtering.FilterConfiguration  = field(default_factory=filtering.FilterConfiguration)
 
     @abstractmethod
     def __enter__(self):
@@ -97,6 +99,14 @@ class ScanOutputBase(OutputBase, metaclass=ABCMeta):
         elif uri != fmt_class.protocol():
             opts["output_location"] = parsed.netloc or parsed.path
 
+        filter_opts = {
+            "tag_filters": opts.get("tags", []),
+            "min_score": int(parsed_qs.get("min_score", 0)),
+            "verbosity": int(parsed_qs.get("verbosity", 1))
+        }
+
+        filter_cfg = filtering.FilterConfiguration(**filter_opts)
+
         tags = opts.pop("tags", [])
 
         for opt in ():  # TODO
@@ -107,63 +117,13 @@ class ScanOutputBase(OutputBase, metaclass=ABCMeta):
             if opt in parsed_qs:
                 opts[opt] = int(parsed_qs[opt])
 
-        obj: ScanOutputBase = fmt_class(**opts)
-        obj.compile_filter_tags(tags)
+        obj: ScanOutputBase = fmt_class(filter_config=filter_cfg, **opts)
+        obj.tag_filters = filtering.compile_filter_tags(tags)
         return obj
-
-    def compile_filter_tags(self, tags: Iterable[str]):
-        """
-        compile input filter tags into an easy to use list of lambda's so the output hits can be filtered using map
-        """
-        for t in tags:
-            # normalize tags to lowercase with `-` replaced to `_`
-            t = t.strip().lower().replace('-', '_')
-
-            if not t:
-                continue
-
-            if t.startswith("!"):  # It a tag is prefixed with `!` then it means to exclude findings with such tag
-                self.tag_filters.append(lambda x: t[1:] not in x)
-            else:
-                self.tag_filters.append(lambda x: t in x)
 
     @abstractmethod
     def output(self, hits: List[Detection], scan_metadata: dict):
         ...
-
-    def filtered(self, hits: List[Detection]) -> List[Detection]:
-        """
-        Helper function get a list of filtered results regardless of the output type
-        This list of results should then be serialized by a specific output format
-
-        :param hits: input hits/results that will be filtered
-        :return: a list of filtered results
-        """
-        hits = sorted(hits)
-
-        processed = []
-
-        for x in hits:  # type: Detection
-            # normalize tags
-            tags = [t.lower().replace('-', '_') for t in x.tags]
-
-            # if verbosity is below 2, informational results are filtered
-            # norm is that informational results should have a score of 0
-            if self.verbosity < 2 and x.informational and x.score == 0:
-                continue
-            elif not all(f(tags) for f in self.tag_filters):
-                continue
-            elif self.verbosity < 3 and x.name == "ASTParseError" and x._metadata.get("source") == "blob":
-                continue
-            else:
-                processed.append(x)
-
-        total_score : int = sum(x.score for x in processed)
-
-        if self.min_score and self.min_score > total_score:
-            raise exceptions.MinimumScoreNotReached(f"Score of {total_score} did not meet the minimum {self.min_score}")
-
-        return processed
 
 
 @dataclass()

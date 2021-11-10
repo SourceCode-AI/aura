@@ -86,6 +86,9 @@ class URIHandler(ABC):
             HANDLERS = handlers
         return HANDLERS
 
+    def __str__(self):
+        return urllib.parse.urlunparse(self.uri)
+
     @property
     def metadata(self) -> dict:
         return {}
