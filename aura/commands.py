@@ -76,7 +76,12 @@ def scan_worker(item: ScanLocation) -> Iterable[Detection]:
         yield from Analyzer.run(item)
 
 
-def scan_uri(uri, metadata: Union[list, dict]=None, download_only: bool=False) -> List[Detection]:
+def scan_uri(
+        uri: str,
+        metadata: Union[list, dict]=None,
+        download_only: bool=False,
+        filter_cfg=None
+) -> List[Detection]:
     with utils.enrich_exception(uri, metadata):
         start = time.time()
         handler = None
@@ -114,7 +119,6 @@ def scan_uri(uri, metadata: Union[list, dict]=None, download_only: bool=False) -
                 else:
                     input_data = ScanData(x)
                     input_data.scan()
-
                     all_hits.extend(input_data.hits)
 
             metadata["end_time"] = datetime.datetime.utcnow().timestamp()
@@ -124,7 +128,10 @@ def scan_uri(uri, metadata: Union[list, dict]=None, download_only: bool=False) -
 
             for formatter in formatters:
                 try:
-                    filtered_hits = formatter.filter_config.filter_detections(all_hits)
+                    if filter_cfg:
+                        filtered_hits = filter_cfg.filter_detections(all_hits)
+                    else:
+                        filtered_hits = all_hits
                 except exceptions.MinimumScoreNotReached:
                     pass
                 else:
@@ -132,7 +139,7 @@ def scan_uri(uri, metadata: Union[list, dict]=None, download_only: bool=False) -
                         formatter.output(hits=filtered_hits, scan_metadata=metadata)
 
         except exceptions.NoSuchPackage:
-            logger.warn(f"No such package: {uri}")
+            logger.warning(f"No such package: {uri}")
         except Exception:
             logger.exception(f"An error was thrown while processing URI: '{uri}'")
             raise

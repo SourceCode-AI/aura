@@ -62,10 +62,7 @@ class OutputBase(metaclass=ABCMeta):
 
 @dataclass()
 class ScanOutputBase(OutputBase, metaclass=ABCMeta):
-    min_score: int = 0
     output_location: str = "-"
-    tag_filters: list = field(default_factory=list)
-    verbosity: int = 1
     filter_config: filtering.FilterConfiguration  = field(default_factory=filtering.FilterConfiguration)
 
     @abstractmethod
@@ -100,25 +97,18 @@ class ScanOutputBase(OutputBase, metaclass=ABCMeta):
             opts["output_location"] = parsed.netloc or parsed.path
 
         filter_opts = {
-            "tag_filters": opts.get("tags", []),
+            "tag_filters": opts.pop("tags", []),
             "min_score": int(parsed_qs.get("min_score", 0)),
             "verbosity": int(parsed_qs.get("verbosity", 1))
         }
 
         filter_cfg = filtering.FilterConfiguration(**filter_opts)
 
-        tags = opts.pop("tags", [])
-
         for opt in ():  # TODO
             if opt in parsed_qs:
                 opts[opt] = qs_to_bool(parsed_qs[opt])
 
-        for opt in ("min_score", "verbosity"):
-            if opt in parsed_qs:
-                opts[opt] = int(parsed_qs[opt])
-
         obj: ScanOutputBase = fmt_class(filter_config=filter_cfg, **opts)
-        obj.tag_filters = filtering.compile_filter_tags(tags)
         return obj
 
     @abstractmethod

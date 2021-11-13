@@ -97,7 +97,7 @@ def test_custom_analyzer(fixtures):
 
 def test_scan_min_score_option(fixtures):
     output = fixtures.scan_test_file(
-        "obfuscated.py", args=["--format", "json://-?min_score=1000"], decode=False
+        "obfuscated.py", args=["--min-score", "1000", "--format", "json://-"], decode=False
     )
     assert len(output.output.strip()) == 0, output.output
 
@@ -176,3 +176,19 @@ def test_async_cleanup(fixtures):
     # Make sure that the temp dir is properly cleaned up also when using async mode
     leftovers = set(tmp_dir.glob("aura_pkg__sandbox*")) - before
     assert len(leftovers) == 0, 0
+
+
+@patch("aura.commands.scan_uri")
+def test_cli_opts_to_filter_config(scan_mock, fixtures):
+    def _side_effect(*args, filter_cfg, **kwargs):
+        assert filter_cfg.min_score == 666
+        assert filter_cfg.verbosity == 3
+        assert filter_cfg.tag_filters == ("blah", "!nein")
+
+    scan_mock.side_effect = _side_effect
+
+    fixtures.scan_test_file(
+        "obfuscated.py", args=["--min-score", "666", "-f", "json", "-vv", "-t", "blah", "-t", "!nein"], decode=False
+    )
+
+    scan_mock.assert_called()

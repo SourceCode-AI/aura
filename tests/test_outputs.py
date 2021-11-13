@@ -182,7 +182,8 @@ def test_output_not_created_when_below_minimum_score(output_type, fixtures, tmp_
         "misc.py",
         decode=False,
         args=[
-            "--format", f"{output_type}://{out_file}?min_score=1000",
+            "--min-score", "1000",
+            "--format", f"{output_type}://{out_file}",
         ]
     )
 

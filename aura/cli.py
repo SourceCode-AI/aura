@@ -16,6 +16,7 @@ from prettyprinter import install_extras
 from . import commands
 from . import exceptions
 from .cache import purge
+from .output.filtering import FilterConfiguration
 from .uri_handlers.base import URIHandler
 from . import config
 
@@ -49,12 +50,12 @@ def cli(ctx, **kwargs):
 
 @cli.command(name="scan", help=scan_help_text())
 @click.argument("uri", metavar="<SCAN_URI>")
-@click.option("-v", "--verbose", default=None, count=True)
+@click.option("-v", "--verbose", default=0, count=True)
 @click.option("-a", "--analyzer", multiple=True, help="Specify analyzer(s) to run")
 @click.option("-f", "--format", "out_type", multiple=True, help="Output format")
 @click.option(
     "--min-score",
-    default=None,
+    default=0,
     type=click.INT,
     help="Output only scans with at least minimum score",
 )
@@ -71,24 +72,22 @@ def cli(ctx, **kwargs):
 @click.option("--download-only", "download_only", flag_value=True)
 def scan(
     uri,
-    verbose=None,
+    verbose=0,
     analyzer=None,
     out_type=("text",),
-    min_score=None,
+    min_score=0,
     benchmark=False,
     benchmark_sort="cumtime",
     filter_tags=None,
     fork_mode=False,
     download_only=False,
 ):
-    output_opts = {
-        "tags": filter_tags
-    }
-    if min_score is not None:
-        output_opts["min_score"] = min_score
 
-    if verbose is not None:
-        output_opts["verbosity"] = verbose + 1
+    filter_cfg = FilterConfiguration(
+        tag_filters=(filter_tags or []),
+        min_score=min_score,
+        verbosity=(verbose + 1)
+    )
 
     if not out_type:
         out_type = ("text",)
@@ -98,7 +97,6 @@ def scan(
         "analyzers": analyzer,
         "source": "cli",
         "fork": fork_mode,
-        "output_opts": output_opts
     }
     if benchmark:
         import cProfile, pstats, io
@@ -110,7 +108,7 @@ def scan(
         cProfile, pstats, pr, io = None, None, None, None
 
     try:
-        commands.scan_uri(uri, metadata=meta, download_only=download_only)
+        commands.scan_uri(uri, metadata=meta, download_only=download_only, filter_cfg=filter_cfg)
     except exceptions.FeatureDisabled as e:
         LOGGER.exception(e.args[0], exc_info=e)
         click.secho(e.args[0], err=True, fg="red")

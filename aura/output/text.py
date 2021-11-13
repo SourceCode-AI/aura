@@ -315,7 +315,7 @@ class TextScanOutput(TextBase, ScanOutputBase):
 
         score = sum(x.score for x in hits)
 
-        if score < self.min_score:
+        if score < self.filter_config.min_score:
             return
 
         secho("\n", file=self.out_fd, color=TTY_COLORS)  # Empty line for readability
