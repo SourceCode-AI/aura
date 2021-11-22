@@ -1,7 +1,9 @@
 from dataclasses import dataclass
+from typing import Sequence
 
 from .base import ScanOutputBase, DiffOutputBase, TyposquattingOutputBase
 from .. import __version__
+from ..scan_data import ScanData, merge_scans
 from ..type_definitions import DiffType, DiffAnalyzerType
 from ..json_proxy import dumps
 
@@ -24,26 +26,10 @@ class JSONScanOutput(JSONOutputBase, ScanOutputBase):
         if self.out_fd:
             self.out_fd.close()
 
-    def output(self, hits, scan_metadata: dict, fd=None):
-        score = 0
-        tags = set()
-
-        for x in hits:
-            tags |= x.tags
-            score += x.score
-
-        data = {
-            "detections": [x._asdict() for x in hits],
-            "imported_modules": list(
-                {x.extra["name"] for x in hits if x.name == "ModuleImport"}
-            ),
-            "tags": list(tags),
-            "metadata": scan_metadata,
-            "score": score,
-            "name": scan_metadata["name"],
-            "version": __version__
-        }
-
+    def output(self, scans: Sequence[ScanData], fd=None):
+        data = {"scans": [
+            scan.as_dict() for scan in scans
+        ]}
         fd = fd or self.out_fd
         print(dumps(data), file=fd)
 

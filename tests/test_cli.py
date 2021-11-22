@@ -58,9 +58,10 @@ OBFUSCATED_DEFAULT_MATCHES = [
 def test_simple_cli_analysis(exec_mode, fixtures):
     pth = fixtures.path('basic_ast.py')
     output = fixtures.scan_test_file("basic_ast.py", args=[exec_mode])
+    assert len(output["scans"]) == 1
 
-    assert output["name"].endswith(pth.split("/")[-1])
-    assert "behavior:url" in output["tags"]
+    assert output["scans"][0]["name"].endswith(pth.split("/")[-1])
+    assert "behavior:url" in output["scans"][0]["tags"]
 
 
 @pytest.mark.e2e
@@ -103,7 +104,8 @@ def test_scan_min_score_option(fixtures):
 
     output = fixtures.scan_test_file("obfuscated.py", args=["--format", "json://-?min_score=10"])
     assert type(output) == dict
-    assert output["score"] > 0
+    assert len(output["scans"]) == 1
+    assert output["scans"][0]["score"] > 0
 
 
 @pytest.mark.parametrize(
@@ -125,7 +127,9 @@ def test_tag_filtering(tag_filter, fixtures):
 
     output = fixtures.scan_test_file("shelli.py", args=args)
 
-    for hit in output["detections"]:
+    assert len(output["scans"]) == 1
+
+    for hit in output["scans"][0]["detections"]:
         for tag in tag_filter:
             if tag.startswith("!"):
                 assert tag[1:] not in hit["tags"], (tag, hit)

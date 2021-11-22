@@ -81,8 +81,7 @@ def test_proxy_mirror_json(cache_mock, tmp_path, filename, content, cache_id, ca
 def test_mirror_cache(fixtures, simulate_mirror, mock_cache):
     out = fixtures.get_cli_output(['scan', '--download-only', 'mirror://wheel', '-f', 'json'])
 
-    parsed_output = json.loads(out.stdout)
-    assert len(parsed_output["detections"]) == 0
+    assert out.stdout.strip() == ""
 
     cache_content = [
         x.item_path.name

@@ -1,7 +1,9 @@
 from uuid import uuid4
 from dataclasses import dataclass
+from typing import Sequence
 
 from .json import JSONScanOutput
+from ..scan_data import ScanData, merge_scans
 from ..json_proxy import dumps
 from .. import __version__
 
@@ -12,7 +14,7 @@ class GitlabSASTOutput(JSONScanOutput):
     def protocol(cls) -> str:
         return "gitlab-sast"
 
-    def output(self, hits, scan_metadata: dict):
+    def output(self, scans: Sequence[ScanData]):
         tpl = {
             "scanner": {
                 "id": "aura",
@@ -29,31 +31,32 @@ class GitlabSASTOutput(JSONScanOutput):
             "vulnerabilities": []
         }
 
-        for detection in hits:
-            d = detection._asdict()
-            data = {
-                "id": str(uuid4()),
-                "category": d["type"],
-                "severity": d["severity"].capitalize(),
-                "message": d["message"],
-                "location": {
-                    "file": d["location"]
-                },
-                "cve": "",  # Required property for some reason
-                "identifiers": [  # Also required per jsonschema
-                    # We will just copy a list of tags in here
-                    # `[d["type"]]` is fallback because this array must be non-empty
-                    {
-                        "type": "aura",
-                        "name": "tag",
-                        "value": x
-                    } for x in d.get("tags", [d["type"]])
-                ],
-                "scanner": {
-                    "id": "aura",
-                    "name": "Aura framework"
+        for scan in scans:
+            for detection in scan.hits:
+                d = detection._asdict()
+                data = {
+                    "id": str(uuid4()),
+                    "category": d["type"],
+                    "severity": d["severity"].capitalize(),
+                    "message": d["message"],
+                    "location": {
+                        "file": d["location"]
+                    },
+                    "cve": "",  # Required property for some reason
+                    "identifiers": [  # Also required per jsonschema
+                        # We will just copy a list of tags in here
+                        # `[d["type"]]` is fallback because this array must be non-empty
+                        {
+                            "type": "aura",
+                            "name": "tag",
+                            "value": x
+                        } for x in d.get("tags", [d["type"]])
+                    ],
+                    "scanner": {
+                        "id": "aura",
+                        "name": "Aura framework"
+                    }
                 }
-            }
-            tpl["vulnerabilities"].append(data)
+                tpl["vulnerabilities"].append(data)
 
         print(dumps(tpl), file=self.out_fd)

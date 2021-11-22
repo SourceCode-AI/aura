@@ -119,7 +119,7 @@ def test_sqlite_scan_output(fixtures, tmp_path: Path):
     db.row_factory = sqlite3.Row
 
     inputs = [dict(x) for x in db.execute(
-        "SELECT * FROM inputs WHERE input=?",
+        "SELECT * FROM scans WHERE input=?",
         (scan_path,)
     ).fetchall()]
     assert len(inputs) == 1
@@ -130,7 +130,7 @@ def test_sqlite_scan_output(fixtures, tmp_path: Path):
 
     assert len(locations) == 1
     for loc in locations:
-        assert loc["input"] == input_id
+        assert loc["scan_id"] == input_id
 
     loc_id = locations[0]["id"]
 
@@ -212,7 +212,7 @@ def test_output_path_formatting(scan_file, fixtures):
     - Paths should not contain parts of a temporary directory
     """
     temp_prefix = tempfile.gettempdir()
-    output = fixtures.scan_test_file(scan_file)["detections"]
+    output = fixtures.scan_test_file(scan_file)["scans"][0]["detections"]
 
     for hit in output:
         location: str = hit.get("location")

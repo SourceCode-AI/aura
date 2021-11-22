@@ -51,7 +51,10 @@ def test_taint_operations():
 
 def test_flask_app(fixtures, fuzzy_rule_match):
     output = fixtures.scan_test_file('flask_app.py')
-    assert len(output['detections']) > 0, output
+
+    assert len(output["scans"]) == 1, output
+    detections = output["scans"][0]["detections"]
+    assert len(detections) > 0, output["scans"][0]
 
     # TODO: also perhaps 24? `eval(self.code)`
     # TODO: cover the case at vuln5:72
@@ -65,13 +68,13 @@ def test_flask_app(fixtures, fuzzy_rule_match):
         } for x in lines
     ]
 
-    output_line_nos = {x['line_no'] for x in output['detections']} - set(lines)
+    output_line_nos = {x['line_no'] for x in detections} - set(lines)
 
     for x in matches:
-        assert any(fuzzy_rule_match(h, x) for h in output['detections']), (output_line_nos, x)
+        assert any(fuzzy_rule_match(h, x) for h in detections), (output_line_nos, x)
 
     excluded = [105, 111]
-    for hit in output['detections']:
+    for hit in detections:
         if hit.get('type') != 'TaintAnomaly':
             continue
 
@@ -98,8 +101,9 @@ def test_taint_log_flask_app(fixtures, fuzzy_rule_match):
     ]
 
     output = fixtures.scan_test_file('flask_app.py')
+    assert len(output["scans"]) == 1
 
-    for h in output['detections']:
+    for h in output["scans"][0]['detections']:
         if h['line_no'] == 45:
             log = h['extra']['taint_log']
             break

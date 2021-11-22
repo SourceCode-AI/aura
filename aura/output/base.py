@@ -4,13 +4,14 @@ import os.path
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass, field
 from urllib import parse
-from typing import List, Union, Mapping, Optional, Iterable, Any, Type
+from typing import List, Union, Mapping, Optional, Sequence, Any, Type
 
 import pkg_resources
 
 from . import filtering
 from .. import exceptions
 from ..analyzers.detections import Detection
+from ..scan_data import ScanData
 from ..type_definitions import DiffType, DiffAnalyzerType
 
 
@@ -111,8 +112,12 @@ class ScanOutputBase(OutputBase, metaclass=ABCMeta):
         obj: ScanOutputBase = fmt_class(filter_config=filter_cfg, **opts)
         return obj
 
+    #@abstractmethod
+    #def output(self, hits: List[Detection], scan_metadata: dict):
+    #    ...
+
     @abstractmethod
-    def output(self, hits: List[Detection], scan_metadata: dict):
+    def output(self, scans: Sequence[ScanData]):
         ...
 
 

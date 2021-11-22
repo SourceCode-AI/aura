@@ -1,11 +1,12 @@
 import json
 import sqlite3
 from dataclasses import dataclass
-from typing import List, Any
+from typing import List, Sequence
 from abc import ABCMeta, abstractmethod
 
 from .base import ScanOutputBase, DiffOutputBase
 from ..analyzers.detections import Detection
+from ..scan_data import ScanData, merge_scans
 from ..utils import json_encoder
 from ..exceptions import InvalidOutput, PluginDisabled
 
@@ -61,7 +62,7 @@ class DiffBase(metaclass=ABCMeta):
 class SQLiteScanOutput(DiffBase, ScanOutputBase):
     def _create_tables(self):
         INPUT_SCHEMA = """
-            CREATE TABLE IF NOT EXISTS inputs (
+            CREATE TABLE IF NOT EXISTS scans (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 input VARCHAR(255) UNIQUE NOT NULL,
                 metadata json
@@ -71,11 +72,11 @@ class SQLiteScanOutput(DiffBase, ScanOutputBase):
         LOCATION_SCHEMA = """
             CREATE TABLE IF NOT EXISTS locations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name VARCHAR(255) UNIQUE,
+                name VARCHAR(255),
                 local_path VARCHAR(255) NOT NULL,
-                input INTEGER,
+                scan_id INTEGER,
                 metadata json,
-                FOREIGN KEY (input) REFERENCES inputs(id)
+                FOREIGN KEY (scan_id) REFERENCES scans(id)
             )
         """
 
@@ -97,56 +98,57 @@ class SQLiteScanOutput(DiffBase, ScanOutputBase):
             self.out_fd.execute(LOCATION_SCHEMA)
             self.out_fd.execute(DETECTION_SCHEMA)
 
-    def output(self, hits: List[Detection], scan_metadata: dict):
+    def output(self, scans: Sequence[ScanData]):
         cur = self.out_fd.cursor()
         try:
-            location_ids = {}
-            cur.execute("""
-                INSERT INTO inputs (input, metadata) VALUES (?,?)
-            """, [
-                scan_metadata["name"],
-                json.dumps(scan_metadata, default=json_encoder)
-            ])
-
-            input_id = cur.lastrowid
-
-            for h in hits:
-                norm_path = h.location
-                location_meta = h._metadata
-                full_path = str(location_meta["path"])
-                detection = h._asdict()
-
-                if norm_path in location_ids:
-                    location_id = location_ids[norm_path]
-                else:
-                    try:
-                        cur.execute("""
-                            INSERT INTO locations(name, local_path, input, metadata)
-                            VALUES (?,?,?,?)
-                        """, [
-                            norm_path,
-                            full_path,
-                            input_id,
-                            json.dumps(location_meta, default=json_encoder)
-                        ])
-                        location_id = cur.lastrowid
-                    except sqlite3.IntegrityError:
-                        location_id = cur.execute(
-                            "SELECT id FROM locations WHERE name=?", [norm_path]
-                        ).fetchone()[0]
-
-                    location_ids[norm_path] = location_id
-
+            for scan in scans:
+                location_ids = {}
                 cur.execute("""
-                    INSERT OR IGNORE into DETECTIONS (signature, score, type, data, location)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO scans (input, metadata) VALUES (?,?)
                 """, [
-                    h.signature,
-                    h.score,
-                    h.name,
-                    json.dumps(detection, default=json_encoder),
-                    location_id
+                    scan.metadata["name"],
+                    json.dumps(scan.metadata, default=json_encoder)
                 ])
+
+                scan_id = cur.lastrowid
+
+                for h in scan.hits:
+                    norm_path = h.location
+                    location_meta = h._metadata
+                    full_path = str(location_meta["path"])
+                    detection = h._asdict()
+
+                    if norm_path in location_ids:
+                        location_id = location_ids[norm_path]
+                    else:
+                        try:
+                            cur.execute("""
+                                INSERT INTO locations(name, local_path, scan_id, metadata)
+                                VALUES (?,?,?,?)
+                            """, [
+                                norm_path,
+                                full_path,
+                                scan_id,
+                                json.dumps(location_meta, default=json_encoder)
+                            ])
+                            location_id = cur.lastrowid
+                        except sqlite3.IntegrityError:
+                            location_id = cur.execute(
+                                "SELECT id FROM locations WHERE name=?", [norm_path]
+                            ).fetchone()[0]
+
+                        location_ids[norm_path] = location_id
+
+                    cur.execute("""
+                        INSERT OR IGNORE into DETECTIONS (signature, score, type, data, location)
+                        VALUES (?, ?, ?, ?, ?)
+                    """, [
+                        h.signature,
+                        h.score,
+                        h.name,
+                        json.dumps(detection, default=json_encoder),
+                        location_id
+                    ])
         except:
             self.out_fd.rollback()
             raise

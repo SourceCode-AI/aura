@@ -25,7 +25,15 @@
 <body>
 <div id="app" class="container-fluid p-3">
     <div class="row">
-        <tabs v-bind:results="results"></tabs>
+        <div class="col-sm-12">
+            <select class="form-select" v-model="selected_scan">
+                <option v-for="(scan, index) in results.scans" v-bind:value="index">Scan #{{ index+1 }}: {{ scan.metadata.name }}</option>
+            </select>
+        </div>
+
+        <div class="col-sm-12">
+            <tabs v-bind:results="results.scans[selected_scan]" v-if="selected_scan >= 0"></tabs>
+        </div>
     </div>
 </div>
 

@@ -579,7 +579,7 @@ Vue.component("tabs", {
     },
     template: `
     <div>
-        <div class="row">
+        <div class="row p-2">
             <h2 class="text-center">Scan results for <mark>{{ results.name }}</mark></h2>
         </div>
     
@@ -633,6 +633,14 @@ if (window.scan_data == undefined) {
 const app = new Vue({
     el: "#app",
     data() {
-        return {results: window.scan_data};
+        d = {
+            results: window.scan_data
+        };
+
+        if (!!window.scan_data) {
+            d["selected_scan"] = 0;
+        }
+
+        return d;
     }
 });

@@ -2,8 +2,10 @@ from importlib import resources
 from io import StringIO
 from base64 import b64encode
 from dataclasses import dataclass
+from typing import Sequence
 
 from .json import JSONScanOutput
+from ..scan_data import ScanData, merge_scans
 
 
 @dataclass()
@@ -12,9 +14,9 @@ class HTMLOutput(JSONScanOutput):
     def protocol(cls) -> str:
         return "html"
 
-    def output(self, hits, scan_metadata: dict):
+    def output(self, scans: Sequence[ScanData]):
         json_fd = StringIO()
-        super().output(hits, scan_metadata, fd=json_fd)
+        super().output(scans, fd=json_fd)
 
         js_renderer = resources.read_text("aura.data.html_results", "results.js")
         payload = resources.read_text("aura.data.html_results", "template.html")

@@ -1,9 +1,11 @@
 import datetime
 from dataclasses import dataclass
 from uuid import uuid4
+from typing import Sequence
 
 from . import json
 from .. import __version__
+from ..scan_data import ScanData
 
 
 @dataclass()
@@ -18,12 +20,13 @@ class SBOMOutput(json.JSONScanOutput):
     def __exit__(self, exc_type, exc_val, exc_tb):
         super().__exit__(exc_type, exc_val, exc_tb)
 
-    def output(self, hits, scan_metadata: dict):
+    def output(self, scans: Sequence[ScanData]):
         components = []
 
-        for x in hits:
-            if "sbom:component" in x.tags:
-                components.append(x.extra)
+        for scan in scans:
+            for x in scan.hits:
+                if "sbom:component" in x.tags:
+                    components.append(x.extra)
 
         now = datetime.datetime.utcnow()
 

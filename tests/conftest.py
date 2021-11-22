@@ -146,20 +146,25 @@ class Fixtures(object):
     def scan_and_match(self, input_file, matches, excludes=None, **kwargs):
         output = self.scan_test_file(input_file, **kwargs)
 
+        detections = []
+
+        for scan in output["scans"]:
+            detections.extend(scan["detections"])
+
         for x in matches:
             try:
-                assert any(match_rule(h, x) for h in output["detections"]), (x, output["detections"])
+                assert any(match_rule(h, x) for h in detections), (x, detections)
             except AssertionError:
-                for h in output["detections"]:
+                for h in detections:
                     pprint.pprint(h)
                 raise
 
         if excludes:
             for x in excludes:
-                for hit in output["detections"]:
+                for hit in detections:
                     assert not match_rule(hit, x), hit
 
-        for hit in output["detections"]:
+        for hit in detections:
             assert hit["type"] != "ASTParseError"
 
 
@@ -226,7 +231,6 @@ def match_rule(source, target) -> bool:
                 return False
 
     return True
-
 
 
 def pytest_addoption(parser):

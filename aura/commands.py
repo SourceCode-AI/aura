@@ -9,7 +9,7 @@ import traceback
 from pathlib import Path
 from functools import partial
 from itertools import islice
-from typing import Union, Optional, Tuple, Generator, List, TextIO, Iterable
+from typing import Union, Optional, Tuple, Sequence, Iterable
 
 import click
 from prettyprinter import pprint
@@ -24,7 +24,6 @@ from . import mirror
 from . import typos
 from . import cache
 from .scan_data import ScanData
-from .analyzers.base import PostAnalysisHook
 from .analyzers.detections import Detection
 from .output.base import ScanOutputBase, DiffOutputBase, InfoOutputBase, TyposquattingOutputBase
 
@@ -81,13 +80,12 @@ def scan_uri(
         metadata: Union[list, dict]=None,
         download_only: bool=False,
         filter_cfg=None
-) -> List[Detection]:
+) -> Sequence[ScanData]:
     with utils.enrich_exception(uri, metadata):
         start = time.time()
         handler = None
         metadata = metadata or {}
         output_format = metadata.get("format", "text")
-        all_hits = []
 
         metadata["start_time"] = datetime.datetime.utcnow().timestamp()
 
@@ -112,31 +110,27 @@ def scan_uri(
                 "depth": 0
             })
 
+            scans = []
+
             # FIXME: metadata=metadata
             for x in handler.get_paths(metadata={"analyzers": metadata["analyzers"]}):  # type: ScanLocation
                 if download_only:
                     continue
                 else:
-                    input_data = ScanData(x)
-                    input_data.scan()
-                    all_hits.extend(input_data.hits)
+                    input_data = ScanData(x, uri_handler=handler, filter_cfg=filter_cfg)
+                    try:
+                        input_data.scan()
+                    except exceptions.MinimumScoreNotReached:
+                        pass
+                    else:
+                        scans.append(input_data)
 
             metadata["end_time"] = datetime.datetime.utcnow().timestamp()
 
-            # Run postprocessing hooks
-            #all_hits = PostAnalysisHook.run_hooks(all_hits, metadata)
-
-            for formatter in formatters:
-                try:
-                    if filter_cfg:
-                        filtered_hits = filter_cfg.filter_detections(all_hits)
-                    else:
-                        filtered_hits = all_hits
-                except exceptions.MinimumScoreNotReached:
-                    pass
-                else:
+            if scans:
+                for formatter in formatters:
                     with formatter:
-                        formatter.output(hits=filtered_hits, scan_metadata=metadata)
+                        formatter.output(scans=scans)
 
         except exceptions.NoSuchPackage:
             logger.warning(f"No such package: {uri}")
@@ -148,7 +142,7 @@ def scan_uri(
                 handler.cleanup()
 
         logger.info(f"Scan finished in {time.time() - start} s")
-        return all_hits
+        return scans
 
 
 def data_diff(a_path: str, b_path: str, format_uri=("text",), output_opts=None):

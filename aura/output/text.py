@@ -6,13 +6,13 @@ from shutil import get_terminal_size
 from dataclasses import dataclass
 from textwrap import wrap
 from prettyprinter import pformat
-from typing import Optional, Any, Generator
+from typing import Optional, Any, Sequence
 from collections import Counter
 
 from click import secho, style
 
-from .. import utils
 from .. import config
+from ..scan_data import ScanData, merge_scans
 from ..analyzers.detections import get_severity
 from .base import ScanOutputBase, DiffOutputBase, InfoOutputBase, TyposquattingOutputBase
 from .table import Table
@@ -302,8 +302,9 @@ class TextScanOutput(TextBase, ScanOutputBase):
         if self.out_fd:
             self.out_fd.close()
 
-    def output(self, hits, scan_metadata: dict):
-        hits = set(hits)
+    def output(self, scans: Sequence[ScanData]):
+        scan_metadata, hits = merge_scans(scans)
+
         imported_modules = {h.extra["name"] for h in hits if h.name == "ModuleImport"}
         score = 0
         tags = set()
