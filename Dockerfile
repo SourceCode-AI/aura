@@ -72,7 +72,8 @@ FROM aura-lite AS aura-full
 
 RUN apk add --no-cache \
     libxml2-dev \
-    libxslt-dev
+    libxslt-dev \
+    postgresql-dev
 
 RUN source $HOME/.poetry/env && \
     poetry install --no-dev -E full
