@@ -42,8 +42,11 @@ class OutputBase(metaclass=ABCMeta):
 
         if not handlers:
             for x in pkg_resources.iter_entry_points(cls.entrypoint()):
-                handler = x.load()
-                handlers[x.name] = handler
+                try:
+                    handler = x.load()
+                    handlers[x.name] = handler
+                except exceptions.PluginDisabled:
+                    pass  # TODO: register disabled plugins and their reason
 
         return handlers
 
