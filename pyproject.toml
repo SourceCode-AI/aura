@@ -45,11 +45,11 @@ requests = "~2.25.1"
 tqdm = "~4.61"
 pytz = "~2021.1"
 "ruamel.yaml" = "~0.17"
+jinja2 = "~3.0"
 
 # TODO: make the following dependencies optional
 python-tlsh = "~3.17.0"
 prettyprinter = "~0.18.0"
-jinja2 = "~3.0"
 
 # TODO: Extras, autodetect their presence in aura
 jsonschema = { version = "~3.2", optional = true }
@@ -59,10 +59,12 @@ tomli = { version = "~1.2", optional = true }
 yara-python = {version = "~4.0.5", optional = true}
 networkx = {version = "~2.6", optional = true}
 python-rapidjson = { version = "~1.4", optional = true }
+psycopg2 = { version = "~2.9", optional = true }
+xxhash = { version = "~2.0", optional = true }
 #pyarrow = { version = "~3.0", optional = true }
 
 [tool.poetry.extras]
-full = ["yara-python", "networkx", "cssselect", "GitPython", "python-rapidjson", "defusedxml", "jsonschema", "tomli"]
+full = ["yara-python", "networkx", "cssselect", "GitPython", "python-rapidjson", "defusedxml", "jsonschema", "tomli", "psycopg2", "xxhash"]
 
 [tool.poetry.dev-dependencies]
 responses = "^0.13"
@@ -103,6 +105,7 @@ gitlab-sast = "aura.output.gitlab:GitlabSASTOutput"
 sarif = "aura.output.sarif:SARIFOutput"
 sbom = "aura.output.sbom:SBOMOutput"
 html = "aura.output.html:HTMLOutput"
+postgres = "aura.output.postgres:PostgresScanOutput"
 
 [tool.poetry.plugins."aura.diff_output_handlers"]
 text = "aura.output.text:TextDiffOutput"

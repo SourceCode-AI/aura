@@ -10,6 +10,15 @@ from ..utils import normalize_path
 from .python.nodes import NodeType, ASTNode
 
 
+try:
+    import xxhash
+    zlib = None
+except ImportError:
+    xxhash = None
+    import zlib
+
+
+
 @dataclass
 @total_ordering
 class Detection:
@@ -56,6 +65,7 @@ class Detection:
         self._hash = None
         self._diff_hash = None
         self._severity = None
+        self._sigint: Optional[None] = None
 
         if self.node and self.line_no is None:
             self.line_no = self.node.line_no
@@ -129,6 +139,16 @@ class Detection:
             return hash(self) == hash(other)
         except:
             return False
+
+    @property
+    def int_signature(self) -> int:
+        if not self._sigint:
+            if xxhash:
+                self._sigint = xxhash.xxh32_intdigest(self.signature)
+            else:
+                self._sigint = zlib.adler32(self.signature.encode())
+
+        return self._sigint
 
     @property
     def name(self) -> str:

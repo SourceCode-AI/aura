@@ -5,8 +5,7 @@ from typing import List, Sequence
 from abc import ABCMeta, abstractmethod
 
 from .base import ScanOutputBase, DiffOutputBase
-from ..analyzers.detections import Detection
-from ..scan_data import ScanData, merge_scans
+from ..scan_data import ScanData
 from ..utils import json_encoder
 from ..exceptions import InvalidOutput, PluginDisabled
 
@@ -31,13 +30,14 @@ def check_sqlite_support():
 class DiffBase(metaclass=ABCMeta):
     def __enter__(self):
         if self.output_location == "-":
-            raise InvalidOutput("SQLite format can't output to stdout")
+            raise InvalidOutput("SQLite format can't output to the stdout")
 
         self.out_fd = sqlite3.connect(self.output_location)
         self._initialize_db()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.out_fd.close()
+        self.out_fd = None
 
     @abstractmethod
     def _create_tables(self):

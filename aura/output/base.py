@@ -64,6 +64,7 @@ class OutputBase(metaclass=ABCMeta):
 @dataclass()
 class ScanOutputBase(OutputBase, metaclass=ABCMeta):
     output_location: str = "-"
+    uri: Optional[parse.ParseResult] = None
     filter_config: filtering.FilterConfiguration  = field(default_factory=filtering.FilterConfiguration)
 
     @abstractmethod
@@ -90,7 +91,7 @@ class ScanOutputBase(OutputBase, metaclass=ABCMeta):
 
         fmt_class = cls.get_format(uri, parsed)
 
-        # TODO: add support for tags from uri
+        opts["uri"] = parsed
 
         if parsed.netloc and parsed.path:
             opts["output_location"] = os.path.join(parsed.netloc, parsed.path)

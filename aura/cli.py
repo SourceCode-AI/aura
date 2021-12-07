@@ -207,7 +207,6 @@ def parse_ast(path, stages=None, format="text"):
             ctx.close()
 
 
-
 @cli.command(name="info")
 def info():
     commands.show_info()
@@ -251,6 +250,30 @@ def check_requirement():
     """
     payload = json.loads(sys.stdin.read())
     commands.check_requirement(payload)
+
+
+@cli.command()
+@click.argument("fpath")
+@click.argument("pg_uri")
+def process_bandersnatch_log(fpath, pg_uri):
+    from .output import postgres
+    postgres.ingest_bandersnatch_log(fpath, pg_uri)
+
+
+@cli.command()
+@click.argument("pg_uri")
+def init_postgres(pg_uri):
+    from .output import postgres
+    pg_handler = postgres.PostgresScanOutput.from_uri(pg_uri)
+
+    with pg_handler:
+        pg_handler._create_tables()
+
+
+@cli.command()
+@click.argument("pg_uri")
+def server_worker(pg_uri):
+    commands.server_worker(pg_uri)
 
 
 @cli.command()

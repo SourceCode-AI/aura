@@ -20,9 +20,13 @@ class ScanData:
         }
 
         if uri_handler:
-            self.metadata["name"] = str(uri_handler)
+            self.metadata["name"] = self.location.metadata.get("name") or str(uri_handler)
             self.metadata["uri_scheme"] = uri_handler.scheme
-            self.metadata["uri_input"] = uri_handler.metadata
+            self.metadata["uri"] = str(uri_handler)
+
+        for k, v in self.location.metadata.items():
+            if k not in self.metadata and type(v) == str:
+                self.metadata[k] = v
 
         self.hits: Set[Detection] = set()
 
@@ -33,9 +37,9 @@ class ScanData:
         post_analysis_hits = set(PostAnalysisHook.run_hooks(hits, self.metadata))
 
         if self.filter_cfg:
-            self.hits |= set(self.filter_cfg.filter_detections(post_analysis_hits))
+            self.hits = set(self.filter_cfg.filter_detections(post_analysis_hits))
         else:
-            self.hits |= post_analysis_hits
+            self.hits = post_analysis_hits
 
         self.metadata["end_time"] = datetime.datetime.utcnow().timestamp()
 

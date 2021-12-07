@@ -102,6 +102,11 @@ aura: &aura_config
   # This will report any and all modules (code imports) even if there is no semantic pattern defined for them
   always_report_module_imports: false
 
+  # Sort collected python files base on their imports by analyzing them via directed graph
+  # This will ensure that imported files will be analyzed before the files that are importing them
+  sort_by_imports: false
+
+
 tags: &tags
   # Filter results that contain only the specified tags
   # Results can also be excluded using "!" to prefix a tag

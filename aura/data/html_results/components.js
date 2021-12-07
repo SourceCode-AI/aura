@@ -339,10 +339,15 @@ Vue.component("detection", {
             </p>
         </div>
         <div class="card-footer">
-            Tags:
-            <span class="badge bg-secondary" v-for="tag in detection.tags" style="margin-right:5px">
-                {{ tag }}
-            </span>
+            <div class="row">
+                <div class="col-md-12">
+                    Tags:
+                    <span class="badge bg-secondary" v-for="tag in detection.tags" style="margin-right:5px">
+                        {{ tag }}
+                    </span>
+                </div>
+            </div>
+            <slot name="footer"></slot>
         </div>
     </div>
     `
@@ -623,24 +628,3 @@ Vue.component("tabs", {
     `
 });
 
-
-if (window.scan_data == undefined) {
-    const data_element = document.getElementById("scan-data");
-    window.scan_data = JSON.parse(atob(data_element.textContent));
-};
-
-
-const app = new Vue({
-    el: "#app",
-    data() {
-        d = {
-            results: window.scan_data
-        };
-
-        if (!!window.scan_data) {
-            d["selected_scan"] = 0;
-        }
-
-        return d;
-    }
-});

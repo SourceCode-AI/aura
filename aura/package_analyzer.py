@@ -132,6 +132,8 @@ class Analyzer:
         topo = TopologySort()
         collected = []
 
+        sort_imports = config.CFG["aura"].get("sort_by_imports")
+
         for f in utils.walk(item.location):
             new_item = item.create_child(
                 f,
@@ -139,22 +141,24 @@ class Analyzer:
                 strip_path=item.strip_path
             )
             collected.append(new_item)
-            topo.add_node(Path(new_item.location).absolute())
+            if sort_imports:
+                topo.add_node(Path(new_item.location).absolute())
 
-        logger.debug("Computing import graph")
+        if sort_imports:
+            logger.debug("Computing import graph")
 
-        for x in collected:
-            if not x.metadata.get('py_imports'):
-                continue
+            for x in collected:
+                if not x.metadata.get('py_imports'):
+                    continue
 
-            node = Path(x.location).absolute()
-            topo.add_edge(node, x.metadata['py_imports']['dependencies'])
+                node = Path(x.location).absolute()
+                topo.add_edge(node, x.metadata['py_imports']['dependencies'])
 
-        topology = topo.sort()
+            topology = topo.sort()
 
-        collected.sort(
-            key=lambda x: topology.index(x.location) if x.location in topology else 0
-        )
-        logger.debug("Topology sorting finished")
+            collected.sort(
+                key=lambda x: topology.index(x.location) if x.location in topology else 0
+            )
+            logger.debug("Topology sorting finished")
 
         return collected

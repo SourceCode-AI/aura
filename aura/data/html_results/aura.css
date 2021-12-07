@@ -1,0 +1,13 @@
+.badge {
+    margin-left: 2px;
+}
+.code-border {
+    padding-right: 5px;
+    padding-left: 5px;
+    border: 1px gray dashed;
+}
+
+ul.tree-view {
+    list-style-type: none;
+    padding-left: 1em;
+}

@@ -23,9 +23,11 @@ from . import utils
 from . import mirror
 from . import typos
 from . import cache
+from .server.worker import ServerWorker
 from .scan_data import ScanData
 from .analyzers.detections import Detection
 from .output.base import ScanOutputBase, DiffOutputBase, InfoOutputBase, TyposquattingOutputBase
+from .output.filtering import FilterConfiguration
 
 
 logger = config.get_logger(__name__)
@@ -93,6 +95,7 @@ def scan_uri(
             output_format = (output_format,)
 
         formatters = [ScanOutputBase.from_uri(x, opts=metadata.get("output_opts")) for x in output_format]
+        scans = []
 
         try:
             handler = URIHandler.from_uri(uri)
@@ -110,10 +113,8 @@ def scan_uri(
                 "depth": 0
             })
 
-            scans = []
-
             # FIXME: metadata=metadata
-            for x in handler.get_paths(metadata={"analyzers": metadata["analyzers"]}):  # type: ScanLocation
+            for x in handler.get_paths(metadata={"analyzers": metadata.get("analyzers", [])}):  # type: ScanLocation
                 if download_only:
                     continue
                 else:
@@ -143,6 +144,21 @@ def scan_uri(
 
         logger.info(f"Scan finished in {time.time() - start} s")
         return scans
+
+
+def server_worker(pg_uri):
+    filter_cfg = FilterConfiguration()
+
+    def worker_func(task_data):
+        scan_uri(
+            task_data["uri"],
+            metadata={"format": pg_uri},
+            filter_cfg=filter_cfg
+        )
+
+    sw = ServerWorker(pg_uri, worker_func)
+    sw.loop()
+
 
 
 def data_diff(a_path: str, b_path: str, format_uri=("text",), output_opts=None):

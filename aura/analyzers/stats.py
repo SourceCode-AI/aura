@@ -49,6 +49,9 @@ class DirectoryTreeStats(PostAnalysisHook):
         self.tree = {"children": {}}
 
     def post_analysis(self, detections: List[Detection], metadata: dict) -> List[Detection]:
+        size = 0
+        files = 0
+
         for d in detections:
             if not d.location:
                 continue
@@ -58,6 +61,8 @@ class DirectoryTreeStats(PostAnalysisHook):
             if d.detection_type == "FileStats":
                 l["mime"] = d.extra["mime"]
                 l["size"] = d.extra["size"]
+                files += 1
+                size += l["size"]
 
             l["tags"] = l.get("tags", set()) | (d.tags - AGGREGATION_EXCLUDE_TAGS)
             l["score"] = l.get("score", 0) + d.score
@@ -66,6 +71,8 @@ class DirectoryTreeStats(PostAnalysisHook):
             self.collapse(name, self.tree)
 
         metadata["directory_tree_stats"] = self.tree
+        metadata["files_processed"] = files
+        metadata["data_processed"] = size
         return detections
 
     def collapse(self, name, parent):

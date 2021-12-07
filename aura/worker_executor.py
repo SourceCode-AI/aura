@@ -11,6 +11,7 @@ from . import config
 
 
 Wait = object()
+logger = config.get_logger(__name__)
 
 
 class AuraExecutor:
@@ -130,10 +131,6 @@ class AsyncQueue:
 
     async def join(self):
         return await self.q.join()
-
-
-
-
 
 
 async def non_blocking(func, /, *args, **kwargs):

@@ -235,13 +235,23 @@ def load_config():
         warnings.simplefilter(w_filter)
         os.environ["PYTHONWARNINGS"] = w_filter
 
-    rss = CFG["aura"].get("rlimit-memory")
-    if rss:
-        resource.setrlimit(resource.RLIMIT_RSS, (rss, rss))
+    try:
+        if rss:=CFG["aura"].get("rlimit-memory"):
+            if rss > resource.RLIMIT_RSS:
+                logger.warning(f"Configured RSS rlimit ({rss}) is greater than the maximum allowed RSS: {resource.RLIMIT_RSS}")
+            else:
+                resource.setrlimit(resource.RLIMIT_RSS, (rss, rss))
+    except ValueError as exc:
+        logger.warning(f"Can't set configured RSS limit: `{exc.args[0]}`")
 
-    fsize = CFG["aura"].get("rlimit-fsize")
-    if fsize:
-        resource.setrlimit(resource.RLIMIT_FSIZE, (fsize, fsize))
+    try:
+        if fsize:=CFG["aura"].get("rlimit-fsize"):
+            if fsize > resource.RLIMIT_FSIZE:
+                logger.warning(f"Configured FSIZE rlimit ({fsize}) is greater than the maximum allowed FSIZE: {resource.RLIMIT_FSIZE}")
+            else:
+                resource.setrlimit(resource.RLIMIT_FSIZE, (fsize, fsize))
+    except ValueError as exc:
+        logger.warning(f"Can't set configured fsize limit: `{exc.args[0]}`")
 
     rec_limit = os.environ.get("AURA_RECURSION_LIMIT") or CFG["aura"].get("python-recursion-limit")
 

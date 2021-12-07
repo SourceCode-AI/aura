@@ -6,6 +6,8 @@ import pathlib
 import urllib.parse
 from typing import Generator, Tuple, Optional, Dict, Any, List
 
+from packaging.utils import canonicalize_name
+
 from .base import URIHandler, PackageProvider, ScanLocation
 from ..cache import FileDownloadCache
 from ..exceptions import UnsupportedDiffLocation
@@ -32,16 +34,22 @@ class PyPiHandler(URIHandler, PackageProvider):
         self.package_name = uri.netloc
         self.pkg = PypiPackage.from_cached(name=self.package_name)
         self.file_name = uri.path.lstrip("/")
-        self.opts : Dict[str, Any] = {"release": "latest", "cleanup": False}
+        self.opts : Dict[str, Any] = {"cleanup": False}
 
         if self.opts.get("download_dir"):
             self.opts["download_dir"] = pathlib.Path(self.opts["download_dir"])
 
-        self.opts.update(urllib.parse.parse_qs(uri.query))
-        self.release = self.opts["release"]
 
-        if type(self.release) == list:  # FIXME: parse_qs returns values as list
-            self.release = self.release[0]
+        parsed_qs = parse_qs(uri.query)
+        self.opts.update(parsed_qs)
+
+        self.filename = self.opts.get("filename")
+        self.md5 = self.opts.get("md5")
+
+        if self.filename or self.md5 and not parsed_qs.get("release"):
+            self.release = "all"
+        else:
+            self.release = parsed_qs.get("release", "latest")
 
         self.comment = uri.fragment.lstrip("#")
 
@@ -54,14 +62,24 @@ class PyPiHandler(URIHandler, PackageProvider):
         m = {
             "uri": self.uri,
             "scheme": self.scheme,
-            "package_name": self.package_name,
-            "package_release": self.opts["release"],
+            "package_name": canonicalize_name(self.package_name),
         }
+
+        if self.release == "latest":
+            m["package_release"] = self.pkg.info["info"]["version"]
+        else:
+            m["package_release"] = self.release
+
         return m
 
-    def list_releases(self, all=True) -> List[ReleaseInfo]:
+    def list_releases(self, all=None) -> List[ReleaseInfo]:
+        if all is None:
+            all = (self.release == "all")
+
         filtered = self.package.filter_package_types(
-            release=self.release
+            release=self.release,
+            filename=self.filename,
+            md5=self.md5
         )
 
         if not all:
@@ -69,15 +87,12 @@ class PyPiHandler(URIHandler, PackageProvider):
 
         return filtered
 
-
     def get_paths(self, metadata: Optional[dict]=None):
         if self.opts.get("download_dir") is None:
             self.opts["download_dir"] = pathlib.Path(
                 tempfile.mkdtemp(prefix="aura_pypi_download_")
             )
             self.opts["cleanup"] = True
-
-        #for f in self.package.download_release(dest=self.opts["download_dir"], filtered=filtered):
 
         for release in self.list_releases():
             loc = self.opts["download_dir"] / release["filename"]
@@ -91,7 +106,9 @@ class PyPiHandler(URIHandler, PackageProvider):
                 meta = {"depth": 0, "report_imports": True, "package_instance": self.package}
 
             meta.update(self.metadata)
+            meta["package_file"] = release["filename"]
             meta.setdefault("package", {})["info"] = release
+            meta["name"] = f"PyPI package {release['filename']}"
 
             yield ScanLocation(
                 location=loc,
@@ -115,3 +132,15 @@ class PyPiHandler(URIHandler, PackageProvider):
     def cleanup(self):
         if self.opts.get("cleanup", False) and self.opts["download_dir"].exists():
             shutil.rmtree(self.opts["download_dir"])
+
+
+def parse_qs(query: str) -> dict:
+    q = {}
+
+    for name, value in urllib.parse.parse_qs(query).items():
+        if type(value) == list:
+            value = value[0]
+
+        q[name] = value
+
+    return q

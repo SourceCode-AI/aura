@@ -16,7 +16,7 @@ from typing import Optional, Generator, Tuple, List, Union
 
 import pytz
 import requests
-from packaging.version import Version
+from packaging.version import Version, InvalidVersion
 from packaging.utils import canonicalize_name
 from packaging.requirements import Requirement
 
@@ -176,17 +176,19 @@ class PypiPackage:
         if release == "latest":
             release = self.get_latest_release()
 
-        if release == "all":
-            releases = list(chain(self.info["releases"].values()))
-        else:
-            releases = self.info["releases"][release]
+        releases = []
 
+        if release == "all":
+            for rversion, version_releases in self.info["releases"].items():
+                for r in version_releases:
+                    r["version"] = rversion
+                    releases.append(r)
+        else:
+            for r in self.info["releases"][release]:
+                r["version"] = release
+                releases.append(r)
 
         types = set(x.get("packagetype") for x in releases)
-
-        if "sdist" in types and packagetype is None:
-            packagetype = "sdist"
-
         filters = (
             partial(packagetype_filter, packagetype=packagetype),
             partial(filename_filter, filename=filename),
@@ -198,7 +200,7 @@ class PypiPackage:
             if all(x(pkg) for x in filters):
                 pkgs.append(pkg)
 
-        # FIXME: sort by version pkgs.sort(key=lambda x: Version(x), reverse=True)
+        pkgs.sort(key=lambda x: (sort_by_version(x), -sort_by_packagetype(x)), reverse=True)
         return pkgs
 
     @property
@@ -544,9 +546,11 @@ class PackageScore:
 
 
 def packagetype_filter(release: ReleaseInfo, packagetype: str="all") -> bool:
+    if packagetype is None:
+        return True
     if packagetype == "all":
         return True
-    elif packagetype and release.get("packagetype") == packagetype:
+    elif release.get("packagetype") == packagetype:
         return True
     else:
         return False
@@ -593,3 +597,22 @@ def log_scale(metric: int, base=10) -> int:
         return math.ceil(math.log(metric, base))
     else:
         return 0
+
+
+
+# Utilities for producing keys for sorting package releases
+def sort_by_packagetype(pkg: ReleaseInfo) -> int:
+    ptype = pkg.get("packagetype")
+
+    if ptype == "sdist":
+        return 0
+    elif ptype == "bdist_wheel":
+        return 1
+    else:
+        return 2
+
+def sort_by_version(pkg: ReleaseInfo) -> Version:
+    try:
+        return Version(pkg.get("release"))
+    except (InvalidVersion, TypeError):
+        return Version("9"*10)
