@@ -120,11 +120,13 @@ class PypiPackage:
     def get_latest_release(self) -> Optional[str]:
         return self.info["info"].get("version")
 
-    def get_dependencies(self) -> Generator[Requirement, None, None]:
+    def get_dependencies(self) -> List[Requirement]:
+        all_deps = []
         deps = self.info["info"].get("requires_dist", [])
         if deps:
             for req_line in deps:
-                yield Requirement(req_line)
+                all_deps.append(Requirement(req_line))
+        return all_deps
 
     def download_release(
         self,

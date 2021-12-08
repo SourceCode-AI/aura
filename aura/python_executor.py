@@ -135,7 +135,11 @@ def get_native_source_code(command):
 
 def init_native_environment():
     global NATIVE_ENVIRONMENT_CACHE
-    NATIVE_ENVIRONMENT_CACHE = execute_interpreter(command=[python_src_inspector.__file__, '--environment-only'], interpreter=sys.executable)
+    try:
+        NATIVE_ENVIRONMENT_CACHE = execute_interpreter(command=[python_src_inspector.__file__, '--environment-only'], interpreter=sys.executable)
+    except PythonExecutorError as exc:
+        LOGGER.exception("An error occurred when pre-caching data for the native python executor")
+        LOGGER.info(f"STDERR output is: {exc.stderr}")
 
 
 init_native_environment()
