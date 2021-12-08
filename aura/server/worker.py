@@ -60,10 +60,11 @@ class ServerWorker:
 
                 if task_data is None:
                     logger.info("Nothing to do")
-                    time.sleep(3)
-
-                task_future = self.executor.submit(self.worker_func, task_data)
-                self.tasks[task_future] = task_data["scan_id"]
+                    time.sleep(1)
+                    continue
+                else:
+                    task_future = self.executor.submit(self.worker_func, task_data)
+                    self.tasks[task_future] = task_data["scan_id"]
         finally:
             self.wait_for_tasks(when=futures.ALL_COMPLETED)
 
