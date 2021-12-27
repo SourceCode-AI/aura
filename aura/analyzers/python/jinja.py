@@ -12,7 +12,7 @@ from .visitor import Visitor
 from .. import base
 from ..detections import Detection
 from .nodes import Context, Taints, ASTNode, String
-from ...utils import Analyzer
+from ...bases import ASTAnalyzer
 from ... import config
 
 
@@ -23,9 +23,9 @@ class JinjaVulnerability(Detection):
     pass
 
 
-@Analyzer.ID("jinja")
-class JinjaAnalyzer(base.NodeAnalyzerV2):
+class JinjaAnalyzer(base.NodeAnalyzerV2, ASTAnalyzer):
     """Analyze Jinja specific vulnerabilities such as XSS"""
+    analyzer_id = "jinja"
 
     def node_Call(self, context):
         yield from self.__analyze_jinja_template(context)

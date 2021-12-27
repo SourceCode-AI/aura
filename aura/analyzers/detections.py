@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from typing  import Union, Set, Optional, Dict, cast
+from typing  import Union, Set, Optional, cast
 from pathlib import Path
 from dataclasses import dataclass, field
 from functools import total_ordering
 
 from .. import config
+from ..bases import JSONSerializable
 from ..utils import normalize_path
 from .python.nodes import NodeType, ASTNode
 
@@ -21,7 +22,7 @@ except ImportError:
 
 @dataclass
 @total_ordering
-class Detection:
+class Detection(JSONSerializable):
     """
     Base for analyzers to produce detections from audit scans that are reported back to the Aura framework
     Subclass this to have different hits on semantic level
@@ -70,7 +71,7 @@ class Detection:
         if self.node and self.line_no is None:
             self.line_no = self.node.line_no
 
-    def _asdict(self) -> Dict:
+    def to_dict(self) -> dict:
         """
         Exporting mechanism for JSON output/machine processing
         Define fields to be exported here, subclass need to fetch the fields from their parent in this method

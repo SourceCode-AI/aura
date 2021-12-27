@@ -3,16 +3,17 @@ import math
 from .. import base
 from .. import detect_redos
 from ..detections import Detection
-from ...utils import Analyzer, fast_checksum
+from ...utils import fast_checksum
+from ...bases import ASTAnalyzer
 from ... import config
 
 
 ENTROPY_THRESHOLD = float(config.CFG["aura"].get("shanon_entropy", 0.0))  # type: ignore[index]
 
 
-@Analyzer.ID("misc")
-class MiscAnalyzer(base.NodeAnalyzerV2):
+class MiscAnalyzer(base.NodeAnalyzerV2, ASTAnalyzer):
     """Various checks mostly for best-practices"""
+    analyzer_id = "misc"
 
     def node_String(self, context):
         val = str(context.node)

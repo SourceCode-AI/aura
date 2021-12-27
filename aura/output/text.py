@@ -351,7 +351,7 @@ class TextScanOutput(TextBase, ScanOutputBase):
             self._formatter.print_heading("Code detections")
             for h in hits:
                 self._formatter.print_thick_separator()
-                self._format_detection(h._asdict(), top_separator=False, bottom_separator=False)
+                self._format_detection(h.to_json(), top_separator=False, bottom_separator=False)
         else:
             self._formatter.print_heading(style("No code detections has been triggered", fg="bright_green"))
 
@@ -506,7 +506,7 @@ class TextDiffOutput(TextBase, DiffOutputBase):
                 out.print_heading(style("Removed detections for this file", fg="bright_yellow"))
                 for x in diff.removed_detections:
                     out.print_separator()
-                    x = x._asdict()
+                    x = x.to_json()
                     header = style(f"Removed: '{x['type']}'", fg="green", bold=True)
                     self._format_detection(x, header=header, bottom_separator=False, top_separator=False)
 
@@ -514,7 +514,7 @@ class TextDiffOutput(TextBase, DiffOutputBase):
                 out.print_heading(style("New detections for this file", fg="bright_red"))
                 for x in diff.new_detections:
                     out.print_separator()
-                    x = x._asdict()
+                    x = x.to_json()
                     header = style(f"Added: '{x['type']}'", fg="red", bold=True)
                     self._format_detection(x, header=header, bottom_separator=False, top_separator=False)
 

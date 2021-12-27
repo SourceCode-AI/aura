@@ -185,8 +185,9 @@ def match_rule(source, target) -> bool:
     if Detection is None:
         from aura.analyzers.detections import Detection
 
+    # TODO: change this to `JSONSerializable`
     if isinstance(source, Detection):
-        source = source._asdict()
+        source = source.to_dict()
 
     # Check if target is a regex and apply it to source string
     if (isinstance(target, Pattern) or isinstance(target, REGEX_TYPE)) and type(source) == str:

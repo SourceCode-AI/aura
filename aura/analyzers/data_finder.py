@@ -14,6 +14,7 @@ from .python.nodes import Context, String, Bytes, ASTNode
 from ..utils import Analyzer
 from ..pattern_matching import PatternMatcher
 from ..uri_handlers.base import ScanLocation
+from ..bases import ASTAnalyzer
 from .. import utils
 from .. import config
 
@@ -23,9 +24,9 @@ BASE64_REGEX = re.compile(
 )
 
 
-@Analyzer.ID("data_finder")
-class DataFinder(NodeAnalyzerV2):
+class DataFinder(NodeAnalyzerV2, ASTAnalyzer):
     """Extracts artifacts from the source code such sa URLs or Base64 blobs"""
+    analyzer_id = "data_finder"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)  # type: ignore[call-arg]

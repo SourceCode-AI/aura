@@ -293,6 +293,9 @@ score: &scores
   # PyPI requirement points to a remote URL
   # requirement-remote-url: 20
 
+  # Variables, attributes and function definitions containing non-ascii characters
+  non-ascii-tokens: 50
+
 cache: &cache
   # Mode can be one of:
   # - "ask": ask if cache should be purged when running some commands (aura info, aura update ...)

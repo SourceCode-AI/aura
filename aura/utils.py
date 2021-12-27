@@ -21,6 +21,7 @@ import tqdm
 import requests
 
 from . import config
+from .bases import JSONSerializable
 
 
 logger = config.get_logger(__name__)
@@ -147,11 +148,10 @@ def json_encoder(obj):
         return obj.json
     elif type(obj) == bytes:
         return obj.decode("utf-8")
+    elif isinstance(obj, JSONSerializable):
+        return obj.to_json()
     elif dataclasses.is_dataclass(obj):
-        if hasattr(obj, "_asdict"):
-            return obj._asdict()
-        else:
-            return dataclasses.asdict(obj)
+        return dataclasses.asdict(obj)
 
 
 def lookup_lines(
@@ -380,13 +380,5 @@ class Analyzer:
     """
 
     @classmethod
-    def name(cls, name):
-        return set_function_attr(name=name)
-
-    @classmethod
     def ID(cls, identity):
         return set_function_attr(analyzer_id=identity)
-
-    @classmethod
-    def type(cls, atype):
-        return set_function_attr(analyzer_type=atype)

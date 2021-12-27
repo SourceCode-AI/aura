@@ -33,7 +33,7 @@ class GitlabSASTOutput(JSONScanOutput):
 
         for scan in scans:
             for detection in scan.hits:
-                d = detection._asdict()
+                d = detection.to_json()
                 data = {
                     "id": str(uuid4()),
                     "category": d["type"],

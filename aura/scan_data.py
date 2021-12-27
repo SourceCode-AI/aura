@@ -5,10 +5,11 @@ from .package_analyzer import Analyzer
 from .analyzers.base import PostAnalysisHook
 from .analyzers.detections import Detection
 from .uri_handlers.base import ScanLocation, URIHandler
+from .bases import JSONSerializable
 from . import __version__
 
 
-class ScanData:
+class ScanData(JSONSerializable):
     def __init__(self, scan_location: ScanLocation, uri_handler: Optional[URIHandler]=None, filter_cfg=None):
         self.location = scan_location
         self.handler = uri_handler
@@ -43,7 +44,7 @@ class ScanData:
 
         self.metadata["end_time"] = datetime.datetime.utcnow().timestamp()
 
-    def as_dict(self) -> dict:
+    def to_dict(self) -> dict:
         score = 0
         tags = set()
         imported_modules = set()
@@ -55,7 +56,7 @@ class ScanData:
                 imported_modules.add(x.extra["name"])
 
         data = {
-            "detections": [x._asdict() for x in self.hits],
+            "detections": [x.to_dict() for x in self.hits],
             "tags": tags,
             "imported_modules": imported_modules,
             "metadata": self.metadata,

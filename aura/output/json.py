@@ -28,7 +28,7 @@ class JSONScanOutput(JSONOutputBase, ScanOutputBase):
 
     def output(self, scans: Sequence[ScanData], fd=None):
         data = {"scans": [
-            scan.as_dict() for scan in scans
+            scan.to_json() for scan in scans
         ]}
         fd = fd or self.out_fd
         print(dumps(data), file=fd)
