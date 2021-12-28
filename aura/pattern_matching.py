@@ -13,7 +13,8 @@ from textwrap import dedent
 from .analyzers.python_src_inspector import collect
 from .analyzers.python import nodes, visitor
 from .analyzers.detections import Detection
-from .type_definitions import ScanLocation
+from .uri_handlers.base import ScanLocation
+from .type_definitions import ScanLocationType
 
 
 PATTERN_CACHE = None
@@ -133,7 +134,7 @@ class FilePatternMatcher():
     def __repr__(self):
         return f"<FilePatternMatcher({repr(self._signature)})>"
 
-    def match(self, value: ScanLocation) -> bool:
+    def match(self, value: ScanLocationType) -> bool:
         if self._signature.get("target", "full") == "full":
             targets = (str(value.location),)
         elif self._signature["target"] == "part":

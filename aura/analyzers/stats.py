@@ -1,5 +1,5 @@
 import re
-from typing import Optional, List
+from typing import Optional, List, Dict, Union
 
 from .base import PostAnalysisHook
 from ..uri_handlers.base import ScanLocation
@@ -11,6 +11,7 @@ from ..utils import Analyzer
 
 PATH_SPLIT_CHARS = re.compile("[$/]")
 AGGREGATION_EXCLUDE_TAGS = {"misc:file_stats"}  # TODO: make this configurable
+
 
 
 @Analyzer.ID("file_stats")
@@ -46,7 +47,7 @@ def analyze(*, location: ScanLocation):
 
 class DirectoryTreeStats(PostAnalysisHook):
     def __init__(self):
-        self.tree = {"children": {}}
+        self.tree: Dict[str, Union[str, dict]] = {"children": {}}
 
     def post_analysis(self, detections: List[Detection], metadata: dict) -> List[Detection]:
         size = 0

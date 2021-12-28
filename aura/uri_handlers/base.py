@@ -14,7 +14,7 @@ from itertools import product
 from dataclasses import dataclass, field
 from pathlib import Path
 from difflib import SequenceMatcher
-from typing import Union, Optional, Tuple, Iterable
+from typing import Union, Optional, Tuple, Iterable, TYPE_CHECKING
 from warnings import warn
 
 import tlsh
@@ -25,7 +25,11 @@ from .. import config
 from ..utils import KeepRefs, lookup_lines, lzset, jaccard, walk
 from ..exceptions import PythonExecutorError, UnsupportedDiffLocation, FeatureDisabled
 from ..analyzers import find_imports
-from ..analyzers.detections import DataProcessing, Detection, get_severity
+from ..analyzers.detections import DataProcessing, get_severity
+from ..type_definitions import ScanLocationType
+
+if TYPE_CHECKING:
+    from ..analyzers.detections import Detection
 
 
 logger = config.get_logger(__name__)
@@ -124,7 +128,7 @@ class IdenticalName(float):
 
 
 @dataclass
-class ScanLocation(KeepRefs):
+class ScanLocation(KeepRefs, ScanLocationType):
     location: Path
     metadata: dict = field(default_factory=dict)
     cleanup: Union[bool, Path, str] = False

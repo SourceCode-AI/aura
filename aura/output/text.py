@@ -6,7 +6,7 @@ from shutil import get_terminal_size
 from dataclasses import dataclass
 from textwrap import wrap
 from prettyprinter import pformat
-from typing import Optional, Any, Sequence
+from typing import Optional, Any, Sequence, Union, List
 from collections import Counter
 
 from click import secho, style
@@ -157,7 +157,7 @@ class PrettyReport:
         self.print_top_separator()
 
         titles = [t.metadata.get("title", "N/A") for t in tables]
-        tparts = [tuple(self.generate_heading(title, width=w, left="", right="") for w, title in zip(table_widths, titles))]
+        tparts: List[Union[tuple, list]] = [tuple(self.generate_heading(title, width=w, left="", right="") for w, title in zip(table_widths, titles))]
 
         for idx, rows in enumerate(itertools.zip_longest(*tables, fillvalue="")):
 
@@ -263,10 +263,10 @@ class TextBase:
         for x in items:
             parts = x.split(".")
             current = root
-            for x in parts:
-                if x not in current:
-                    current[x] = {}
-                current = current[x]
+            for part in parts:
+                if part not in current:
+                    current[part] = {}
+                current = current[part]
 
         return root
 

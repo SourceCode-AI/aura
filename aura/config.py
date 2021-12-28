@@ -9,7 +9,7 @@ from importlib import resources
 from pathlib import Path
 from functools import lru_cache
 from logging.handlers import RotatingFileHandler
-from typing import Optional, Generator, Any, Iterable
+from typing import Optional, Generator, Any, Union
 
 import tqdm
 import pkg_resources
@@ -154,7 +154,11 @@ def find_configuration() -> Path:  # TODO: add tests
     return Path(DEFAULT_CFG_PATH)
 
 
-def get_file_location(location: str, base_path: Optional[str]=None, exc: bool=True) -> str:
+def get_file_location(
+        location: str,
+        base_path: Optional[Union[str, Path]]=None,
+        exc: bool=True
+) -> str:
     """
     Lookup a location of a file
 

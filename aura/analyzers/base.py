@@ -1,14 +1,13 @@
-from abc import ABCMeta
-from typing import List
+from __future__ import annotations
+
+from typing import List, Generic
 
 from .python.readonly import ReadOnlyAnalyzer
 from .detections import Detection
-from .. import exceptions
-from ..uri_handlers.base import ScanLocation
-from ..utils import Analyzer   # Imported for convenience
+from ..type_definitions import AnalyzerType
 
 
-class NodeAnalyzerV2(metaclass=ABCMeta):
+class NodeAnalyzerV2:
     def reset_hook(self):
         pass
 
@@ -17,7 +16,7 @@ class NodeAnalyzerV2(metaclass=ABCMeta):
 
 
 class PostAnalysisHook:
-    _hooks = []
+    _hooks: List[PostAnalysisHook] = []
 
     @classmethod
     def run_hooks(cls, detections: List[Detection], metadata: dict) -> List[Detection]:

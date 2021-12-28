@@ -19,7 +19,7 @@ class MiscAnalyzer(base.NodeAnalyzerV2, ASTAnalyzer):
         val = str(context.node)
         entropy = calculate_entropy(val)
 
-        if ENTROPY_THRESHOLD > 0 and entropy >= ENTROPY_THRESHOLD:
+        if ENTROPY_THRESHOLD and entropy >= ENTROPY_THRESHOLD:
             hit = Detection(
                 detection_type="HighEntropyString",
                 message="A string with high shanon entropy was found",

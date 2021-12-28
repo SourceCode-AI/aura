@@ -22,13 +22,12 @@ SUPPORTED_MIME = (
 logger = config.get_logger(__name__)
 
 
-
 class ArchiveAnomaly(Detection):
     @classmethod
     def from_generic_exception(cls, location: ScanLocation, exc: Exception):
         return cls(
             detection_type=cls.__name__,
-            location = location.location,
+            location=location.location,
             message="Could not open the archive for analysis",
             signature=f"archive_anomaly#read_error#{location.location}",
             score=config.get_score_or_default("corrupted-archive", 10),
@@ -38,7 +37,7 @@ class ArchiveAnomaly(Detection):
                 "exc_type": exc.__class__.__name__,
                 "mime": location.metadata["mime"]
             },
-            tags = {"anomaly:package_archive_error"}
+            tags={"anomaly:package_archive_error"}
         )
 
 
@@ -47,24 +46,24 @@ def is_suspicious(pth: str, location: Path) -> Optional[Detection]:
 
     if pth.startswith("/"):
         return Detection(
-            message = "Archive contains an absolute path item",
+            message="Archive contains an absolute path item",
             detection_type="SuspiciousArchiveEntry",
             location=utils.normalize_path(location),
             signature=f"suspicious_archive_entry#absolute_path#{norm}#{location}",
             extra={"entry_type": "absolute_path", "entry_path": norm},
             score=config.get_score_or_default("suspicious-archive-entry-absolute-path", 50),
-            tags = {"anomaly:package_content"}
+            tags={"anomaly:package_content"}
         )
 
     elif any(x == ".." for x in Path(pth).parts):
         return Detection(
-            message = "Archive contains an item with parent reference",
+            message="Archive contains an item with parent reference",
             detection_type="SuspiciousArchiveEntry",
             location=utils.normalize_path(location),
             signature=f"suspicious_archive_entry#parent_reference#{norm}#{location}",
             extra={"entry_type": "parent_reference", "entry_path": norm},
             score=config.get_score_or_default("suspicious-archive-entry-parent-reference", 50),
-            tags = {"anomaly:package_content"}
+            tags={"anomaly:package_content"}
         )
 
     return None

@@ -68,7 +68,7 @@ class JinjaAnalyzer(base.NodeAnalyzerV2, ASTAnalyzer):
             taints[name] = kw._taint_class
 
         if len(context.node.args) == 0 or type(context.node.args[0]) not in (String, str):
-            logger.warn(f"Unable to determine jinja template location for template located in '{context.visitor.normalized_path}'#{context.node.line_no}")
+            logger.warning(f"Unable to determine jinja template location for template located in '{context.visitor.normalized_path}'#{context.node.line_no}")
             return
 
         tpl_name = str(context.node.args[0])
@@ -147,7 +147,7 @@ class JinjaTemplateVisitor(Visitor):
         # Check if it is an AST node in the Jinja template
         if isinstance(context.node, jnodes.Node):
             new_node = NodeWrapper(jinja_node=context.node)
-            context.replace(new_node)
+            context.replace(new_node)  # type: ignore[call-arg]
             return
 
         # Now, process only wrapped nodes

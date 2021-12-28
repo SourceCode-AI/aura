@@ -1,16 +1,16 @@
 import typing
 
 from ..detections import Detection
-from ...uri_handlers.base import ScanLocation
 from .visitor import Visitor
 from .nodes import Context
+from ...type_definitions import ScanLocationType
 
 
 class ReadOnlyAnalyzer(Visitor):
     stage_name = "read_only"
     hooks = []
 
-    def __init__(self, *, location: ScanLocation):
+    def __init__(self, *, location: ScanLocationType):
         super().__init__(location=location)
         self.convergence = None
 
