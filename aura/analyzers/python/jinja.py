@@ -19,10 +19,6 @@ from ... import config
 logger = config.get_logger(__name__)
 
 
-class JinjaVulnerability(Detection):
-    pass
-
-
 class JinjaAnalyzer(base.NodeAnalyzerV2, ASTAnalyzer):
     """Analyze Jinja specific vulnerabilities such as XSS"""
     analyzer_id = "jinja"
@@ -42,7 +38,8 @@ class JinjaAnalyzer(base.NodeAnalyzerV2, ASTAnalyzer):
             return
 
         if signature.arguments.get("autoescape", True) is False:
-            hit = JinjaVulnerability(
+            hit = Detection(
+                detection_type="JinjaVulnerability",
                 message="Detected jinja environment with autoescaping explicitly disabled",
                 score=100,
                 line_no=context.node.line_no,
@@ -193,7 +190,8 @@ class JinjaTemplateVisitor(Visitor):
         ):
             lineno = context.node.jinja_node.lineno
 
-            hit = JinjaVulnerability(
+            hit = Detection(
+                detection_type="JinjaVulnerability",
                 message="Tainted input passed to sink in the jinja template",
                 score=100,
                 line_no=lineno,

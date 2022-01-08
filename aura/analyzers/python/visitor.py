@@ -17,9 +17,9 @@ from ..detections import Detection
 from ...stack import CallGraph
 from .. import python_src_inspector
 from ...exceptions import ASTParseError
+from ...uri_handlers.base import ScanLocation
 from ... import python_executor
 from ... import config
-from ...type_definitions import ScanLocationType
 
 
 INSPECTOR_PATH = os.path.abspath(python_src_inspector.__file__)
@@ -43,7 +43,7 @@ def ignore_error(func):
     return wrapper
 
 
-def get_ast_tree(location: Union[ScanLocationType, bytes], metadata=None) -> dict:
+def get_ast_tree(location: Union[ScanLocation, bytes], metadata=None) -> dict:
     if type(location) == bytes:
         kwargs = {
             "command": [INSPECTOR_PATH, "-"],
@@ -55,7 +55,7 @@ def get_ast_tree(location: Union[ScanLocationType, bytes], metadata=None) -> dic
         }
 
     if metadata is None:
-        if isinstance(location, ScanLocationType):
+        if isinstance(location, ScanLocation):
             metadata = location.metadata
         else:
             metadata = {}
@@ -84,8 +84,8 @@ class Visitor:
 
     stage_name : Optional[str] = None
 
-    def __init__(self, *, location: ScanLocationType):
-        self.location: ScanLocationType = location
+    def __init__(self, *, location: ScanLocation):
+        self.location: ScanLocation = location
         self.tree : Optional[NodeType] = None
         self.traversed = False
         self.modified = False
@@ -110,7 +110,7 @@ class Visitor:
         return obj
 
     @classmethod
-    def run_stages(cls, *, location: ScanLocationType, stages: Optional[Tuple[str, ...]]=None, ast_tree=None) -> Visitor:
+    def run_stages(cls, *, location: ScanLocation, stages: Optional[Tuple[str, ...]]=None, ast_tree=None) -> Visitor:
         if not stages:
             stages = config.get_ast_stages()
 
