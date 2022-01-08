@@ -103,6 +103,33 @@ class PostgresScanOutput(PGBase, ScanOutputBase):
             )
         """
 
+        TAGS_SCHEMA = """
+            CREATE TABLE IF NOT EXISTS tags (
+                id BIGSERIAL PRIMARY KEY,
+                tag varchar(64) UNIQUE NOT NULL
+            )
+        """
+
+        SCAN_TAGS_SCHEMA = """
+            CREATE TABLE IF NOT EXISTS scan_tags (
+                scan_id bigint not null,
+                tag_id bigint not null,
+                FOREIGN KEY (scan_id) REFERENCES scans(id),
+                FOREIGN KEY (tag_id) REFERENCES tags(id),
+                PRIMARY KEY (scan_id, tag_id)
+            )
+        """
+
+        DETECTIONS_TAGS_SCHEMA = """
+            CREATE TABLE IF NOT EXISTS detection_tags (
+                detection_id bigint not null,
+                tag_id bigint not null,
+                FOREIGN KEY (detection_id) REFERENCES detections(id),
+                FOREIGN KEY (tag_id) REFERENCES tags(id),
+                PRIMARY KEY (detection_id, tag_id)
+            )
+        """
+
         DETECTION_FUNCS = (
             "CREATE INDEX IF NOT EXISTS tags ON detections USING GIN ((data->'tags') jsonb_path_ops)",
 
@@ -159,6 +186,9 @@ class PostgresScanOutput(PGBase, ScanOutputBase):
             cur.execute(SCAN_SCHEMA)
             cur.execute(LOCATION_SCHEMA)
             cur.execute(DETECTION_SCHEMA)
+            cur.execute(TAGS_SCHEMA)
+            cur.execute(SCAN_TAGS_SCHEMA)
+            cur.execute(DETECTIONS_TAGS_SCHEMA)
 
             for idx in DETECTION_FUNCS:
                 try:
@@ -170,6 +200,8 @@ class PostgresScanOutput(PGBase, ScanOutputBase):
 
     def output(self, scans: Sequence[ScanData]):
         with self.out_fd.cursor() as cur:
+            tag_ids = {}
+
             for scan in scans:
                 location_ids = {}
                 if not (ref_id:=scan.metadata.get("reference")):
@@ -196,6 +228,7 @@ class PostgresScanOutput(PGBase, ScanOutputBase):
                 ))
 
                 scan_id = cur.fetchone()[0]
+                all_tags = set()
 
                 for detection in scan.hits:
                     norm_path = detection.location
@@ -219,7 +252,10 @@ class PostgresScanOutput(PGBase, ScanOutputBase):
 
                     # TODO handle unique violation
                     cur.execute("""
-                        INSERT INTO detections (signature, score, type, data, scan_id, location_id) VALUES (%s, %s, %s, %s, %s, %s)
+                        INSERT INTO detections
+                        (signature, score, type, data, scan_id, location_id)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        RETURNING id
                     """, (
                         detection.int_signature,
                         detection.score,
@@ -228,6 +264,41 @@ class PostgresScanOutput(PGBase, ScanOutputBase):
                         scan_id,
                         location_id
                     ))
+                    detection_id = cur.fetchone()
+
+                    for tag in detection.tags:
+                        if tag not in tag_ids:
+                            cur.execute("""
+                                WITH ins AS (
+                                    INSERT INTO tags(tag)
+                                    VALUES(%s)
+                                    ON CONFLICT (tag) DO UPDATE
+                                    SET tag=NULL
+                                    WHERE FALSE -- never executes but locks the row
+                                    RETURNING id
+                                )
+                                SELECT id FROM ins
+                                UNION ALL
+                                SELECT id FROM tags
+                                WHERE tag=%s
+                                LIMIT 1
+                            """, (tag, tag))  # TODO use the while exec here
+                            tag_ids[tag] = cur.fetchone()
+
+                        cur.execute("""
+                            INSERT INTO detection_tags
+                            VALUES (%s, %s)
+                        """, (detection_id, tag_ids[tag]))
+
+                    all_tags |= set(detection.tags)
+
+                for tag in all_tags:
+                    cur.execute("""
+                        INSERT INTO scan_tags
+                        VALUES (%s, %s)
+                    """, (scan_id, tag_ids[tag]))
+
+
 
 
 def connection_opts_from_uri(uri: Union[urllib.parse.ParseResult, str]) -> dict:
@@ -280,3 +351,12 @@ def ingest_bandersnatch_log(log_path: str, pg_uri: str):
             for uri in parse_bandersnatch_log(Path(log_path)):
                 logger.info(f"Inserting URI into the scan queue: `{uri}`")
                 cur.execute("INSERT INTO pending_scans (uri, reference) VALUES (%s, %s)", (uri, str(uuid.uuid4())))
+
+
+def exec_while(cursor, fetch_func, stmt, vars):
+    row = None
+    while not row is None:
+        cursor.execute(stmt, vars)
+        row = fetch_func()
+
+    return row
