@@ -83,7 +83,8 @@ class Detection:
             "score": self.score,
             "type": self.name,
             "slug": self.slug,
-            "severity": get_severity(self)
+            "severity": get_severity(self),
+            "hash": self.int_signature
         }
 
         if self.tags:
