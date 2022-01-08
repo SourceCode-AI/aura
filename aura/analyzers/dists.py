@@ -1,6 +1,8 @@
 import base64
 import hashlib
 from importlib import metadata
+from typing import cast, Union
+from pathlib import Path
 
 from .detections import Detection
 from ..utils import Analyzer
@@ -10,8 +12,9 @@ from ..config import get_score_or_default
 from .. import sbom
 
 
-def get_checksum(alg: str, path: metadata.PackagePath) -> str:
+def get_checksum(alg: str, path: Union[metadata.PackagePath, Path]) -> str:
     h = hashlib.new(alg)
+    path = cast(Path, path)
     with path.open("rb") as fd:
         h.update(fd.read())
 
@@ -54,7 +57,10 @@ def analyze(*, location: ScanLocation) -> AnalyzerReturnType:
     existing_files = set()
 
     try:
-        dist_files = list(dist.files)
+        if not (dist_files:=dist.files):
+            dist_files = []
+        else:
+            dist_files = list(dist_files)
     except UnicodeDecodeError:
         yield Detection(
             detection_type="PythonDistribution",
@@ -66,7 +72,7 @@ def analyze(*, location: ScanLocation) -> AnalyzerReturnType:
         return
 
     for dist_file in dist_files:
-        fpath = dist_file.locate()
+        fpath = cast(Path, dist_file.locate())
         existing_files.add(fpath)
 
         if not fpath.exists():

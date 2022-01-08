@@ -145,6 +145,7 @@ crypto_gen_key = "aura.analyzers.python.crypto:CryptoGenKey"
 secrets = "aura.analyzers.python.secrets:SecretsAnalyzer"
 taint_analysis = "aura.analyzers.python.taint.base:TaintDetection"
 stats = "aura.analyzers.stats:analyze"
+non_ascii_characters = "aura.analyzers.python.unicode:NonAsciiCharacters"
 # Post analysis hooks
 directory_tree_stats = "aura.analyzers.stats:DirectoryTreeStats"
 behavioral_analysis = "aura.analyzers.behavioral:BehavioralAnalysis"

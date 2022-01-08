@@ -16,14 +16,14 @@ from .nodes import Context, ASTNode, NodeType
 from ..detections import Detection
 from ...stack import CallGraph
 from .. import python_src_inspector
-from ...uri_handlers.base import ScanLocation
 from ...exceptions import ASTParseError
+from ...uri_handlers.base import ScanLocation
 from ... import python_executor
 from ... import config
 
 
 INSPECTOR_PATH = os.path.abspath(python_src_inspector.__file__)
-VISITORS = None
+VISITORS: Optional[Dict[str, Visitor]] = None
 
 logger = config.get_logger(__name__)
 

@@ -12,20 +12,16 @@ from .visitor import Visitor
 from .. import base
 from ..detections import Detection
 from .nodes import Context, Taints, ASTNode, String
-from ...utils import Analyzer
+from ...bases import ASTAnalyzer
 from ... import config
 
 
 logger = config.get_logger(__name__)
 
 
-class JinjaVulnerability(Detection):
-    pass
-
-
-@Analyzer.ID("jinja")
-class JinjaAnalyzer(base.NodeAnalyzerV2):
+class JinjaAnalyzer(base.NodeAnalyzerV2, ASTAnalyzer):
     """Analyze Jinja specific vulnerabilities such as XSS"""
+    analyzer_id = "jinja"
 
     def node_Call(self, context):
         yield from self.__analyze_jinja_template(context)
@@ -42,7 +38,8 @@ class JinjaAnalyzer(base.NodeAnalyzerV2):
             return
 
         if signature.arguments.get("autoescape", True) is False:
-            hit = JinjaVulnerability(
+            hit = Detection(
+                detection_type="JinjaVulnerability",
                 message="Detected jinja environment with autoescaping explicitly disabled",
                 score=100,
                 line_no=context.node.line_no,
@@ -68,7 +65,7 @@ class JinjaAnalyzer(base.NodeAnalyzerV2):
             taints[name] = kw._taint_class
 
         if len(context.node.args) == 0 or type(context.node.args[0]) not in (String, str):
-            logger.warn(f"Unable to determine jinja template location for template located in '{context.visitor.normalized_path}'#{context.node.line_no}")
+            logger.warning(f"Unable to determine jinja template location for template located in '{context.visitor.normalized_path}'#{context.node.line_no}")
             return
 
         tpl_name = str(context.node.args[0])
@@ -147,7 +144,7 @@ class JinjaTemplateVisitor(Visitor):
         # Check if it is an AST node in the Jinja template
         if isinstance(context.node, jnodes.Node):
             new_node = NodeWrapper(jinja_node=context.node)
-            context.replace(new_node)
+            context.replace(new_node)  # type: ignore[call-arg]
             return
 
         # Now, process only wrapped nodes
@@ -193,7 +190,8 @@ class JinjaTemplateVisitor(Visitor):
         ):
             lineno = context.node.jinja_node.lineno
 
-            hit = JinjaVulnerability(
+            hit = Detection(
+                detection_type="JinjaVulnerability",
                 message="Tainted input passed to sink in the jinja template",
                 score=100,
                 line_no=lineno,

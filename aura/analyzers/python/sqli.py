@@ -3,7 +3,7 @@ import re
 from .. import base
 from ..detections import Detection
 from .nodes import *
-from ...utils import Analyzer
+from ...bases import ASTAnalyzer
 
 
 SQL_REGEX = re.compile(
@@ -19,9 +19,9 @@ def is_sql(data):
     return bool(SQL_REGEX.match(data))
 
 
-@Analyzer.ID("sql_injection")
-class SQLi(base.NodeAnalyzerV2):
+class SQLi(base.NodeAnalyzerV2, ASTAnalyzer):
     """Finds possible SQL injections via direct string manipulations"""
+    analyzer_id = "sql_injection"
 
     def node_BinOp(self, context):
         """

@@ -7,7 +7,7 @@ from typing import cast
 from .nodes import *
 from .. import base
 from ..detections import Detection
-from ...utils import Analyzer
+from ...bases import ASTAnalyzer
 
 # Key generation functions to lookup
 CRYPTO_GEN_KEYS = {
@@ -37,9 +37,9 @@ CRYPTO_GEN_KEYS = {
 MIN_KEY_SIZES = {"rsa": 2048, "dsa": 2048}
 
 
-@Analyzer.ID("cryptography_generate_keys")
-class CryptoGenKey(base.NodeAnalyzerV2):
+class CryptoGenKey(base.NodeAnalyzerV2, ASTAnalyzer):
     """Analyze the generation of cryptography keys"""
+    analyzer_id = "cryptography_generate_keys"
 
     def node_Call(self, context: Context):
         node = cast(Call, context.node)

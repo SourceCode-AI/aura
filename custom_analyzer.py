@@ -1,12 +1,11 @@
 from aura.analyzers import base
-from aura.utils import Analyzer
+from aura.bases import ASTAnalyzer
 from aura.analyzers.detections import Detection
 
 
-# A unique ID is required to identify the analyzer
-@Analyzer.ID('custom_analyzer')
-class CustomAnalyzer(base.NodeAnalyzerV2):
+class CustomAnalyzer(base.NodeAnalyzerV2, ASTAnalyzer):
     """Some description, this is automatically displayed when running aura info"""
+    analyzer_id = "custom_analyzer"
 
     # Hook to a specific type of a node
     def node_String(self, context):

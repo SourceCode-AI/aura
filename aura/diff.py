@@ -113,10 +113,10 @@ class Diff():
             })
 
         if self.new_detections:
-            d["new_detections"] = [x._asdict() for x in self.new_detections]
+            d["new_detections"] = [x.to_dict() for x in self.new_detections]
 
         if self.removed_detections:
-            d["removed_detections"] = [x._asdict() for x in self.removed_detections]
+            d["removed_detections"] = [x.to_dict() for x in self.removed_detections]
 
         return d
 

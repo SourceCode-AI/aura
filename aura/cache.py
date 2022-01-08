@@ -169,8 +169,10 @@ class Cache(ABC):
         self.metadata_location.write_text(dumps(self.metadata))
 
     def delete(self):
-        self.cache_file_location.unlink(missing_ok=True)
-        self.metadata_location.unlink(missing_ok=True)
+        if self.cache_file_location:
+            self.cache_file_location.unlink(missing_ok=True)
+        if self.metadata_location:
+            self.metadata_location.unlink(missing_ok=True)
 
 
 class URLCache(Cache):

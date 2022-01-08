@@ -18,10 +18,14 @@ from .uri_handlers.base import URIHandler
 from . import github
 from . import plugins
 from . import config
+from .bases import AbstractAnalyzer
 from .json_proxy import loads
 
 
 def get_analyzer_description(analyzer) -> str:
+    if isinstance(analyzer, AbstractAnalyzer):
+        return analyzer.description
+
     doc = getattr(analyzer, "analyzer_description", None)
     if not doc:
         doc = inspect.getdoc(analyzer) or "Description N/A"

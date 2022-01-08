@@ -1,4 +1,5 @@
-from aura.analyzers.base import NodeAnalyzerV2, Analyzer
+from aura.analyzers.base import NodeAnalyzerV2
+from aura.utils import Analyzer
 from aura.analyzers.detections import Detection
 
 

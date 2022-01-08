@@ -529,7 +529,7 @@ class List(ASTNode):
 
 @dataclass
 class Var(ASTNode):
-    var_name: str
+    var_name: typing.Union[str, NodeType]
     value: typing.Union[NodeType, None] = None
     var_type: str = "assign"
     typing = None

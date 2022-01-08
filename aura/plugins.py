@@ -6,7 +6,7 @@ from typing import List, Optional
 import pkg_resources
 
 from . import exceptions
-from .type_definitions import AnalyzerType, ScanLocation
+from .type_definitions import AnalyzerType, ScanLocationType
 from .analyzers.base import NodeAnalyzerV2, PostAnalysisHook
 from .analyzers.detections import Detection
 from .analyzers.python.visitor import Visitor
@@ -135,7 +135,7 @@ def get_analyzers(names: Optional[List[str]]=None) -> List[AnalyzerType]:
 def get_analyzer_group(names: Optional[List[str]]):
     analyzers = get_analyzers(names)
 
-    def _run_analyzers(location: ScanLocation):
+    def _run_analyzers(location: ScanLocationType):
         ast_analysis = False
         for x in analyzers:
             if isinstance(x, NodeAnalyzerV2):

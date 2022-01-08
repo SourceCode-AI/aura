@@ -1,27 +1,30 @@
 from __future__ import annotations
 
-from typing  import Union, Set, Optional, Dict, cast
+import zlib
+from typing  import Union, Set, Optional, cast, TYPE_CHECKING
 from pathlib import Path
 from dataclasses import dataclass, field
 from functools import total_ordering
 
 from .. import config
+
+from ..bases import JSONSerializable
 from ..utils import normalize_path
 from .python.nodes import NodeType, ASTNode
 
+if TYPE_CHECKING:
+    from ..uri_handlers.base import ScanLocation
 
 try:
     import xxhash
-    zlib = None
 except ImportError:
     xxhash = None
-    import zlib
 
 
 
 @dataclass
 @total_ordering
-class Detection:
+class Detection(JSONSerializable):
     """
     Base for analyzers to produce detections from audit scans that are reported back to the Aura framework
     Subclass this to have different hits on semantic level
@@ -58,19 +61,19 @@ class Detection:
     extra: dict = field(default_factory=dict)
     informational: bool = False
     location: Optional[Union[Path, str]] = None
-    scan_location = None
+    scan_location: Optional[ScanLocation] = None
     _metadata: Optional[dict] = None
 
     def __post_init__(self):
         self._hash = None
         self._diff_hash = None
         self._severity = None
-        self._sigint: Optional[None] = None
+        self._sigint: Optional[int] = None
 
         if self.node and self.line_no is None:
             self.line_no = self.node.line_no
 
-    def _asdict(self) -> Dict:
+    def to_dict(self) -> dict:
         """
         Exporting mechanism for JSON output/machine processing
         Define fields to be exported here, subclass need to fetch the fields from their parent in this method
@@ -143,7 +146,7 @@ class Detection:
 
     @property
     def int_signature(self) -> int:
-        if not self._sigint:
+        if self._sigint is None:
             if xxhash:
                 self._sigint = xxhash.xxh32_intdigest(self.signature)
             else:

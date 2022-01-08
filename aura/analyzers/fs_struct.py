@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Analyzer for FileSystem structure
-from typing import Iterable
+from typing import Iterable, Optional
 
 from .detections import Detection
 from ..utils import Analyzer
@@ -10,7 +10,7 @@ from ..pattern_matching import FilePatternMatcher
 from .. import config
 
 
-FILE_PATTERNS = None
+FILE_PATTERNS: Optional[Iterable[FilePatternMatcher]] = None
 
 
 def get_file_patterns() -> Iterable[FilePatternMatcher]:

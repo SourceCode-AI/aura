@@ -4,12 +4,12 @@ from typing import Optional, cast
 from ..nodes import Taints, ASTNode, TaintLog, Context, NodeType, ReturnStmt
 from ...base import NodeAnalyzerV2
 from ...detections import Detection
-from ....utils import Analyzer
+from ....bases import ASTAnalyzer
 
 
-@Analyzer.ID("taint_analysis")
-class TaintDetection(NodeAnalyzerV2):
+class TaintDetection(NodeAnalyzerV2, ASTAnalyzer):
     """Analyze propagation of tainted data into sinks"""
+    analyzer_id = "taint_analysis"
 
     def __generate_hit(self, context) -> Detection:
         log = TaintLog.extract_log(context.node)

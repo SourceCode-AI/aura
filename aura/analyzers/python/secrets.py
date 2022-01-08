@@ -4,7 +4,7 @@ from urllib.parse import urlparse, parse_qs
 from .nodes import *
 from .. import base
 from ..detections import Detection
-from ...utils import Analyzer
+from ...bases import ASTAnalyzer
 
 
 URL_REGEX = re.compile(r"^(https?|ftp)://.{5,}\?.{3,}")
@@ -12,9 +12,9 @@ SECRET_REGEX = re.compile(r".*(pass(wd|word)?|pwd|token|secrete?).*")  # Be able
 TOKEN_FILTER_REGEX = re.compile(r"[a-z\d_\.-]{8,}", flags=re.IGNORECASE)
 
 
-@Analyzer.ID("secrets")
-class SecretsAnalyzer(base.NodeAnalyzerV2):
+class SecretsAnalyzer(base.NodeAnalyzerV2, ASTAnalyzer):
     """Look for leaking secrets such as passwords or API tokens"""
+    analyzer_id = "secrets"
 
     def node_Var(self, context):
         name = str(context.node.var_name)

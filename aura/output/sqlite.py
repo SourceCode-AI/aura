@@ -116,7 +116,7 @@ class SQLiteScanOutput(DiffBase, ScanOutputBase):
                     norm_path = h.location
                     location_meta = h._metadata
                     full_path = str(location_meta["path"])
-                    detection = h._asdict()
+                    detection = h.to_json()
 
                     if norm_path in location_ids:
                         location_id = location_ids[norm_path]
@@ -222,7 +222,7 @@ class SQLiteDiffOutput(DiffBase, DiffOutputBase):
             detection.signature,
             detection.score,
             detection.name,
-            json.dumps(detection._asdict(), default=json_encoder),
+            json.dumps(detection.to_json(), default=json_encoder),
             diff_id
         ])
 

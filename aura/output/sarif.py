@@ -49,7 +49,7 @@ class SARIFOutput(JSONScanOutput):
                     artifact = self._convert_to_artifact(detection)
                     locations[uri] = artifact
 
-                d = detection._asdict()
+                d = detection.to_json()
                 level = d["severity"]
                 level = LEVEL_MAP.get(level, level)
 

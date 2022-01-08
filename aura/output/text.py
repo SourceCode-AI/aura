@@ -6,7 +6,7 @@ from shutil import get_terminal_size
 from dataclasses import dataclass
 from textwrap import wrap
 from prettyprinter import pformat
-from typing import Optional, Any, Sequence
+from typing import Optional, Any, Sequence, Union, List
 from collections import Counter
 
 from click import secho, style
@@ -157,7 +157,7 @@ class PrettyReport:
         self.print_top_separator()
 
         titles = [t.metadata.get("title", "N/A") for t in tables]
-        tparts = [tuple(self.generate_heading(title, width=w, left="", right="") for w, title in zip(table_widths, titles))]
+        tparts: List[Union[tuple, list]] = [tuple(self.generate_heading(title, width=w, left="", right="") for w, title in zip(table_widths, titles))]
 
         for idx, rows in enumerate(itertools.zip_longest(*tables, fillvalue="")):
 
@@ -263,10 +263,10 @@ class TextBase:
         for x in items:
             parts = x.split(".")
             current = root
-            for x in parts:
-                if x not in current:
-                    current[x] = {}
-                current = current[x]
+            for part in parts:
+                if part not in current:
+                    current[part] = {}
+                current = current[part]
 
         return root
 
@@ -351,7 +351,7 @@ class TextScanOutput(TextBase, ScanOutputBase):
             self._formatter.print_heading("Code detections")
             for h in hits:
                 self._formatter.print_thick_separator()
-                self._format_detection(h._asdict(), top_separator=False, bottom_separator=False)
+                self._format_detection(h.to_json(), top_separator=False, bottom_separator=False)
         else:
             self._formatter.print_heading(style("No code detections has been triggered", fg="bright_green"))
 
@@ -506,7 +506,7 @@ class TextDiffOutput(TextBase, DiffOutputBase):
                 out.print_heading(style("Removed detections for this file", fg="bright_yellow"))
                 for x in diff.removed_detections:
                     out.print_separator()
-                    x = x._asdict()
+                    x = x.to_json()
                     header = style(f"Removed: '{x['type']}'", fg="green", bold=True)
                     self._format_detection(x, header=header, bottom_separator=False, top_separator=False)
 
@@ -514,7 +514,7 @@ class TextDiffOutput(TextBase, DiffOutputBase):
                 out.print_heading(style("New detections for this file", fg="bright_red"))
                 for x in diff.new_detections:
                     out.print_separator()
-                    x = x._asdict()
+                    x = x.to_json()
                     header = style(f"Added: '{x['type']}'", fg="red", bold=True)
                     self._format_detection(x, header=header, bottom_separator=False, top_separator=False)
 

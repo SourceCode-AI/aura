@@ -207,7 +207,7 @@ class PostgresScanOutput(PGBase, ScanOutputBase):
                 if not (ref_id:=scan.metadata.get("reference")):
                     ref_id = str(uuid.uuid4())
 
-                scan_data = scan.as_dict()
+                scan_data = scan.to_json()
                 scan_metadata = scan_data.pop("metadata", {})
 
                 cur.execute("""
