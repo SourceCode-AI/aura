@@ -22,10 +22,7 @@ class ServerWorker:
             raise PluginDisabled("Postgres plugin is not enabled in aura, check the documentation")
 
         self.pg_uri = pg_uri
-
         self.db_session = postgres.get_session(pg_uri)
-
-        self.conn = psycopg2.connect(**postgres.connection_opts_from_uri(pg_uri))
         self.executor = futures.ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="aura_server_worker")
         self.tasks = {}
         self.worker_func = worker_func

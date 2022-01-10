@@ -9,51 +9,40 @@ from pathlib import Path
 
 import packaging.utils
 
-from sqlalchemy import (
-    BIGINT, Column, VARCHAR, TIMESTAMP, INTEGER, SMALLINT, TEXT,
-    ForeignKey, UniqueConstraint, DDL,
-    create_engine, text as sql_text, event
-)
-from sqlalchemy.dialects.postgresql import TSVECTOR, JSONB, UUID
-from sqlalchemy.orm import scoped_session, sessionmaker, relationship
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.ext.hybrid import hybrid_property
-from sqlalchemy.types import TypeEngine
-
-
 from .base import ScanOutputBase
 from ..scan_data import ScanData
 from ..json_proxy import dumps, loads
 from ..exceptions import InvalidOutput, PluginDisabled
 
 try:
-    import psycopg2
-    import psycopg2.extras
-    from psycopg2.errors import UniqueViolation, DuplicateObject
+    import sqlalchemy as sa
+    from sqlalchemy import event
+    from sqlalchemy.dialects.postgresql import TSVECTOR, JSONB, UUID
+    from sqlalchemy.orm import scoped_session, sessionmaker, relationship
+    from sqlalchemy.ext.declarative import declarative_base
+    from sqlalchemy.ext.hybrid import hybrid_property
+    from sqlalchemy.types import TypeEngine
 except ImportError:
-    raise PluginDisabled("`psycopg2` library is not installed")
+    raise PluginDisabled("`SQLAlchemy` library is not installed")
+
 
 logger = logging.getLogger(__name__)
-psycopg2.extras.register_uuid()
-
-
-
 Base = declarative_base()
 
 
 class ScanModel(Base):
     __tablename__ = "scans"
 
-    id = Column(BIGINT, primary_key=True)
-    input = Column(VARCHAR(255), nullable=False)
-    reference = Column(UUID, nullable=False, unique=True)
-    scan_data = Column(JSONB, nullable=False)
-    metadata_col = Column("metadata", JSONB, nullable=False)
-    scan_score = Column("score", INTEGER, nullable=False, default=0)
-    created = Column(TIMESTAMP, default=datetime.datetime.utcnow)
-    package = Column(VARCHAR(255))
-    package_release = Column(VARCHAR(64))
-    pkg_filename = Column(VARCHAR(255))
+    id = sa.Column(sa.BIGINT, primary_key=True)
+    input = sa.Column(sa.VARCHAR(255), nullable=False)
+    reference = sa.Column(UUID, nullable=False, unique=True)
+    scan_data = sa.Column(JSONB, nullable=False)
+    metadata_col = sa.Column("metadata", JSONB, nullable=False)
+    scan_score = sa.Column("score", sa.INTEGER, nullable=False, default=0)
+    created = sa.Column(sa.TIMESTAMP, default=datetime.datetime.utcnow)
+    package = sa.Column(sa.VARCHAR(255))
+    package_release = sa.Column(sa.VARCHAR(64))
+    pkg_filename = sa.Column(sa.VARCHAR(255))
 
     detections = relationship("DetectionModel", backref="scan")
 
@@ -65,39 +54,39 @@ class ScanModel(Base):
 class DetectionModel(Base):
     __tablename__ = "detections"
 
-    id = Column(BIGINT, primary_key=True)
-    signature = Column(BIGINT, nullable=False)
-    score = Column(INTEGER, default=0, nullable=False)
-    slug = Column(VARCHAR(64), nullable=False)
-    data = Column(JSONB, nullable=False)
-    scan_id = Column(BIGINT, ForeignKey("scans.id"), nullable=False)
-    location_id = Column(BIGINT, nullable=False)
-    idx_vector = Column(TSVECTOR, nullable=True)
+    id = sa.Column(sa.BIGINT, primary_key=True)
+    signature = sa.Column(sa.BIGINT, nullable=False)
+    score = sa.Column(sa.INTEGER, default=0, nullable=False)
+    slug = sa.Column(sa.VARCHAR(64), nullable=False)
+    data = sa.Column(JSONB, nullable=False)
+    scan_id = sa.Column(sa.BIGINT, sa.ForeignKey("scans.id"), nullable=False)
+    location_id = sa.Column(sa.BIGINT, nullable=False)
+    idx_vector = sa.Column(TSVECTOR, nullable=True)
 
     __table_args__ = (
-        UniqueConstraint("location_id", "signature"),
+        sa.UniqueConstraint("location_id", "signature"),
     )
 
 
 class LocationModel(Base):
     __tablename__ = "locations"
 
-    id = Column(BIGINT, primary_key=True)
-    name = Column(VARCHAR(255), nullable=False)
-    scan_id = Column(BIGINT, ForeignKey("scans.id"), nullable=False)
-    metadata_col = Column("metadata", JSONB, nullable=False)
-    idx_path = Column(TSVECTOR, nullable=True)
+    id = sa.Column(sa.BIGINT, primary_key=True)
+    name = sa.Column(sa.VARCHAR(255), nullable=False)
+    scan_id = sa.Column(sa.BIGINT, sa.ForeignKey("scans.id"), nullable=False)
+    metadata_col = sa.Column("metadata", JSONB, nullable=False)
+    idx_path = sa.Column(TSVECTOR, nullable=True)
 
     __table_args__ = (
-        UniqueConstraint("name", "scan_id"),
+        sa.UniqueConstraint("name", "scan_id"),
     )
 
 
 class TagsModel(Base):
     __tablename__ = "tags"
 
-    id = Column(BIGINT, primary_key=True)
-    tag = Column(VARCHAR(64), unique=True, nullable=False)
+    id = sa.Column(sa.BIGINT, primary_key=True)
+    tag = sa.Column(sa.VARCHAR(64), unique=True, nullable=False)
 
     scans = relationship(
         "ScanModel", secondary="scan_tags",
@@ -116,24 +105,24 @@ class TagsModel(Base):
 class ScanTagsModel(Base):
     __tablename__ = "scan_tags"
 
-    scan_id = Column(BIGINT, ForeignKey("scans.id"), nullable=False, primary_key=True)
-    tag_id = Column(BIGINT, ForeignKey("tags.id"), nullable=False, primary_key=True)
+    scan_id = sa.Column(sa.BIGINT, sa.ForeignKey("scans.id"), nullable=False, primary_key=True)
+    tag_id = sa.Column(sa.BIGINT, sa.ForeignKey("tags.id"), nullable=False, primary_key=True)
 
 
 class DetectionTagsModel(Base):
     __tablename__ = "detection_tags"
 
-    detection_id = Column(BIGINT, ForeignKey("detections.id"), nullable=False, primary_key=True)
-    tag_id = Column(BIGINT, ForeignKey("tags.id"), nullable=False, primary_key=True)
+    detection_id = sa.Column(sa.BIGINT, sa.ForeignKey("detections.id"), nullable=False, primary_key=True)
+    tag_id = sa.Column(sa.BIGINT, sa.ForeignKey("tags.id"), nullable=False, primary_key=True)
 
 
 class BehavioralIndicator(Base):
     __tablename__ = "indicators"
 
-    id = Column(BIGINT, primary_key=True)
-    slug = Column(VARCHAR(64), nullable=False, unique=True)
-    name = Column(VARCHAR(255), nullable=False, unique=True)
-    description = Column(TEXT, nullable=False)
+    id = sa.Column(sa.BIGINT, primary_key=True)
+    slug = sa.Column(sa.VARCHAR(64), nullable=False, unique=True)
+    name = sa.Column(sa.VARCHAR(255), nullable=False, unique=True)
+    description = sa.Column(sa.TEXT, nullable=False)
 
     @hybrid_property
     def indicator_id(self) -> int:
@@ -143,25 +132,25 @@ class BehavioralIndicator(Base):
 class ScanIndicators(Base):
     __tablename__ = "scan_indicators"
 
-    scan_id = Column(BIGINT, ForeignKey("scans.id"), nullable=False, primary_key=True)
-    indicator_id = Column(BIGINT, ForeignKey("indicators.id"), nullable=False, primary_key=True)
+    scan_id = sa.Column(sa.BIGINT, sa.ForeignKey("scans.id"), nullable=False, primary_key=True)
+    indicator_id = sa.Column(sa.BIGINT, sa.ForeignKey("indicators.id"), nullable=False, primary_key=True)
 
 
 class PendingScans(Base):
     __tablename__ = "pending_scans"
 
-    queue_id = Column(BIGINT, primary_key=True)
-    created = Column(TIMESTAMP, default=datetime.datetime.utcnow, nullable=False)
-    updated = Column(TIMESTAMP, default=datetime.datetime.utcnow, nullable=False)
-    status = Column(SMALLINT, default=0, nullable=False)
-    uri = Column(VARCHAR(255), nullable=False)
-    reference = Column(UUID, default=lambda: str(uuid.uuid4()))
+    queue_id = sa.Column(sa.BIGINT, primary_key=True)
+    created = sa.Column(sa.TIMESTAMP, default=datetime.datetime.utcnow, nullable=False)
+    updated = sa.Column(sa.TIMESTAMP, default=datetime.datetime.utcnow, nullable=False)
+    status = sa.Column(sa.SMALLINT, default=0, nullable=False)
+    uri = sa.Column(sa.VARCHAR(255), nullable=False)
+    reference = sa.Column(UUID, default=lambda: str(uuid.uuid4()))
 
 
-event.listen(
+sa.event.listen(
     DetectionModel.__table__,
     "after_create",
-    DDL("""
+    sa.DDL("""
         CREATE OR REPLACE FUNCTION index_detection()
         RETURNS TRIGGER
         AS $$
@@ -172,10 +161,10 @@ event.listen(
     """)
 )
 
-event.listen(
+sa.event.listen(
     DetectionModel.__table__,
     "after_create",
-    DDL("""
+    sa.DDL("""
         CREATE TRIGGER  set_detection_index
         BEFORE INSERT OR UPDATE ON detections
         FOR EACH ROW
@@ -183,16 +172,16 @@ event.listen(
     """)
 )
 
-event.listen(
+sa.event.listen(
     DetectionModel.__table__,
     "after_create",
-    DDL("CREATE INDEX detections_text_idx ON detections USING GIN (idx_vector)")
+    sa.DDL("CREATE INDEX detections_text_idx ON detections USING GIN (idx_vector)")
 )
 
-event.listen(
+sa.event.listen(
     LocationModel.__table__,
     "after_create",
-    DDL("""
+    sa.DDL("""
         CREATE OR REPLACE FUNCTION index_filepath()
         RETURNS TRIGGER
         AS $$
@@ -203,10 +192,10 @@ event.listen(
     """)
 )
 
-event.listen(
+sa.event.listen(
     LocationModel.__table__,
     "after_create",
-    DDL("""
+    sa.DDL("""
         CREATE TRIGGER set_filepath_index
         BEFORE INSERT OR UPDATE ON locations
         FOR EACH ROW
@@ -214,12 +203,11 @@ event.listen(
     """)
 )
 
-event.listen(
+sa.event.listen(
     LocationModel.__table__,
     "after_create",
-    DDL("CREATE INDEX filepaths_text_idx ON locations USING GIN (idx_path)")
+    sa.DDL("CREATE INDEX filepaths_text_idx ON locations USING GIN (idx_path)")
 )
-
 
 
 @dataclass
@@ -382,38 +370,12 @@ class PostgresScanOutput(PGBase, ScanOutputBase):
                     ))
 
 
-def connection_opts_from_uri(uri: Union[urllib.parse.ParseResult, str]) -> dict:
-    if type(uri) == str:
-        uri = urllib.parse.urlparse(uri)
-
-    conn_options = {
-        "host": uri.hostname,
-        "port": (uri.port or 5432)
-    }
-
-    if (dbname := uri.path.lstrip("/")):
-        if "/" in dbname:
-            raise InvalidOutput(f"Database name `{dbname}` can't contain `/` slashes")
-    else:
-        dbname = "aura"
-
-    conn_options["dbname"] = dbname
-
-    if uri.username:
-        conn_options["user"] = uri.username
-
-    if uri.password:
-        conn_options["password"] = uri.password
-
-    return conn_options
-
-
 def get_engine(uri: Union[urllib.parse.ParseResult, str]) -> TypeEngine:
     if type(uri) == str:
         uri = urllib.parse.urlparse(uri)
 
     # TODO: change the hook name in package setup to postgresql to avoid this
-    return create_engine(
+    return sa.create_engine(
         urllib.parse.urlunparse(("postgresql",) + tuple(uri)[1:]),
         json_serializer=sanitize_json,
         json_deserializer=loads
