@@ -22,6 +22,9 @@ class ServerWorker:
             raise PluginDisabled("Postgres plugin is not enabled in aura, check the documentation")
 
         self.pg_uri = pg_uri
+
+        self.db_session = postgres.get_session(pg_uri)
+
         self.conn = psycopg2.connect(**postgres.connection_opts_from_uri(pg_uri))
         self.executor = futures.ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="aura_server_worker")
         self.tasks = {}
@@ -29,25 +32,24 @@ class ServerWorker:
         self.max_workers = max_workers
 
     def fetch_task(self) -> Optional[dict]:
-        with self.conn.cursor() as cur:
-            cur.execute("""
+        with self.db_session.begin():
+            row = self.db_session.execute(postgres.sql_text("""
             UPDATE pending_scans
             SET status=1, updated=(now() at time zone 'utc')
-            WHERE scan_id = (
-                    SELECT scan_id
+            WHERE queue_id = (
+                    SELECT queue_id
                     FROM pending_scans
                     WHERE status = 0
                     ORDER BY updated DESC
                     LIMIT 1
                     FOR UPDATE SKIP LOCKED
                 )
-            RETURNING scan_id, uri, reference;
-            """)
-            row = cur.fetchone()
+            RETURNING queue_id, uri, reference;
+            """)).fetchone()
             if not row:
                 return
             else:
-                self.conn.commit()
+                self.db_session.commit()
                 return {"scan_id": row[0], "uri": row[1], "reference": row[2]}
 
     def loop(self):
@@ -71,11 +73,16 @@ class ServerWorker:
     def wait_for_tasks(self, when=futures.FIRST_COMPLETED):
         done, _ = futures.wait(self.tasks, return_when=when)
 
-        with self.conn.cursor() as cur:
+        with self.db_session():
             for f in done:
                 if not (scan_id:=self.tasks.get(f)):
                     continue
 
-                cur.execute("UPDATE pending_scans SET status=2 WHERE scan_id=%s", (scan_id,))
-                self.conn.commit()
+                self.db_session.execute(postgres.sql_text("""
+                    UPDATE pending_scans
+                    SET status=2
+                    WHERE queue_id=:scan_id
+                """), {"scan_id": scan_id})
+
+                self.db_session.commit()
                 del self.tasks[f]

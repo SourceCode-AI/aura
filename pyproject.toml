@@ -60,11 +60,11 @@ yara-python = {version = "~4.0.5", optional = true}
 networkx = {version = "~2.6", optional = true}
 python-rapidjson = { version = "~1.4", optional = true }
 psycopg2 = { version = "~2.9", optional = true }
+SQLAlchemy = { version = "~1.4", optional = true }
 xxhash = { version = "~2.0", optional = true }
-#pyarrow = { version = "~3.0", optional = true }
 
 [tool.poetry.extras]
-full = ["yara-python", "networkx", "cssselect", "GitPython", "python-rapidjson", "defusedxml", "jsonschema", "tomli", "psycopg2", "xxhash"]
+full = ["yara-python", "networkx", "cssselect", "GitPython", "python-rapidjson", "defusedxml", "jsonschema", "tomli", "psycopg2", "xxhash", "SQLAlchemy"]
 
 [tool.poetry.dev-dependencies]
 responses = "^0.13"
