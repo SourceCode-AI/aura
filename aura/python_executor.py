@@ -22,6 +22,7 @@ from .exceptions import PythonExecutorError
 
 LOGGER = config.get_logger(__name__)
 NATIVE_ENVIRONMENT_CACHE = None
+NATIVE_INTERPRETER_ENABLED = True
 
 
 def run_with_interpreters(*, metadata=None, **kwargs):
@@ -94,6 +95,9 @@ def execute_interpreter(*, command: List[str], interpreter: str, stdin=None, nat
     :return: json decoded stdout
     """
     if (interpreter == "native" or interpreter == sys.executable) and native_callback:
+        if not NATIVE_INTERPRETER_ENABLED:
+            raise PythonExecutorError(f"Native interpreter is disabled")
+
         try:
             return native_callback(command)
         except Exception as exc:
@@ -134,12 +138,17 @@ def get_native_source_code(command):
 
 
 def init_native_environment():
-    global NATIVE_ENVIRONMENT_CACHE
+    global NATIVE_ENVIRONMENT_CACHE, NATIVE_INTERPRETER_ENABLED
+
+    if sys.argv[0].split("/")[-1] == "uwsgi":
+        NATIVE_INTERPRETER_ENABLED = False
+
     try:
         NATIVE_ENVIRONMENT_CACHE = execute_interpreter(command=[python_src_inspector.__file__, '--environment-only'], interpreter=sys.executable)
     except PythonExecutorError as exc:
         LOGGER.exception("An error occurred when pre-caching data for the native python executor")
         LOGGER.info(f"STDERR output is: {exc.stderr}")
+        NATIVE_INTERPRETER_ENABLED = False
 
 
 init_native_environment()

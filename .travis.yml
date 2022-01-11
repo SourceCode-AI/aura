@@ -6,6 +6,9 @@ arch:
   - amd64
   - arm64
 
+install:
+  - echo "install disabled"
+
 services:
   - docker
 
