@@ -87,7 +87,6 @@ def test_damaged_tarfile(fixtures):
             "message": "Could not open the archive for analysis",
             "extra": {
                 "reason": "archive_read_error",
-                "exc_message": "file could not be opened successfully",
                 "mime": "application/gzip"
             }
         }
