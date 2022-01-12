@@ -41,38 +41,39 @@ packaging = "~20.9"
 python-magic = "~0.4.24"
 click = "~8.0"
 colorama = "~0.4.4"
-requests = "~2.25.1"
-tqdm = "~4.61"
-pytz = "~2021.1"
+requests = "~2.5"
+tqdm = "~4.62"
 "ruamel.yaml" = "~0.17"
 jinja2 = "~3.0"
 
 # TODO: make the following dependencies optional
 python-tlsh = "~3.17.0"
-prettyprinter = "~0.18.0"
+prettyprinter = "~0.18"
+chardet = "~4.0"
 
 # TODO: Extras, autodetect their presence in aura
 jsonschema = { version = "~3.2", optional = true }
 GitPython = { version = "~3.1", optional = true }
 defusedxml = { version = "~0.7", optional = true }
-tomli = { version = "~1.2", optional = true }
+tomli = { version = "~2.0", optional = true }
 yara-python = {version = "~4.0.5", optional = true}
 networkx = {version = "~2.6", optional = true}
-python-rapidjson = { version = "~1.4", optional = true }
+python-rapidjson = { version = "~1.5", optional = true }
 psycopg2 = { version = "~2.9", optional = true }
 SQLAlchemy = { version = "~1.4", optional = true, extras = ["mypy"] }
 xxhash = { version = "~2.0", optional = true }
+
 
 [tool.poetry.extras]
 full = ["yara-python", "networkx", "cssselect", "GitPython", "python-rapidjson", "defusedxml", "jsonschema", "tomli", "psycopg2", "xxhash", "SQLAlchemy"]
 
 [tool.poetry.dev-dependencies]
-responses = "^0.13"
+responses = "^0.17"
 tox = "~3.24"
 pytest = "~6.2"
-pytest-cov = "~2.12"
-pytest-randomly = "~3.8"
-sphinx = "~4.1"
+pytest-cov = "~3.0"
+pytest-randomly = "~3.11"
+sphinx = "~4.3"
 sphinxcontrib-mermaid = "~0.7"
 
 [tool.poetry.urls]

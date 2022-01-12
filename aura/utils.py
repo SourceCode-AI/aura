@@ -110,30 +110,30 @@ def download_file(url: str, fd: IO[bytes], session=None) -> None:
     if session is None:
         session = requests
 
-    with session.get(url, stream=True) as r:
-        content_length = r.headers.get('Content-length', None)
-        desc = "Downloading file"
+    r = session.get(url, stream=True)
+    content_length = r.headers.get('Content-length', None)
+    desc = "Downloading file"
 
-        if content_disposition := r.headers.get("content-disposition"):
-            fname = re.findall("filename=(.+)", content_disposition)[0]
-            desc = f"Downloading `{fname}`"
-        elif "." in (fname := urlparse(url).path.split("/")[-1]):  # Fallback method, attempt to parse the filename from URL
-            desc = f"Downloading `{fname}`"
+    if content_disposition := r.headers.get("content-disposition"):
+        fname = re.findall("filename=(.+)", content_disposition)[0]
+        desc = f"Downloading `{fname}`"
+    elif "." in (fname := urlparse(url).path.split("/")[-1]):  # Fallback method, attempt to parse the filename from URL
+        desc = f"Downloading `{fname}`"
 
-        pbar = tqdm.tqdm(
-            total=int(content_length) if content_length is not None else None,
-            unit="bytes",
-            unit_scale=True,
-            unit_divisor=1024,
-            desc=desc,
-            disable=config.PROGRESSBAR_DISABLED,
-        )
-        r.raw.read = partial(
-            _,
-            reader=r.raw.read,
-            pbar=pbar,
-        )
-        shutil.copyfileobj(r.raw, fd)  # https://stackoverflow.com/a/39217788
+    pbar = tqdm.tqdm(
+        total=int(content_length) if content_length is not None else None,
+        unit="bytes",
+        unit_scale=True,
+        unit_divisor=1024,
+        desc=desc,
+        disable=config.PROGRESSBAR_DISABLED,
+    )
+    r.raw.read = partial(
+        _,
+        reader=r.raw.read,
+        pbar=pbar,
+    )
+    shutil.copyfileobj(r.raw, fd)  # https://stackoverflow.com/a/39217788
     fd.flush()
     pbar.close()
 

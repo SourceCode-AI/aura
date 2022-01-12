@@ -13,7 +13,6 @@ from itertools import product
 from contextlib import contextmanager
 from typing import Optional, Generator, Tuple, List, Union
 
-import pytz
 import requests
 from packaging.version import Version, InvalidVersion
 from packaging.utils import canonicalize_name
@@ -332,7 +331,7 @@ class PackageScore:
         else:
             self.pkg = package
 
-        self.now = pytz.UTC.localize(datetime.datetime.utcnow())
+        self.now = datetime.datetime.utcnow()
         self.github: Optional[github.GitHub] = None
 
         if fetch_github:
