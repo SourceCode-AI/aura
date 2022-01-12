@@ -1,3 +1,4 @@
+import urllib.parse
 import uuid
 import os
 import datetime
@@ -9,6 +10,7 @@ import pytz
 import pytest
 
 from aura import package
+from aura.uri_handlers.base import URIHandler
 from aura import exceptions
 
 
@@ -37,30 +39,6 @@ def test_package_info(mock_pypi_rest_api):
     dep_names = [x.name for x in deps]
     assert "pytest" in dep_names
     assert "pytest-cov" in dep_names
-
-
-@responses.activate
-def test_package_retrieval(mock_pypi_rest_api):
-    mock_pypi_rest_api(responses)
-    pkg = package.PypiPackage.from_cached("wheel")
-    url = "https://files.pythonhosted.org/packages/8c/23/848298cccf8e40f5bbb59009b32848a4c38f4e7f3364297ab3c3e2e2cd14/wheel-0.34.2-py2.py3-none-any.whl"
-
-    assert pkg.name == "wheel"
-    assert pkg.source == "pypi"  # TODO: add tests for other package options
-
-    with pkg.url2local(url) as location:
-        assert location.is_file()
-        file_name = url.split("/")[-1]
-        assert location.name.endswith(file_name), (location, file_name)
-
-    with tempfile.TemporaryDirectory(prefix="aura_pytest_") as tmp:
-        downloaded = [x["filename"] for x in pkg.download_release(tmp, packagetype="all", release="0.34.2")]
-        content = os.listdir(tmp)
-
-    assert "wheel-0.34.2.tar.gz" in downloaded
-    assert "wheel-0.34.2.tar.gz" in content
-    assert "wheel-0.34.2-py2.py3-none-any.whl" in downloaded
-    assert "wheel-0.34.2-py2.py3-none-any.whl" in content
 
 
 @responses.activate
@@ -130,3 +108,40 @@ def test_package_diff_candidates(mock_pypi_rest_api):
     candidates = tuple(map(convert, requests.get_diff_candidates(requests2)))
     assert ('requests-2.16.0.tar.gz', 'requests2-2.16.0.tar.gz') in candidates
     assert ('requests-2.24.0.tar.gz', 'requests2-2.16.0.tar.gz') in candidates
+
+
+@pytest.mark.parametrize("uri,expected_metadata",(
+        (
+            "pypi://wheel?filename=wheel-0.33.0-py2.py3-none-any.whl&release=all",
+            {
+                "package_file": "wheel-0.33.0-py2.py3-none-any.whl",
+                "package_name": "wheel",
+                "package_release": "0.33.0",
+                "scheme": "pypi"
+            }
+        ),
+        (
+            "pypi://wheel?release=0.34.2",
+            {
+                "package_file": "wheel-0.34.2.tar.gz",
+                "package_name": "wheel",
+                "package_release": "0.34.2",
+                "scheme": "pypi"
+            }
+        ),
+))
+@responses.activate
+def test_correct_location_metadata(uri, expected_metadata, mock_pypi_rest_api, fuzzy_rule_match):
+    mock_pypi_rest_api(responses)
+    static_meta = {"test_key": "test_value"}
+
+    handler = URIHandler.from_uri(uri)
+    locations = tuple(handler.get_paths(metadata=static_meta.copy()))
+
+    import pprint
+    pprint.pprint(locations[0].metadata)
+
+    assert len(locations) == 1
+    assert fuzzy_rule_match(locations[0].metadata, expected_metadata)
+    assert fuzzy_rule_match(locations[0].metadata, static_meta)
+

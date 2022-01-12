@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Sequence
 
 from .json import JSONScanOutput
-from ..scan_data import ScanData, merge_scans
+from ..scan_data import ScanData
 from ..json_proxy import dumps
 from .. import __version__
 
@@ -21,7 +21,7 @@ class SARIFOutput(JSONScanOutput):
     def protocol(cls) -> str:
         return "sarif"
 
-    def output(self, scans: Sequence[ScanData]):
+    def output(self, scans: Sequence[ScanData], fd=None):
         tpl = {
             "version": "2.1.0",
             "$schema": "https://schemastore.azurewebsites.net/schemas/json/sarif-2.1.0-rtm.4.json",
@@ -95,7 +95,8 @@ class SARIFOutput(JSONScanOutput):
             run["artifacts"].extend(locations.values())
             tpl["runs"].append(run)
 
-        print(dumps(tpl), file=self.out_fd)
+        fd = fd or self.out_fd
+        print(dumps(tpl), file=fd)
 
     @staticmethod
     def _convert_to_artifact(detection) -> dict:

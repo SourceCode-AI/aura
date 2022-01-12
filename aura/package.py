@@ -6,11 +6,10 @@ import dataclasses
 import tempfile
 import shutil
 import difflib
-import xmlrpc.client
 from functools import partial
 from urllib.parse import urlparse, ParseResult
 from pathlib import Path
-from itertools import product, chain
+from itertools import product
 from contextlib import contextmanager
 from typing import Optional, Generator, Tuple, List, Union
 
@@ -71,13 +70,6 @@ class PypiPackage:
 
         return cls(name, *args, **kwargs)
 
-    @classmethod
-    def list_packages(cls):
-        repo = xmlrpc.client.ServerProxy(
-            "https://pypi.python.org/pypi", use_builtin_types=True
-        )
-        return list(repo.list_packages())
-
     def __contains__(self, item: str):
         return item in self.info["releases"].keys()
 
@@ -128,33 +120,8 @@ class PypiPackage:
                 all_deps.append(Requirement(req_line))
         return all_deps
 
-    def download_release(
-        self,
-        dest,
-        all=True,
-        filtered: Optional[List[ReleaseInfo]] = None,
-        **filters  # TODO: add tests for the filters
-    ):  # TODO: check if we can remove this method
-        dest = Path(dest)
-        files = []
-
-        if filtered and filters:
-            raise RuntimeError("You can't specify both pre-`filtered` list and filters")
-
-        filtered = filtered or self.filter_package_types(**filters)
-
-        if not all:
-            filtered = filtered[:1]
-
-        for url in filtered:
-            with open(dest / url["filename"], "wb") as fd:
-                cache.FileDownloadCache.proxy(url=url["url"], fd=fd)
-            files.append(url)
-
-        return files
-
     @contextmanager
-    def url2local(self, url: str) -> Generator[Path, None, None]:
+    def url2local(self, url: Union[str, ParseResult]) -> Generator[Path, None, None]:
         if not isinstance(url, ParseResult):
             url = urlparse(url)
 
@@ -190,7 +157,6 @@ class PypiPackage:
                 r["version"] = release
                 releases.append(r)
 
-        types = set(x.get("packagetype") for x in releases)
         filters = (
             partial(packagetype_filter, packagetype=packagetype),
             partial(filename_filter, filename=filename),
@@ -367,7 +333,7 @@ class PackageScore:
             self.pkg = package
 
         self.now = pytz.UTC.localize(datetime.datetime.utcnow())
-        self.github = None
+        self.github: Optional[github.GitHub] = None
 
         if fetch_github:
             try:
@@ -547,7 +513,7 @@ class PackageScore:
         return score_table
 
 
-def packagetype_filter(release: ReleaseInfo, packagetype: str="all") -> bool:
+def packagetype_filter(release: ReleaseInfo, packagetype: Optional[str]="all") -> bool:
     if packagetype is None:
         return True
     if packagetype == "all":
@@ -585,11 +551,8 @@ def get_reverse_dependencies(pkg_name: str) -> List[str]:
 
 
 def get_packages_for_author(author: str) -> List[Tuple[str, str]]:
-    repo = xmlrpc.client.ServerProxy(
-        "https://pypi.org/pypi", use_builtin_types=True
-    )
-    return list(repo.user_packages(author))
-
+    # TODO: find alternative or remove related code
+    raise RuntimeError(f"This functionality has been disabled due to upstream pypi XMLRC is no longer operational")
 
 def log_scale(metric: int, base=10) -> int:
     """
@@ -615,6 +578,9 @@ def sort_by_packagetype(pkg: ReleaseInfo) -> int:
 
 def sort_by_version(pkg: ReleaseInfo) -> Version:
     try:
-        return Version(pkg.get("release"))
+        if (ver:=pkg.get("release")):
+            return Version(ver)
     except (InvalidVersion, TypeError):
-        return Version("9"*10)
+        pass
+
+    return Version("9"*10)

@@ -3,7 +3,7 @@ from typing import Sequence
 
 from .base import ScanOutputBase, DiffOutputBase, TyposquattingOutputBase
 from .. import __version__
-from ..scan_data import ScanData, merge_scans
+from ..scan_data import ScanData
 from ..type_definitions import DiffType, DiffAnalyzerType
 from ..json_proxy import dumps
 

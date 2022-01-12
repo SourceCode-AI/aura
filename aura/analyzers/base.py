@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Generic
+from typing import List, Iterable
 
 from .python.readonly import ReadOnlyAnalyzer
 from .detections import Detection
@@ -19,11 +19,11 @@ class PostAnalysisHook:
     _hooks: List[PostAnalysisHook] = []
 
     @classmethod
-    def run_hooks(cls, detections: List[Detection], metadata: dict) -> List[Detection]:
+    def run_hooks(cls, detections: Iterable[Detection], metadata: dict) -> Iterable[Detection]:
         for hook in PostAnalysisHook._hooks:
             detections = hook.post_analysis(detections, metadata)
 
         return detections
 
-    def post_analysis(self, detections: List[Detection], metadata: dict) -> List[Detection]:
+    def post_analysis(self, detections: Iterable[Detection], metadata: dict) -> Iterable[Detection]:
         return detections

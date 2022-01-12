@@ -65,22 +65,3 @@ class ScanData(JSONSerializable):
             "version": __version__
         }
         return data
-
-
-# TODO: this is a fallback for the refactor of the new ScanData format for output formats
-#       existing code should be updated to not use this if possible
-def merge_scans(scans: Sequence[ScanData]) -> Tuple[dict, Set[Detection]]:
-    all_hits = set()
-
-    start = end = 0
-
-    for scan in scans:
-        start = min(scan.metadata["start_time"], start)
-        end = max(scan.metadata["end_time"], end)
-        all_hits |= set(scan.hits)
-
-    meta = scans[0].metadata.copy()
-    meta["start_time"] = start
-    meta["end_time"] = end
-
-    return (meta, all_hits)

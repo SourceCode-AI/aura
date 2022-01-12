@@ -4,6 +4,7 @@ import shutil
 import tempfile
 import pathlib
 import urllib.parse
+import typing as t
 from typing import Generator, Tuple, Optional, Dict, Any, List
 
 from packaging.utils import canonicalize_name
@@ -24,7 +25,7 @@ class PyPiHandler(URIHandler, PackageProvider):
     \n
     Examples:\n
     - pypi://requests\n
-    - pypi://simplejson?version=3.16.0
+    - pypi://simplejson?release=3.16.0
     """
 
     def __init__(self, uri: urllib.parse.ParseResult):
@@ -107,6 +108,7 @@ class PyPiHandler(URIHandler, PackageProvider):
 
             meta.update(self.metadata)
             meta["package_file"] = release["filename"]
+            meta["package_release"] = release["version"]
             meta.setdefault("package", {})["info"] = release
             meta["name"] = f"PyPI package {release['filename']}"
 
@@ -134,13 +136,11 @@ class PyPiHandler(URIHandler, PackageProvider):
             shutil.rmtree(self.opts["download_dir"])
 
 
-def parse_qs(query: str) -> dict:
-    q = {}
+def parse_qs(query: str) -> Dict[str, str]:
+    q: Dict[str, str] = {}
 
     for name, value in urllib.parse.parse_qs(query).items():
         if type(value) == list:
-            value = value[0]
-
-        q[name] = value
+            q[name] = value[0]
 
     return q

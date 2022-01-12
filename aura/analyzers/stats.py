@@ -1,5 +1,5 @@
 import re
-from typing import Optional, List, Dict, Union
+from typing import Optional, List, Dict, Union, Iterable
 
 from .base import PostAnalysisHook
 from ..uri_handlers.base import ScanLocation
@@ -49,7 +49,7 @@ class DirectoryTreeStats(PostAnalysisHook):
     def __init__(self):
         self.tree: Dict[str, Union[str, dict]] = {"children": {}}
 
-    def post_analysis(self, detections: List[Detection], metadata: dict) -> List[Detection]:
+    def post_analysis(self, detections: Iterable[Detection], metadata: dict) -> List[Detection]:
         size = 0
         files = 0
 

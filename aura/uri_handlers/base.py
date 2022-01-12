@@ -22,7 +22,7 @@ import pkg_resources
 import magic
 
 from .. import config
-from ..utils import KeepRefs, lookup_lines, lzset, jaccard, walk
+from ..utils import KeepRefs, lookup_lines, lzset, jaccard, walk, sanitize_uri
 from ..exceptions import PythonExecutorError, UnsupportedDiffLocation, FeatureDisabled
 from ..analyzers import find_imports
 from ..analyzers.detections import DataProcessing, get_severity
@@ -45,7 +45,7 @@ class URIHandler(ABC):
         self.uri = uri
 
     @classmethod
-    def is_supported(cls, parsed_uri):
+    def is_supported(cls, parsed_uri: urllib.parse.ParseResult) -> bool:
         return parsed_uri.scheme == cls.scheme
 
     @classmethod
@@ -90,8 +90,8 @@ class URIHandler(ABC):
             HANDLERS = handlers
         return HANDLERS
 
-    def __str__(self):
-        return urllib.parse.urlunparse(self.uri)
+    def __str__(self) -> str:
+        return sanitize_uri(self.uri)
 
     @property
     def metadata(self) -> dict:

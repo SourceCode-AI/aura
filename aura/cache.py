@@ -5,11 +5,12 @@ import shutil
 import hashlib
 import datetime
 import pickle
-import xmlrpc.client
 import concurrent.futures
+import typing as t
+from html.parser import HTMLParser
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional, List, Generator, Iterable, BinaryIO, Tuple, Set, Dict, Type
+from typing import Optional, List, Generator, Iterable, BinaryIO, Tuple, Set, Dict, Type, Union
 
 import click
 import requests
@@ -22,6 +23,23 @@ from .json_proxy import loads, dumps
 
 
 logger = config.get_logger(__name__)
+
+
+class SimpleIndexParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.pkgs = []
+        self.current_tag = None
+
+    def handle_starttag(self, tag, attrs) -> None:
+        self.current_tag = tag
+
+    def handle_endtag(self, tag: str) -> None:
+        self.current_tag = None
+
+    def handle_data(self, data: str) -> None:
+        if self.current_tag == "a":
+            self.pkgs.append(canonicalize_name(data))
 
 
 class CacheItem:
@@ -113,6 +131,9 @@ class CacheItem:
 
 
 class Cache(ABC):
+    cid: str
+    metadata: dict
+
     prefix = ""
     DISABLE_CACHE = bool(os.environ.get("AURA_NO_CACHE"))
     __location: Optional[Path] = None
@@ -135,16 +156,18 @@ class Cache(ABC):
     def cache_file_location(self) -> Optional[Path]:
         if location:=self.get_location():
             return location / f"{self.prefix}{self.cid}"
+        return None
 
     @property
     def metadata_location(self) -> Optional[Path]:
         if location:=self.get_location():
             return location / f"{self.prefix}{self.cid}.metadata.json"
+        return None
 
     @property
     def is_valid(self) -> bool:
-        if self.cache_file_location.exists():
-            return True
+        if (c_location:=self.cache_file_location):
+            return c_location.exists()
 
         return False
 
@@ -166,7 +189,10 @@ class Cache(ABC):
         return cls.__location
 
     def save_metadata(self):
-        self.metadata_location.write_text(dumps(self.metadata))
+        if (loc:=self.metadata_location):
+            loc.write_text(dumps(self.metadata))
+        else:
+            raise ValueError(f"Could not determine the metadata location")
 
     def delete(self):
         if self.cache_file_location:
@@ -184,11 +210,15 @@ class URLCache(Cache):
         self.cid = cache_id or self.cache_id(url=url)
 
     @classmethod
-    def cache_id(cls, url: [str, bytes]) -> str:
+    def cache_id(cls, url: Union[str, bytes]) -> str:
+        burl: bytes
+
         if type(url) == bytes:
             burl = url
-        else:
+        elif type(url) == str:
             burl = url.encode()
+        else:
+            raise ValueError(f"Unknown type received: `{repr(url)}`")
 
         return hashlib.md5(burl).hexdigest()
 
@@ -383,10 +413,10 @@ class PyPIPackageList(Cache):
 
     @classmethod
     def _get_package_list(cls) -> List[str]:
-        repo = xmlrpc.client.ServerProxy(
-            "https://pypi.python.org/pypi", use_builtin_types=True
-        )
-        return [canonicalize_name(x) for x in repo.list_packages()]
+        index_content = requests.get("https://pypi.org/simple/").text
+        parser = SimpleIndexParser()
+        parser.feed(index_content)
+        return parser.pkgs
 
     @classmethod
     def proxy(cls) -> List[str]:
@@ -394,8 +424,8 @@ class PyPIPackageList(Cache):
             return cls._get_package_list()
 
         cache_obj = cls()
-        if cache_obj.is_valid:
-            return loads(cache_obj.cache_file_location.read_text())
+        if cache_obj.is_valid and (c_location:=cache_obj.cache_file_location):
+            return loads(c_location.read_text())
 
         try:
             return cache_obj.fetch()

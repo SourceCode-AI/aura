@@ -3,6 +3,8 @@ ARG alpinever=3.15
 
 FROM python:${pythonver}-alpine${alpinever} AS aura-base
 
+ENV PATH="/root/.local/bin:${PATH}"
+
 # This is a specific order of installing the dependencies first so we can use caching mechanism to quickly rebuild the image in case only aura source code changed
 RUN addgroup analysis && adduser -S -G analysis analysis
 
@@ -15,13 +17,12 @@ RUN apk add --no-cache \
     autoconf \
     libtool \
     build-base \
+    libffi-dev \
     git
 
 RUN mkdir /analyzer && \
-    curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python && \
-    source $HOME/.poetry/env  && \
-    poetry config virtualenvs.create false && \
-    echo "source $HOME/.poetry/env" >>/etc/profile
+    curl -sSL https://install.python-poetry.org | python3 - && \
+    poetry config virtualenvs.create false
 
 WORKDIR /analyzer
 
@@ -45,8 +46,7 @@ ADD tests /analyzer/tests
 ENV AURA_NO_CACHE=true
 
 # Install Aura
-RUN source $HOME/.poetry/env && \
-    poetry install --no-dev &&\
+RUN poetry install --no-dev &&\
     python -c "import aura;"  &&\
     find /analyzer -name '*.pyc' -delete -print &&\
     chmod +x /analyzer/entrypoint.sh &&\
@@ -60,8 +60,7 @@ CMD ["--help"]
 
 FROM aura-lite AS aura-lite-tests
 
-RUN source $HOME/.poetry/env && \
-    poetry install
+RUN poetry install
 
 RUN pytest tests/
 
@@ -75,8 +74,7 @@ RUN apk add --no-cache \
     libxslt-dev \
     postgresql-dev
 
-RUN source $HOME/.poetry/env && \
-    poetry install --no-dev -E full
+RUN poetry install --no-dev -E full
 
 ADD docs /analyzer/docs
 
@@ -87,8 +85,7 @@ CMD ["--help"]
 
 FROM aura-full AS aura-full-tests
 
-RUN source $HOME/.poetry/env && \
-    poetry install -E full
+RUN poetry install -E full
 
 RUN pytest tests/
 

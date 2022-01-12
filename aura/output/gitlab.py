@@ -1,9 +1,9 @@
 from uuid import uuid4
 from dataclasses import dataclass
-from typing import Sequence
+from typing import List, Sequence
 
 from .json import JSONScanOutput
-from ..scan_data import ScanData, merge_scans
+from ..scan_data import ScanData
 from ..json_proxy import dumps
 from .. import __version__
 

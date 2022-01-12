@@ -5,6 +5,7 @@ import re
 import codecs
 import hashlib
 import shutil
+import urllib.parse
 import weakref
 import mmap
 import dataclasses
@@ -13,7 +14,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
 from functools import partial, lru_cache
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse, ParseResult
 from zlib import adler32
 from typing import Union, List, TypeVar, Generic, Mapping, cast, Dict, Type, Iterable, ByteString, IO
 
@@ -372,6 +373,18 @@ def isascii(s: str) -> bool:  # TODO: use this to check for non-ascii string def
     - try except when fail generates whole stack as part of exception which can be very large when doing SAST analysis and prone to memory leaks
     """
     return all(ord(c) < 128 for c in s)
+
+
+def sanitize_uri(uri: Union[str, ParseResult]) -> str:
+    if isinstance(uri, str):
+        parts = tuple(urlparse(uri))
+    else:
+        parts = tuple(uri)
+
+    if len(parts) > 1 and parts[1]:
+        parts = parts[:1] + ("***",) + parts[2:]
+
+    return urlunparse(parts)
 
 
 class Analyzer:

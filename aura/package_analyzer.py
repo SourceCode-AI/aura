@@ -6,6 +6,7 @@ Produced hits from analyzers are collected for later processing
 
 import os
 import shutil
+import typing as t
 from pathlib import Path
 from typing import Union, Tuple, List, Iterable, Optional, Coroutine
 from collections import deque
@@ -28,9 +29,9 @@ class Analyzer:
     def run(
             cls,
             initial_locations: Union[base.ScanLocation, Iterable[base.ScanLocation]]
-    ) -> Coroutine[Detection, Optional[AnalysisQueueItem], None]:
+    ) -> t.Generator[Detection, Optional[AnalysisQueueItem], None]:
         cleanup = []
-        files_queue = deque()
+        files_queue: t.Deque[AnalysisQueueItem] = deque()
         executor = worker_executor.AuraExecutor(job_queue=files_queue)
 
         if isinstance(initial_locations, base.ScanLocation):
@@ -52,9 +53,9 @@ class Analyzer:
                     item: AnalysisQueueItem = files_queue.popleft()
                 except IndexError:  # Queue is empty
                     executor.wait()
-                    item = False
+                    item = worker_executor.Wait
 
-                if item is False or item is worker_executor.Wait:
+                if item is worker_executor.Wait:
                     for f in executor:
                         locations, detections = f.result()
                         for loc in locations:  # type: base.ScanLocation
@@ -63,22 +64,23 @@ class Analyzer:
 
                             files_queue.append(loc)
 
-                        for x in detections:
-                            comm = yield x
+                        for worker_detection in detections:  # type: Detection
+                            comm = yield worker_detection
                             if comm:
                                 files_queue.append(comm)
                     continue
 
+                item = t.cast(base.ScanLocation, item)
                 should_continue: Union[bool, Detection] = item.should_continue()
                 # Equals True if it's ok to process this item
                 # Otherwise returns `Rule` indicating why processing of this location should be halted
-                if should_continue is not True:
+                if isinstance(should_continue, Detection):
                     comm = yield should_continue
                     if comm:
                         files_queue.append(comm)
                     continue
 
-                if item.location.is_dir():
+                if isinstance(item, base.ScanLocation) and item.location.is_dir():
                     collected = cls.scan_directory(item=item)
 
                     for x in collected:
@@ -93,12 +95,6 @@ class Analyzer:
                 if isinstance(x, base.ScanLocation):
                     x.do_cleanup()
                     continue
-
-                if type(x) != str:
-                    x = os.fspath(x)
-                if os.path.exists(x):
-                    logger.debug(f"Cleaning up location: {x}")
-                    shutil.rmtree(x)
 
     @staticmethod
     def analyze(location: base.ScanLocation) -> Tuple[List[base.ScanLocation], List[Detection]]:

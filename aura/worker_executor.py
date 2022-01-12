@@ -2,7 +2,7 @@ import time
 import asyncio
 import sys
 from concurrent import futures
-from typing import Optional, Iterable, Set
+from typing import Optional, Iterable, Set, Generator
 
 import tqdm
 from tqdm.asyncio import tqdm as async_tqdm
@@ -47,7 +47,7 @@ class AuraExecutor:
         """
         return len(self.jobs) != 0 and all(x.done() for x in self.jobs)
 
-    def __iter__(self) -> Iterable[futures.Future]:
+    def __iter__(self) -> Generator[futures.Future, None, None]:
         for future in futures.as_completed(tuple(self.jobs)):
             self.jobs.remove(future)
             self._update_progress()

@@ -12,7 +12,7 @@ from collections import Counter
 from click import secho, style
 
 from .. import config
-from ..scan_data import ScanData, merge_scans
+from ..scan_data import ScanData
 from ..analyzers.detections import get_severity
 from .base import ScanOutputBase, DiffOutputBase, InfoOutputBase, TyposquattingOutputBase
 from .table import Table
@@ -303,59 +303,59 @@ class TextScanOutput(TextBase, ScanOutputBase):
             self.out_fd.close()
 
     def output(self, scans: Sequence[ScanData]):
-        scan_metadata, hits = merge_scans(scans)
+        #scan_metadata, hits = merge_scans(scans)
+        for scan in scans:
+            imported_modules = {h.extra["name"] for h in scan.hits if h.name == "ModuleImport"}
+            score = 0
+            tags = set()
+            severities = Counter(get_severity(d) for d in scan.hits)
 
-        imported_modules = {h.extra["name"] for h in hits if h.name == "ModuleImport"}
-        score = 0
-        tags = set()
-        severities = Counter(get_severity(d) for d in hits)
+            for h in scan.hits:
+                score += h.score
+                tags |= h.tags
 
-        for h in hits:
-            score += h.score
-            tags |= h.tags
+            score = sum(x.score for x in scan.hits)
 
-        score = sum(x.score for x in hits)
+            if score < self.filter_config.min_score:
+                return
 
-        if score < self.filter_config.min_score:
-            return
+            secho("\n", file=self.out_fd, color=TTY_COLORS)  # Empty line for readability
+            self._formatter.print_top_separator()
+            self._formatter.print_heading(style(f"Scan results for {scan.metadata.get('name', 'N/A')}", fg="bright_green"))
+            score_color = "bright_green" if score == 0 else "bright_red"
+            self._formatter.align(style(f"Scan score: {score}", fg=score_color, bold=True))
 
-        secho("\n", file=self.out_fd, color=TTY_COLORS)  # Empty line for readability
-        self._formatter.print_top_separator()
-        self._formatter.print_heading(style(f"Scan results for {scan_metadata.get('name', 'N/A')}", fg="bright_green"))
-        score_color = "bright_green" if score == 0 else "bright_red"
-        self._formatter.align(style(f"Scan score: {score}", fg=score_color, bold=True))
+            self._formatter.align("")
 
-        self._formatter.align("")
+            for severity, color in SEVERITY_COLORS.items():
+                count = severities[severity]
+                if count == 0:
+                    color = "bright_black"
+                self._formatter.align(style(f"{severity.capitalize()} severity - {count}x", fg=color))
 
-        for severity, color in SEVERITY_COLORS.items():
-            count = severities[severity]
-            if count == 0:
-                color = "bright_black"
-            self._formatter.align(style(f"{severity.capitalize()} severity - {count}x", fg=color))
+            self._formatter.align("")
 
-        self._formatter.align("")
+            if len(tags) > 0:
+                self._formatter.align(f"Tags:")
+                for t in tags:
+                    self._formatter.align(f" - {t}")
 
-        if len(tags) > 0:
-            self._formatter.align(f"Tags:")
-            for t in tags:
-                self._formatter.align(f" - {t}")
+            if imported_modules:
+                self._formatter.print_heading("Imported modules")
+                for line in self.pprint_imports(self.imports_to_tree(imported_modules)):
+                    self._formatter.align(line)
+            else:
+                self._formatter.print_heading("No imported modules detected")
 
-        if imported_modules:
-            self._formatter.print_heading("Imported modules")
-            for line in self.pprint_imports(self.imports_to_tree(imported_modules)):
-                self._formatter.align(line)
-        else:
-            self._formatter.print_heading("No imported modules detected")
+            if scan.hits:
+                self._formatter.print_heading("Code detections")
+                for h in scan.hits:
+                    self._formatter.print_thick_separator()
+                    self._format_detection(h.to_json(), top_separator=False, bottom_separator=False)
+            else:
+                self._formatter.print_heading(style("No code detections has been triggered", fg="bright_green"))
 
-        if hits:
-            self._formatter.print_heading("Code detections")
-            for h in hits:
-                self._formatter.print_thick_separator()
-                self._format_detection(h.to_json(), top_separator=False, bottom_separator=False)
-        else:
-            self._formatter.print_heading(style("No code detections has been triggered", fg="bright_green"))
-
-        self._formatter.print_bottom_separator()
+            self._formatter.print_bottom_separator()
 
 
 class TextInfoOutput(InfoOutputBase):

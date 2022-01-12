@@ -6,8 +6,11 @@ from unittest.mock import patch
 import pytest
 
 from aura import utils
+from aura import commands
+from aura.output.filtering import FilterConfiguration
 from aura.uri_handlers.base import ScanLocation
 from aura.analyzers import fs_struct
+from aura.analyzers.base import PostAnalysisHook
 
 
 def test_misc_signatures(fixtures):
@@ -254,3 +257,37 @@ def test_dist_detections(fixtures):
 
     fixtures.scan_and_match("djamgo-0.0.1-py3-none-any.whl", matches)
 
+
+
+def test_worker_isolation(fixtures):
+    filter_cfg = FilterConfiguration()
+    captured_detections = set()
+
+    class PAHook(PostAnalysisHook):
+        def post_analysis(self, detections, metadata):
+            nonlocal captured_detections
+            captured_detections = set(detections)
+            return detections
+
+    PostAnalysisHook._hooks.append(PAHook())
+
+    commands.scan_uri(
+        fixtures.path("djamgo-0.0.1-py3-none-any.whl"),
+        metadata={"format": "json"},
+        filter_cfg=filter_cfg
+    )
+
+    assert captured_detections
+    first_run = captured_detections
+
+    captured_detections = set()
+    commands.scan_uri(
+        fixtures.path("simplewheel-1.0-py2.py3-none-any.whl"),
+        metadata={"format": "json"},
+        filter_cfg=filter_cfg
+    )
+    assert captured_detections
+    second_run = captured_detections
+
+    overlap = second_run.intersection(first_run)
+    assert not overlap

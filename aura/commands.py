@@ -79,7 +79,7 @@ def scan_worker(item: ScanLocation) -> Iterable[Detection]:
 
 def scan_uri(
         uri: str,
-        metadata: Union[list, dict]=None,
+        metadata: Optional[dict]=None,
         download_only: bool=False,
         filter_cfg=None
 ) -> Sequence[ScanData]:
@@ -93,6 +93,8 @@ def scan_uri(
 
         if type(output_format) not in (list, tuple):
             output_format = (output_format,)
+
+        metadata["format"] = [utils.sanitize_uri(x) for x in output_format]
 
         formatters = [ScanOutputBase.from_uri(x, opts=metadata.get("output_opts")) for x in output_format]
         scans = []
