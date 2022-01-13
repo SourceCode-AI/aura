@@ -34,7 +34,6 @@ jobs:
         - docker push ${IMAGE_NAME}-full
         - docker push ${IMAGE_NAME}-lite
 
-
     - stage: deploy_prod
       if: branch = master
       script:
