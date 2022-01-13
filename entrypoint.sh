@@ -1,8 +1,6 @@
 #!/bin/bash
 set -e
 
-source $HOME/.poetry/env
-
 
 if [ $1 == "run_tests" ]; then
     cd /analyzer
