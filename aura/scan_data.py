@@ -10,7 +10,7 @@ from . import __version__
 
 
 class ScanData(JSONSerializable):
-    def __init__(self, scan_location: ScanLocation, uri_handler: Optional[URIHandler]=None, filter_cfg=None):
+    def __init__(self, scan_location: ScanLocation, uri_handler: Optional[URIHandler]=None, filter_cfg=None, metadata=None):
         self.location = scan_location
         self.handler = uri_handler
         self.filter_cfg = filter_cfg
@@ -19,6 +19,9 @@ class ScanData(JSONSerializable):
             "depth": 0,
             "paths": []
         }
+
+        if metadata:
+            self.metadata.update(metadata.copy())
 
         if uri_handler:
             self.metadata["name"] = self.location.metadata.get("name") or str(uri_handler)

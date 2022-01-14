@@ -331,7 +331,7 @@ class PackageScore:
         else:
             self.pkg = package
 
-        self.now = datetime.datetime.utcnow()
+        self.now = datetime.datetime.utcnow().astimezone(datetime.timezone.utc)
         self.github: Optional[github.GitHub] = None
 
         if fetch_github:
@@ -553,6 +553,7 @@ def get_packages_for_author(author: str) -> List[Tuple[str, str]]:
     # TODO: find alternative or remove related code
     raise RuntimeError(f"This functionality has been disabled due to upstream pypi XMLRC is no longer operational")
 
+
 def log_scale(metric: int, base=10) -> int:
     """
     Normalizes the metric to log scale score
@@ -561,7 +562,6 @@ def log_scale(metric: int, base=10) -> int:
         return math.ceil(math.log(metric, base))
     else:
         return 0
-
 
 
 # Utilities for producing keys for sorting package releases
@@ -574,6 +574,7 @@ def sort_by_packagetype(pkg: ReleaseInfo) -> int:
         return 1
     else:
         return 2
+
 
 def sort_by_version(pkg: ReleaseInfo) -> Version:
     try:

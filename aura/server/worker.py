@@ -30,7 +30,7 @@ class ServerWorker:
 
     def fetch_task(self) -> Optional[dict]:
         with self.db_session.begin():
-            row = self.db_session.execute(postgres.sql_text("""
+            row = self.db_session.execute(postgres.sa.text("""
             UPDATE pending_scans
             SET status=1, updated=(now() at time zone 'utc')
             WHERE queue_id = (
@@ -47,7 +47,7 @@ class ServerWorker:
                 return
             else:
                 self.db_session.commit()
-                return {"scan_id": row[0], "uri": row[1], "reference": row[2]}
+                return {"scan_id": row[0], "uri": row[1], "reference": str(row[2])}
 
     def loop(self):
         try:
@@ -75,7 +75,7 @@ class ServerWorker:
                 if not (scan_id:=self.tasks.get(f)):
                     continue
 
-                self.db_session.execute(postgres.sql_text("""
+                self.db_session.execute(postgres.sa.text("""
                     UPDATE pending_scans
                     SET status=2
                     WHERE queue_id=:scan_id

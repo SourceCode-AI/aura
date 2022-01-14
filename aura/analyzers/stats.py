@@ -46,10 +46,11 @@ def analyze(*, location: ScanLocation):
 
 
 class DirectoryTreeStats(PostAnalysisHook):
-    def __init__(self):
-        self.tree: Dict[str, Union[str, dict]] = {"children": {}}
+    tree: Dict[str, Union[str, dict]]
 
     def post_analysis(self, detections: Iterable[Detection], metadata: dict) -> List[Detection]:
+        self.tree = {"children": {}}
+
         size = 0
         files = 0
 

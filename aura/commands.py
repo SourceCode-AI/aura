@@ -115,12 +115,11 @@ def scan_uri(
                 "depth": 0
             })
 
-            # FIXME: metadata=metadata
-            for x in handler.get_paths(metadata={"analyzers": metadata.get("analyzers", [])}):  # type: ScanLocation
+            for x in handler.get_paths(metadata=metadata):  # type: ScanLocation
                 if download_only:
                     continue
                 else:
-                    input_data = ScanData(x, uri_handler=handler, filter_cfg=filter_cfg)
+                    input_data = ScanData(x, uri_handler=handler, filter_cfg=filter_cfg, metadata=metadata)
                     try:
                         input_data.scan()
                     except exceptions.MinimumScoreNotReached:
@@ -152,9 +151,13 @@ def server_worker(pg_uri):
     filter_cfg = FilterConfiguration()
 
     def worker_func(task_data):
+        meta = {"format": pg_uri}
+        if (ref:=task_data.get("reference")):
+            meta["reference"] = ref
+
         scan_uri(
             task_data["uri"],
-            metadata={"format": pg_uri},
+            metadata=meta,
             filter_cfg=filter_cfg
         )
 

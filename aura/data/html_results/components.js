@@ -11,7 +11,13 @@ function hide_elem (cond) {
 
 
 Vue.component("tree-view", {
-    props: ["name", "data"],
+    props: {
+        name: {required: true},
+        data: {required: true, default: {}},
+        depth: {default: 0},
+        max_depth: {default: 2},
+        collapsed: {default: false}
+    },
     computed: {
         icon: function() {
             if (this.data.mime == "text/x-python") {
@@ -20,7 +26,7 @@ Vue.component("tree-view", {
                 return "fa fa-file-archive";
             } else if (this.data.mime == "text/plain") {
                 return "fa fa-file-word";
-            } else if (this.data.mime || this.data.size || this.data.children.length == 0) {
+            } else if (this.data.mime || this.data.size || !this.hasChildren) {
                 return "fa fa-file-alt";
             }
             return "fa fa-folder";
@@ -34,12 +40,30 @@ Vue.component("tree-view", {
                 }
                 converted = converted / 1024;
             }
+        },
+        hasChildren: function(){
+            'use strict';
+            return this.data && Object.keys(this.data.children).length > 0;
+        }
+    },
+    data: function(){
+        'use strict';
+        return {collapse: this.collapsed || (this.max_depth<=this.depth)};
+    },
+    methods: {
+        toggle: function(){
+            'use strict';
+            this.collapse=!this.collapse;
         }
     },
     template: `
     <div>
         <div class="tree-info">
-            <span :class="icon"></span>
+            <span v-if="hasChildren" style="cursor: pointer;" v-on:click="toggle()">
+              <i class="fa fa-xs" :class="collapse?'fa-plus-square':'fa-minus-square'"></i>
+            </span>
+        
+            <span class="fa-lg" :class="icon"></span>
             <span class="badge bg-primary" v-if="data.score">Score: {{ data.score }}</span>
             {{ name }}
             <span class="text-muted">
@@ -47,11 +71,11 @@ Vue.component("tree-view", {
                 <span v-if="data.size">{{ size }}</span>
             </span>
             <br />
-            <span class="badge bg-secondary" v-for="tag in data.tags">{{ tag }}</span>
+            <span class="badge bg-secondary me-1" v-for="tag in data.tags">{{ tag }}</span>
         </div>
-        <ul class="tree-view border border-end-0 border-bottom-0" v-if="data.children">
+        <ul class="tree-view border border-end-0 border-bottom-0" v-if="hasChildren && !collapse">
             <li v-for="(ch_value, ch_name) in data.children">
-                <tree-view :name="ch_name" :data="ch_value"></tree-view>
+                <tree-view :name="ch_name" :data="ch_value" :depth="(depth || 0)+1"></tree-view>
             </li>
         </ul>
     </div>
@@ -154,7 +178,7 @@ Vue.component("overview", {
                     <li class="list-group-item d-flex justify-content-between">
                         <b>SBoM licenses:</b>
                         <div>
-                            <span class="badge bg-secondary" v-for="license in licenses">{{ license }}</span>
+                            <span class="badge bg-secondary me-1" v-for="license in licenses">{{ license }}</span>
                         </div>
                     </li>
                     <li class="list-group-item d-flex justify-content-between">
