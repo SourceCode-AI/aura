@@ -51,8 +51,8 @@ python-tlsh = "~3.17.0"
 prettyprinter = "~0.18"
 chardet = "~4.0"
 
-# TODO: Extras, autodetect their presence in aura
-jsonschema = { version = "~3.2", optional = true }
+
+jsonschema = { version = "~4.4", optional = true }
 GitPython = { version = "~3.1", optional = true }
 defusedxml = { version = "~0.7", optional = true }
 tomli = { version = "~2.0", optional = true }

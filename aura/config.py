@@ -178,13 +178,15 @@ def get_file_location(
         if pth.is_file():
             return str(pth)
     else:
-        pth = location
+        pth = Path(location)
 
     if exc:
-        # TODO: add location and base path directoly to the exception as variables for easy extraction
-        raise MissingFile(f"Can't find configuration file `{location}` using base path `{base_path}`")
+        raise MissingFile(
+            f"Can't find configuration file `{location}` using base path `{base_path}`",
+            file_location=location, base_path=str(base_path)
+        )
     else:
-        return pth
+        return str(pth)
 
 
 def get_file_content(location: str, base_path: Optional[str]=None) -> str:

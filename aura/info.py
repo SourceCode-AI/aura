@@ -4,6 +4,7 @@ Implementation of the `aura info` command
 
 import inspect
 import shutil
+import sys
 from importlib import resources
 from typing import Optional
 
@@ -115,7 +116,8 @@ def gather_aura_information() -> dict:
         "analyzers": {},
         "integrations": {},
         "uri_handlers": {},
-        "schema_validation": check_schema()
+        "schema_validation": check_schema(),
+        "python_version": sys.version
     }
 
     analyzers = plugins.load_entrypoint("aura.analyzers")

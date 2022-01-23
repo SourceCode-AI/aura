@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 import typing
+import typing as t  # TODO: Migrate to use this
 import inspect
 import logging
 from abc import ABCMeta, abstractmethod
@@ -58,7 +59,7 @@ class Taints(Enum):
         else:
             return False
 
-    def __add__(self, other):
+    def __add__(self, other) -> Taints:
         if type(other) != Taints:
             return NotImplemented
 
@@ -74,30 +75,23 @@ class Taints(Enum):
             return Taints.UNKNOWN
 
 
-@slotted_dataclass(
-    taint_level = None,
-    line_no = None,
-    message = None,
-    extra = field(default_factory=dict),
-    node = None
-)
+@dataclass(slots=True)
 class TaintLog:
     """
     Log entry to track the propagation of taints in the AST
     """
-    __slots__ = ("path", "taint_level", "line_no", "message", "extra", "node")
     path: Path  # Path to the affected source code
-    taint_level: typing.Optional[Taints]
-    line_no: typing.Optional[int]
-    message: typing.Optional[str]
-    extra: typing.Dict[str, typing.Any]
-    node: typing.Optional[ASTNode]
+    taint_level: t.Optional[Taints] = None
+    line_no: t.Optional[int] = None
+    message: t.Optional[str] = None
+    extra: t.Dict[str, typing.Any] = field(default_factory=dict)
+    node: t.Optional[ASTNode] = None
 
     def __post_init__(self):
         self.path = Path(self.path).absolute()
 
     def json(self) -> dict:
-        d : typing.Dict[str, typing.Any] = {
+        d : typing.Dict[str, t.Any] = {
             'line_no': self.line_no,
             'message': self.message
         }
@@ -132,7 +126,7 @@ class TaintLog:
 
 
 class ASTNode(KeepRefs, metaclass=ABCMeta):
-    def __post_init__(self, *args, previous_node=None, **kwargs):
+    def __post_init__(self, *args, previous_node: t.Optional[ASTNode]=None, **kwargs):
         self._full_name = None
         self._original = None
         self._docs = None
@@ -293,7 +287,7 @@ NodeType = typing.Union["NodeType", ASTNode, typing.Dict, typing.List, int, str]
 
 @dataclass
 class Module(ASTNode):
-    body: typing.List[NodeType]
+    body: t.List[NodeType]
 
     def _visit_node(self, context: Context):
         for idx, x in enumerate(self.body):
@@ -1428,7 +1422,7 @@ class Container(ASTNode):
         return d
 
     @property
-    def full_name(self):
+    def full_name(self) -> str:
         if type(self.pointer) == Import:
             return self.pointer.names[self.name]
         else:
@@ -1484,7 +1478,7 @@ class Context:
             scope_closure=self.scope_closure
         )
 
-    def visit_child(self, node, stack=None, replace=lambda x: None, closure=None):
+    def visit_child(self, node, stack=None, replace=lambda x: None, closure=None) -> None:
         if type(node) in (str, int, type(...)) or node is None or node == ...:
             return
 

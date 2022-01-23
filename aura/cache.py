@@ -11,7 +11,7 @@ import typing as t
 from html.parser import HTMLParser
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional, List, Generator, Iterable, BinaryIO, Tuple, Set, Dict, Type, Union
+from typing import Optional, List, Generator, Iterable, BinaryIO, Tuple, Set, Dict, Type
 
 import click
 import requests
@@ -131,6 +131,7 @@ class CacheItem:
             x.delete()
 
 
+@dataclasses.dataclass(slots=True, kw_only=True)
 class CacheRequest(ABC):
     cache_id: Optional[str]
 
@@ -144,6 +145,7 @@ class CacheRequest(ABC):
 
 
 class Cache(ABC):
+    req: CacheRequest
     prefix: t.ClassVar[str]
     DISABLE_CACHE = bool(os.environ.get("AURA_NO_CACHE"))
     __location: Optional[Path] = None
@@ -210,7 +212,7 @@ class Cache(ABC):
             self.metadata_location.unlink(missing_ok=True)
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(slots=True, kw_only=True)
 class URLCacheRequest(CacheRequest):
     url: str
     cache_id: t.Optional[str] = None
@@ -286,7 +288,7 @@ class URLCache(Cache):
         return self.cache_file_location.read_text()
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(slots=True, kw_only=True)
 class FileDownloadRequest(URLCacheRequest):
     fd: Optional[BinaryIO]=None
 
@@ -335,7 +337,7 @@ class FileDownloadCache(URLCache):
             cfd.flush()
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(slots=True, kw_only=True)
 class MirrorRequest(CacheRequest):
     src: Path
     cache_id: Optional[str] = None
@@ -393,7 +395,7 @@ class MirrorCache(Cache):
         self.save_metadata()
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(slots=True, kw_only=True)
 class PyPIPackageListRequest(CacheRequest):
     cache_id: str = ""
     tags: List[str] = dataclasses.field(default_factory=list)
@@ -444,7 +446,7 @@ class PyPIPackageList(Cache):
         return packages
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(slots=True, kw_only=True)
 class ASTPatternsRequest(CacheRequest):
     default: t.ClassVar = None
 
@@ -481,6 +483,7 @@ class ASTPatternsRequest(CacheRequest):
 
 class ASTPatternCache(Cache):
     prefix = "ast_patterns_"
+    req: ASTPatternsRequest
 
     @classmethod
     def proxy(cls, cache_request: ASTPatternsRequest) -> Tuple[ASTPattern, ...]:

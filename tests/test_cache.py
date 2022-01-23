@@ -39,11 +39,11 @@ def test_url_cache_ids(url, cache_id):
 
 
 @mock.patch("aura.cache.Cache.get_location")
-@pytest.mark.parametrize("filename,content,cache_id,call", (
-        ("testjson_file", "json_content", "mirror_testjson_file", lambda x: cache.MirrorRequest(x).proxy()),
-        ("testpkg_file", "pkg_content", "mirror_testpkg_file", lambda x: cache.MirrorRequest(x).proxy())
+@pytest.mark.parametrize("filename,content,cache_id", (
+        ("testjson_file", "json_content", "mirror_testjson_file"),
+        ("testpkg_file", "pkg_content", "mirror_testpkg_file")
 ))
-def test_proxy_mirror_json(cache_mock, tmp_path, filename, content, cache_id, call):
+def test_proxy_mirror_json(cache_mock, tmp_path, filename, content, cache_id):
     f = tmp_path / filename
     cache_path = tmp_path / "cache"
     cache_path.mkdir()
@@ -52,14 +52,14 @@ def test_proxy_mirror_json(cache_mock, tmp_path, filename, content, cache_id, ca
     cache_mock.return_value = cache_path
 
     assert f.exists() is False
-    out = call(f)  # TODO: refactor this after the mirrorfile is migration is completed
+    out = cache.MirrorRequest(src=f).proxy()
     assert out == f
     assert cache_file.exists() is False
     assert len(list(cache_path.iterdir())) == 0
 
     f.write_text(content)
     assert f.exists() is True
-    out = call(f)
+    out = cache.MirrorRequest(src=f).proxy()
     assert out != f
     assert out == cache_file
     assert len(list(x for x in cache_path.iterdir() if not x.name.endswith(".metadata.json"))) == 1
@@ -68,12 +68,12 @@ def test_proxy_mirror_json(cache_mock, tmp_path, filename, content, cache_id, ca
     # Make sure the cache does not attempt to do any kind of file access if the cache entry exists
     m = mock.MagicMock(spec_set=("name",), side_effect=ValueError("Call prohibited"))
     m.name = filename
-    out = call(m)
+    out = cache.MirrorRequest(src=m).proxy()
     assert out == cache_file
 
     # Original path should be returned if cache is disabled
     cache_mock.return_value = None
-    out = call(f)
+    out = cache.MirrorRequest(src=f).proxy()
     assert out == f
 
 
