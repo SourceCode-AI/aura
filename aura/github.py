@@ -11,7 +11,7 @@ import requests
 
 from . import config
 from .worker_executor import non_blocking, AsyncQueue
-from .cache import URLCache
+from .cache import URLCache, URLCacheRequest
 from .utils import remaining_time
 from .exceptions import NoSuchRepository, RateLimitError
 
@@ -64,7 +64,9 @@ class GitHub:
 
     @staticmethod
     def _get_json(url: str) -> Union[dict, list]:
-        payload = URLCache.proxy(url=url, tags=["github_api"], session=SESSION)
+        payload = URLCacheRequest(
+            url=url, tags=["github_api"], session=SESSION
+        ).proxy()
         return json.loads(payload)
 
     def get_repository_data(self) -> dict:

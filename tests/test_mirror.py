@@ -38,7 +38,7 @@ def test_mirror_uri_handler(simulate_mirror):
     paths = list(handler.get_paths())
     assert len(paths) == 2
     filenames = set(x.filename for x in paths)
-    assert {"wheel-0.34.2-py2.py3-none-any.whl", "wheel-0.34.2.tar.gz"} == filenames
+    assert filenames == {"wheel-0.34.2-py2.py3-none-any.whl", "wheel-0.34.2.tar.gz"}
 
 
 def test_mirror_suspicious_file_trigger(simulate_mirror):

@@ -5,7 +5,7 @@ from ..detections import Detection
 from .nodes import Context, Import
 from .visitor import Visitor
 from ...pattern_matching import ASTPattern
-from ...cache import ASTPatternCache
+from ...cache import ASTPatternsRequest
 from ... import config
 
 
@@ -17,7 +17,7 @@ class ASTPatternMatcherVisitor(Visitor):
     def __init__(self, *, location):
         super().__init__(location=location)
         self.convergence = None
-        self._signatures = ASTPatternCache.proxy()
+        self._signatures = ASTPatternsRequest.get_default().proxy()
         self._report_modules = (
                 config.CFG["aura"].get("always_report_module_imports", True) or  # type: ignore[index]
                 os.environ.get("AURA_ALL_MODULE_IMPORTS", False) or

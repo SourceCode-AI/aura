@@ -24,7 +24,7 @@ from .exceptions import InvalidConfiguration, MissingFile
 
 
 CFG : dict
-CFG_PATH = None
+CFG_PATH: Path
 SEMANTIC_RULES : dict
 LOG_FMT = logging.Formatter("%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s")
 LOG_ERR = None
@@ -297,8 +297,7 @@ def get_maximum_archive_size() ->typing.Optional[int] :
 
 
 def get_default_tag_filters() -> typing.List[str]:
-    tags = CFG.get("tags", [])
-    return tags
+    return CFG.get("tags", [])
 
 
 def get_installed_stages() -> typing.Generator[str,None,None]:

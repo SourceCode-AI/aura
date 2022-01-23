@@ -36,7 +36,7 @@ include = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.8 || ^3.9 || ^3.10"
+python = "^3.10"
 packaging = "~20.9"
 python-magic = "~0.4.24"
 click = "~8.0"

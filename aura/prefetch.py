@@ -39,10 +39,10 @@ async def fetch_package(uri_queue, github_prefetcher):
 
 def prefetch_mirror(uris: Iterable[str], workers=10):
     logger.info("Caching AST patterns")
-    cache.ASTPatternCache.proxy()
+    cache.ASTPatternsRequest.get_default().proxy()
 
     logger.info("Caching list of packages on pypi")
-    cache.PyPIPackageList.proxy()
+    cache.PyPIPackageListRequest().proxy()
 
     #logger.info("Prefetching package JSON information")
     #lm = mirror.LocalMirror()

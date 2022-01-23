@@ -36,7 +36,7 @@ def test_get_package_licenses(package_name, license_, mock_pypi_rest_api):
     ("requests", "pkg:pypi/requests@2.24.0"),
     ("requests2", "pkg:pypi/requests2@2.16.0"),
     ("wheel", "pkg:pypi/wheel@0.34.2"),
-    ("badboy", "pkg:pypi/badboy")
+    ("badboy", "pkg:pypi/badboy@666")
 ))
 def test_get_package_purl(package_name, purl, mock_pypi_rest_api):
     mock_pypi_rest_api(responses)
@@ -52,17 +52,18 @@ def test_get_component(mock_pypi_rest_api, fuzzy_rule_match):
     expected = {
         "name": "wheel",
         "type": "library",
-        "purl": "pkg:pypi/wheel@0.2",
-        "version": "0.2",
+        "purl": "pkg:pypi/wheel@0.34.2",
+        "version": "0.34.2",
         "licenses": [{"license": {"id": "MIT"}}],
         "hashes": [
-            {"alg": "MD5", "content": "96d458e73e65f87c1354c78e2145ce30"},
-            {"alg": "SHA-256", "content": "82026a421ca379affefa9a0cb85807047e7184574a92f406670b2dcc3384da36"}
+            {"alg": "MD5", "content": "8a2e3b6aca9665a0c6abecc4f4ea7090"},
+            {"alg": "SHA-256", "content": "df277cb51e61359aba502208d680f90c0493adec6f0e848af94948778aed386e"},
+            {"alg": "MD5", "content": "ce2a27f99c130a927237b5da1ff5ceaf"},
+            {"alg": "SHA-256", "content": "8788e9155fe14f54164c1b9eb0a319d98ef02c160725587ad60f14ddc57b6f96"}
         ]
     }
 
     pkg = package.PypiPackage.from_cached("wheel")
-    pkg.opts["version"] = "0.2"
     component = sbom.get_component(pkg)
     assert fuzzy_rule_match(component, expected), component
 

@@ -3,17 +3,21 @@ from __future__ import annotations
 import math
 import datetime
 import dataclasses
+import queue
 import tempfile
 import shutil
 import difflib
+import typing as t
 from functools import partial
 from urllib.parse import urlparse, ParseResult
 from pathlib import Path
 from itertools import product
 from contextlib import contextmanager
+from collections import deque
 from typing import Optional, Generator, Tuple, List, Union
 
 import requests
+from packaging import markers
 from packaging.version import Version, InvalidVersion
 from packaging.utils import canonicalize_name
 from packaging.requirements import Requirement
@@ -37,9 +41,10 @@ LOGGER = config.get_logger(__name__)
 class PypiPackage:
     mirror = LocalMirror()
 
-    def __init__(self, name: str, info: dict, source: Optional[str]=None, opts: Optional[dict]=None):
+    def __init__(self, name: str, info: dict, version:str, source: Optional[str]=None, opts: Optional[dict]=None):
         self.name: str = name.lower()
         self.info: dict = info
+        self.version: str = version
         self.source: Optional[str] = source
         self.opts: dict = opts or {}
         # normalize missing data
@@ -48,32 +53,54 @@ class PypiPackage:
             self.info["info"]["project_urls"] = {}
 
     @classmethod
-    def from_cached(cls, name: str, *args, **kwargs):
+    def from_cached(cls, name: str, *, opts:Optional[dict]=None, **kwargs):
         name = canonicalize_name(name)
+        opts = opts or {}
+
+        if (version:=opts.get("version")):
+            del opts["version"]
 
         if cls.mirror.get_mirror_path():
             try:
                 kwargs["info"] = cls.mirror.get_json(name)
                 kwargs["source"] = "local_mirror"
-                return cls(name, *args, **kwargs)
+
+                if not version:
+                    version = kwargs["info"]["info"]["version"]
+
+                return cls(name, version=version, **kwargs)
             except NoSuchPackage:
                 pass
 
+        url = f"https://pypi.org/pypi/{name}/"
+
+        if version not in (None, "all", "latest"):
+            url += f"{version}/"
+            version = None
+
+        url += "json"
+
         try:
-            resp = cache.URLCache.proxy(url=f"https://pypi.org/pypi/{name}/json", tags=["pypi_json"])
+            resp = cache.URLCacheRequest(url=url, tags=["pypi_json"]).proxy()
         except requests.exceptions.HTTPError as exc:
             raise NoSuchPackage(f"`{name}` on PyPI repository") from exc
 
         kwargs["info"] = loads(resp)
         kwargs["source"] = "pypi"
 
-        return cls(name, *args, **kwargs)
+        if not version:
+            version = kwargs["info"]["info"]["version"]
+
+        return cls(name, version=version, opts=opts, **kwargs)
 
     def __contains__(self, item: str):
         return item in self.info["releases"].keys()
 
     def __getitem__(self, item: str):
         return self.info[item]
+
+    def __hash__(self) -> int:
+        return hash((self.name, self.version, self["last_serial"]))
 
     @property
     def source_url(self) -> Optional[str]:
@@ -96,20 +123,14 @@ class PypiPackage:
         return self.info["info"]["project_urls"].get("Documentation")
 
     @property
-    def version(self) -> str:
-        if v := self.opts.get("version"):
-            return v
-        return self.get_latest_release()
-
-    @property
     def author(self) -> str:
         if (author:=self.info["info"].get("author_email")):
             return author
 
         return self.info["info"]["author"]
 
-    def get_latest_release(self) -> Optional[str]:
-        return self.info["info"].get("version")
+    def get_latest_release(self) -> str:
+        return self.info["info"]["version"]
 
     def get_dependencies(self) -> List[Requirement]:
         all_deps = []
@@ -257,7 +278,7 @@ class PypiPackage:
                 pkg_path /= pkg["filename"]
 
                 with pkg_path.open("wb") as fd:
-                    cache.FileDownloadCache.proxy(url=pkg["url"], fd=fd)
+                    cache.FileDownloadRequest(url=pkg["url"], fd=fd).proxy()
 
                 location_cache[pkg["url"]] = ScanLocation(
                     location=pkg_path,
@@ -372,11 +393,11 @@ class PackageScore:
         if not dependencies:
             return PackageScore.NA("Reverse dependencies")
 
-        dependencies = len(dependencies)
-        normalized = log_scale(dependencies)
-        explanation = f"{dependencies} (+{normalized})"
+        num_dependencies = len(dependencies)
+        normalized = log_scale(num_dependencies)
+        explanation = f"{num_dependencies} (+{normalized})"
 
-        return self.Value(dependencies, normalized, "Reverse dependencies", explanation)
+        return self.Value(num_dependencies, normalized, "Reverse dependencies", explanation)
 
     def score_github_stars(self) -> Union[Value, NA]:
         if self.github is None:
@@ -469,7 +490,7 @@ class PackageScore:
                 break
         return self.Value(sdist, sdist, "Has sdist", f"+{sdist}")
 
-    def get_score_entries(self) -> List[Value]:
+    def get_score_entries(self) -> List[Union[Value, NA]]:
         entries = [
             self.score_pypi_downloads(),
             self.score_reverse_dependencies(),
@@ -510,6 +531,118 @@ class PackageScore:
         score_table += total_row
 
         return score_table
+
+
+@dataclasses.dataclass(eq=True, frozen=True)
+class DependencyItem:
+    package: PypiPackage
+    requirement: Optional[Requirement] = None
+    parent: Optional[DependencyItem] = None
+    extras: Tuple[str, ...] = ()
+
+    def __hash__(self) -> int:
+        return hash((self.package, self.extras))
+
+    def __repr__(self) -> str:
+        r = f"<DependencyItem `{self.package.name}=={self.package.version}`"
+        if self.parent:
+            r += f" from `{self.parent.package.name}`"
+            if self.parent.extras:
+                r += "[" + ",".join(self.parent.extras) + "]"
+
+        r += ">"
+        return r
+
+
+class DependencyTree:
+    def __init__(self):
+        # How many versions behind we want to look and collect
+        self.max_versions = 1
+
+        self.dependencies: t.Dict[DependencyItem, t.List[DependencyItem]] = {}
+        self.package_cache: t.Dict[t.Tuple[str, str], DependencyItem] = {}
+        self.package_versions: t.Dict[str, List[Version]] = {}
+
+    @staticmethod
+    def is_marker_valid(req: Requirement, extras: Tuple[str, ...]) -> bool:
+        if req.marker is None:
+            return True
+
+        for submarker in req.marker._markers:
+            if type(submarker) in (list, tuple) and str(submarker[0]) == "extra":
+                if str(submarker[-1]) not in extras:
+                    return False
+
+        return True
+
+    def expand(self, dep: DependencyItem):
+        q: t.Deque[DependencyItem] = deque()
+        q.append(dep)
+
+        while len(q) > 0:
+            dependency = q.popleft()
+            if not dependency:
+                break
+            elif dependency in self.dependencies:
+                continue
+
+            LOGGER.info(f"[{len(q)}] Resolving dependencies for: {dependency}")
+            requirements = dependency.package["info"].get("requires_dist", []) or []
+
+            for req in requirements:
+                parsed_req = Requirement(req)
+
+                if not self.is_marker_valid(parsed_req, dependency.extras):
+                    continue
+
+                sub_dependencies = self.iterate_requirement(parsed_req, parent=dependency)
+                self.dependencies[dependency] = sub_dependencies
+                q.extend(sub_dependencies)
+
+    def get_package_versions(self, pkg_name: str) -> List[Version]:
+        if pkg_name not in self.package_versions:
+            main_package = PypiPackage.from_cached(pkg_name)
+            versions = []
+
+            for release in main_package["releases"].keys():
+                try:
+                    versions.append(Version(release))
+                except InvalidVersion:
+                    pass
+
+            versions.sort(reverse=True)
+            self.package_versions[pkg_name] = versions
+            return versions
+        else:
+            return self.package_versions[pkg_name]
+
+    def iterate_requirement(self, req: Union[str, Requirement], parent: DependencyItem) -> List[DependencyItem]:
+        if type(req) == str:
+            parsed_req = Requirement(req)
+        else:
+            assert type(req) == Requirement
+            parsed_req = req
+
+        versions = self.get_package_versions(parsed_req.name)
+        extras = tuple(sorted(parsed_req.extras))
+
+        dependencies = []
+        filtered_versions = tuple(parsed_req.specifier.filter(versions))[:self.max_versions]
+
+        for version in filtered_versions:
+            version = str(version)
+            dep_key = (parsed_req.name, version)
+
+            if dep_key in self.package_cache:
+                sub_dependency = self.package_cache[dep_key]
+            else:
+                pkg = PypiPackage.from_cached(parsed_req.name, opts={"version": version})
+                sub_dependency = DependencyItem(pkg, parsed_req, parent=parent, extras=extras)
+                self.package_cache[dep_key] = sub_dependency
+
+            dependencies.append(sub_dependency)
+
+        return dependencies
 
 
 def packagetype_filter(release: ReleaseInfo, packagetype: Optional[str]="all") -> bool:
