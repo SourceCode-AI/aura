@@ -6,6 +6,7 @@ from .analyzers.base import PostAnalysisHook
 from .analyzers.detections import Detection
 from .uri_handlers.base import ScanLocation, URIHandler
 from .bases import JSONSerializable
+from .tracing import tracer
 from . import __version__
 
 
@@ -35,7 +36,8 @@ class ScanData(JSONSerializable):
         self.metadata["start_time"] = datetime.datetime.utcnow().timestamp()
         # TODO: check if this works when location does not exists as the `commands.scan_worker` is handling that
         hits = tuple(Analyzer.run(self.location))
-        post_analysis_hits = set(PostAnalysisHook.run_hooks(hits, self.metadata))
+        with tracer.start_as_current_span("post-analysis-hooks"):
+            post_analysis_hits = set(PostAnalysisHook.run_hooks(hits, self.metadata))
 
         if self.filter_cfg:
             self.hits = set(self.filter_cfg.filter_detections(post_analysis_hits))

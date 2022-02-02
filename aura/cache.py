@@ -312,7 +312,7 @@ class FileDownloadCache(URLCache):
         cache_obj = cls(cache_request)
 
         if cache_obj.is_valid:
-            logger.debug(f"Loading {cache_obj.cid} from cache")
+            logger.debug(f"Loading {cache_obj.req.cache_id} from cache")
             if cache_request.fd:
                 cache_obj.fetch()
             return

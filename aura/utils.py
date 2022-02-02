@@ -5,13 +5,12 @@ import re
 import codecs
 import hashlib
 import shutil
-import urllib.parse
 import weakref
 import mmap
 import dataclasses
 from contextlib import contextmanager, ExitStack
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from functools import partial, lru_cache
 from urllib.parse import urlparse, urlunparse, ParseResult
@@ -67,7 +66,7 @@ def parse_iso_8601(date_string: str) -> datetime:
     if date_string.endswith("Z"):
         date_string = date_string[:-1] + "+00:00"
 
-    return datetime.fromisoformat(date_string)
+    return datetime.fromisoformat(date_string).replace(tzinfo=timezone.utc)
 
 
 @lru_cache()
@@ -226,35 +225,6 @@ def normalize_path(
         return os.fspath(pth)
     else:
         return Path(pth)
-
-
-def slotted_dataclass(dataclass_arguments=None, **kwargs):
-    """
-    Decorator to make dataclasses works with slots
-    Built-in dataclasses do not support __slots__ if a default value is specified for a field, this can be fixed using a decorator or a metaclass
-    https://stackoverflow.com/questions/50180735/how-can-dataclasses-be-made-to-work-better-with-slots
-
-    :param dataclass_arguments: dict specifying arguments to a dataclass such as {"frozen": True}
-    :param kwargs: default values for a fields
-    """
-    if dataclass_arguments is None:
-        dataclass_arguments = {}
-
-    def decorator(cls):
-        old_attrs = {}
-
-        for k, v in kwargs.items():
-            old_attrs[k] = getattr(cls, k)
-            setattr(cls, k, v)
-
-        cls = dataclasses.dataclass(cls, **dataclass_arguments)  # type: ignore[call-overload]
-        for k, v in old_attrs.items():
-            setattr(cls, k, v)
-
-        return cls
-
-    return decorator
-
 
 
 def lzset(indata) -> set:

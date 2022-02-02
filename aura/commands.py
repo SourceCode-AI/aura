@@ -28,6 +28,7 @@ from .scan_data import ScanData
 from .analyzers.detections import Detection
 from .output.base import ScanOutputBase, DiffOutputBase, InfoOutputBase, TyposquattingOutputBase
 from .output.filtering import FilterConfiguration
+from .tracing import tracer
 
 
 logger = config.get_logger(__name__)
@@ -83,7 +84,8 @@ def scan_uri(
         download_only: bool=False,
         filter_cfg=None
 ) -> Sequence[ScanData]:
-    with utils.enrich_exception(uri, metadata):
+    with utils.enrich_exception(uri, metadata), tracer.start_as_current_span("scan-uri") as span:
+        span.set_attribute("uri", uri)
         start = time.time()
         handler = None
         metadata = metadata or {}
@@ -132,7 +134,7 @@ def scan_uri(
 
             if scans:
                 for formatter in formatters:
-                    with formatter:
+                    with formatter, tracer.start_as_current_span("output-formatter", attributes={"protocol": formatter.protocol()}):
                         formatter.output(scans=scans)
 
         except exceptions.NoSuchPackage:
@@ -142,7 +144,8 @@ def scan_uri(
             raise
         finally:
             if handler:
-                handler.cleanup()
+                with tracer.start_as_current_span("handler-cleanup"):
+                    handler.cleanup()
 
         logger.info(f"Scan finished in {time.time() - start} s")
         return scans

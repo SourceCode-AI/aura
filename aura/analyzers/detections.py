@@ -22,7 +22,7 @@ except ImportError:
 
 
 
-@dataclass
+@dataclass(slots=True)
 @total_ordering
 class Detection(JSONSerializable):
     """
@@ -50,9 +50,7 @@ class Detection(JSONSerializable):
     message: str
     score: int = 0  # Score that affects security audit
     line_no: Optional[int] = None  # Set to None to hide it from output
-    line: Union[
-        str, None
-    ] = None  # Set to None or empty string to hide it from output
+    line: Optional[str] = None  # Set to None or empty string to hide it from output
     # If the rule is tied to the AST tree detections, then set the node pointer appropriately
     # Set to None to hide or for rules that are not tied to the AST tree
     detection_type: Optional[str] = None
@@ -63,13 +61,12 @@ class Detection(JSONSerializable):
     location: Optional[Union[Path, str]] = None
     scan_location: Optional[ScanLocation] = None
     _metadata: Optional[dict] = None
+    _hash: Optional[int] = None
+    _diff_hash: Optional[int] = None
+    _severity: Optional[str] = None
+    _sigint: Optional[int] = None
 
     def __post_init__(self):
-        self._hash = None
-        self._diff_hash = None
-        self._severity = None
-        self._sigint: Optional[int] = None
-
         if self.node and self.line_no is None:
             self.line_no = self.node.line_no
 
@@ -122,7 +119,7 @@ class Detection(JSONSerializable):
             return True
         return self.line_no <= other.line_no
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         """
         Default hash implementation for deduplication of detections.
         By default a combination of a class name and a `signature` attribute is used to produce the hash.

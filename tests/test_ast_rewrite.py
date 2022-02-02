@@ -94,6 +94,29 @@ def test_string_slice(src, result):
     assert str(tree) == result
 
 
+@pytest.mark.parametrize(
+    "src,result",(
+        ("{}", {}),
+        ("{'a': 'b', 1: 2}", {"a": "b", 1: 2}),
+        ("{None: 42}", {None: 42}),
+        ("""
+        d = {"a": "b"}
+        {1: 2, **d}
+        """, {"a": "b", 1: 2}),
+        ("""
+        d1 = {'a': 'b'}
+        d2 = {'c': 'd'}
+        {**d1, **d2}
+        """, {"a": "b", "c": "d"})
+    )
+)
+def test_dictionary(src, result):
+    tree = process_source_code(src)
+    assert isinstance(tree, Dictionary)
+    src_dict = tree.as_native()
+    assert src_dict == result, src_dict
+
+
 def test_if_condition_dont_modify_data():
     src = """
     x = "a"

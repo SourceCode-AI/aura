@@ -3,27 +3,26 @@ from collections import OrderedDict
 
 from .visitor import Visitor
 from .nodes import *
+from ... import tracing
 
 
-def visit_List(context):
+def visit_List(context) -> List:
     new_node = List(elts=context.node.get("elts", []), ctx=context.node.get("ctx"))
-    new_node.line_no = context.node["lineno"]
-    new_node.col = context.node["col_offset"]
+    new_node.enrich_from_previous(context.node)
     context.replace(new_node)
     return new_node
 
 
-def visit_Str(context):
+def visit_Str(context) -> String:
     node = String(context.node["s"])
     node.enrich_from_previous(context.node)
     context.replace(node)
     return node
 
 
-def visit_Bytes(context):
+def visit_Bytes(context) -> Bytes:
     node = Bytes(context.node["s"])
-    node.line_no = context.node["lineno"]
-    node.col = context.node["col_offset"]
+    node.enrich_from_previous(context.node)
     context.replace(node)
     return node
 
@@ -189,24 +188,45 @@ def visit_arguments(context):
     args = []
     if context.node.get("args"):
         for x in context.node["args"]:
-            if isinstance(x, dict) and "arg" in x:
-                args.append(x["arg"])
-            else:
-                args.append(x)
+            match x:
+                case str():
+                    args.append(Arg(arg=x))
+                case {"_type": "arg", **rest}:
+                    args.append(Arg.from_raw_ast(x))
+                case _:
+                    raise RuntimeError(f"Unknown AST type for arg: {x}")
 
-    if (
-        isinstance(context.node.get("kwarg"), dict)
-        and context.node["kwarg"].get("_type") == "arg"
-    ):
-        kwarg = context.node["kwarg"]["arg"]
-    else:
-        kwarg = context.node.get("kwarg")
+            #if isinstance(x, dict) and "arg" in x:
+            #    args.append(x["arg"])
+            #else:
+            #    args.append(x)
+
+    match ast_kwarg := context.node.get("kwarg"):
+        case {"_type": "arg", **rest}:
+            node_kwarg = Arg.from_raw_ast(ast_kwarg)
+        case str():
+            node_kwarg = Arg(arg=ast_kwarg)
+        case None:
+            node_kwarg = None
+        case _:
+            raise RuntimeError(f"Unknown AST type for kwarg: {ast_kwarg}")
+
+    match ast_vararg := context.node.get("vararg"):
+        case {"_type": "arg", **rest}:
+            node_vararg = Arg.from_raw_ast(ast_vararg)
+        case str():
+            node_vararg = Arg(arg=ast_vararg)
+        case None:
+            node_vararg = None
+        case _:
+            raise RuntimeError(f"Unknown AST type for vararg: {ast_vararg}")
 
     new_node = Arguments(
         args=args,
-        vararg=context.node.get("varargs"),
+        vararg=node_vararg,
+        posonlyargs=context.node.get("posonlyargs", []),
         kwonlyargs=context.node.get("kwonlyarg", []),
-        kwarg=kwarg,
+        kwarg=node_kwarg,
         defaults=context.node.get("defaults", []),
         kw_defaults=context.node.get("kw_defaults", []),
     )
@@ -216,7 +236,7 @@ def visit_arguments(context):
     return new_node
 
 
-def visit_ClassDef(context):
+def visit_ClassDef(context) -> ClassDef:
     new_node = ClassDef(
         name=context.node.get("name"),
         body=context.node.get("body"),
@@ -227,14 +247,14 @@ def visit_ClassDef(context):
     return new_node
 
 
-def visit_Return(context):
+def visit_Return(context) -> ReturnStmt:
     new_node = ReturnStmt(value=context.node["value"])
     new_node.enrich_from_previous(context.node)
     context.replace(new_node)
     return new_node
 
 
-def visit_Yield(context):
+def visit_Yield(context) -> Yield:
     new_node = Yield(value=context.node["value"])
     new_node.enrich_from_previous(context.node)
     context.replace(new_node)
@@ -334,12 +354,13 @@ class ASTVisitor(Visitor):
     This class converts JSON serialized AST tree to appropriate dataclasses if possible
     """
 
+    __slots__ = Visitor.__slots__
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.convergence = None
 
     def _visit_node(self, context):
-        #print(context.node)
         if type(context.node) not in (dict, OrderedDict):
             return
 
@@ -352,3 +373,6 @@ class ASTVisitor(Visitor):
             #     context.visitor.queue.clear()
             #     context.visitor.push(context.parent)
             #     new_node._visit_node(context)
+
+    def _post_analysis(self):
+        super()._post_analysis()

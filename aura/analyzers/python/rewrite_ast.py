@@ -10,23 +10,30 @@ class ASTRewrite(Visitor):
     Visitor to transform the AST tree for deobfuscation purposes
     """
 
+    __slots__ = Visitor.__slots__ + ("_node_mutations",)
+
     def __init__(self, **kwargs):
-        self.__mutations = (
-            self.binop,
-            self.resolve_variable,
-            self.string_slice,
-            self.inline_decode,
-            self.rewrite_function_call,
-            self.replace_string,
-            self.unary_op,
-            self.return_statement,
-        )
         super().__init__(**kwargs)
+        self._node_mutations = {
+            ReturnStmt: (self.return_statement,),
+            Yield: (self.return_statement,),
+            YieldFrom: (self.return_statement,),
+            dict: (self.unary_op,),
+            OrderedDict: (self.unary_op,),
+            Call: (self.replace_string, self.rewrite_function_call, self.inline_decode),
+            Attribute: (self.resolve_variable,),
+            Var: (self.resolve_variable,),
+            Subscript: (self.resolve_variable, self.string_slice),
+            BinOp: (self.binop,)
+        }
 
     def _visit_node(self, context):
-        for mutation in self.__mutations:
-            if mutation(context):
-                return
+        node_type = type(context.node)
+
+        if (mutations:=self._node_mutations.get(node_type)):
+            for mutation in mutations:
+                if mutation(context):
+                    return
 
     def binop(self, context):
         """
@@ -279,6 +286,7 @@ class ASTRewrite(Visitor):
                 pass
 
     def resolve_class(self, context):
+        # TODO: unused for now
         node = context.node
         if not isinstance(node, Attribute):
             return

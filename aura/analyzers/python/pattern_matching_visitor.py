@@ -14,6 +14,8 @@ DEFAULT_EXCLUDE_TAGS = {"misc:test_code", "misc:stats"}
 
 
 class ASTPatternMatcherVisitor(Visitor):
+    __slots__ = Visitor.__slots__ + ("_signatures", "_report_modules")
+
     def __init__(self, *, location):
         super().__init__(location=location)
         self.convergence = None

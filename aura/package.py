@@ -352,7 +352,7 @@ class PackageScore:
         else:
             self.pkg = package
 
-        self.now = datetime.datetime.utcnow()
+        self.now = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
         self.github: Optional[github.GitHub] = None
 
         if fetch_github:
@@ -575,7 +575,7 @@ class DependencyTree:
 
         return True
 
-    def expand(self, dep: DependencyItem):
+    def expand(self, dep: DependencyItem) -> None:
         q: t.Deque[DependencyItem] = deque()
         q.append(dep)
 

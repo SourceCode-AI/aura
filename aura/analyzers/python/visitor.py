@@ -20,6 +20,7 @@ from ...exceptions import ASTParseError
 from ...uri_handlers.base import ScanLocation
 from ... import python_executor
 from ... import config
+from ...tracing import tracer
 
 
 INSPECTOR_PATH = os.path.abspath(python_src_inspector.__file__)
@@ -83,6 +84,10 @@ class Visitor:
     """
 
     stage_name : Optional[str] = None
+    __slots__ = (
+        "location", "tree", "traversed", "modified", "iteration", "convergence", "queue", "call_graph", "hits",
+        "path", "normalized_path", "max_iterations", "max_queue_size"
+    )
 
     def __init__(self, *, location: ScanLocation):
         self.location: ScanLocation = location
@@ -127,11 +132,15 @@ class Visitor:
             if stage == "raw":
                 continue
 
-            assert previous.tree is not None, stage
-            if stage not in visitors:
-                raise ValueError("Unknown AST stage: " + stage)
-            v = visitors[stage].from_visitor(previous)
-            previous = v
+            with tracer.start_as_current_span("run-stage") as span:
+                span.set_attribute("stage", stage)
+
+                assert previous.tree is not None, stage
+                if stage not in visitors:
+                    raise ValueError("Unknown AST stage: " + stage)
+                v = visitors[stage].from_visitor(previous)
+                previous = v
+                span.set_attribute("iterations", v.iteration)
 
         return v
 

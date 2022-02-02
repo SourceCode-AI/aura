@@ -1,4 +1,4 @@
-import typing
+import typing as t
 
 from ..detections import Detection
 from .visitor import Visitor
@@ -9,12 +9,13 @@ from ...type_definitions import ScanLocationType
 class ReadOnlyAnalyzer(Visitor):
     stage_name = "read_only"
     hooks = []
+    __slots__ = Visitor.__slots__
 
     def __init__(self, *, location: ScanLocationType):
         super().__init__(location=location)
         self.convergence = None
 
-    def __call__(self) -> typing.Iterable[Detection]:
+    def __call__(self) -> t.Iterable[Detection]:
         if not self.hooks:
             return
         elif not self.location.is_python_source_code:
@@ -33,8 +34,7 @@ class ReadOnlyAnalyzer(Visitor):
         node_type = "node_" + type(context.node).__name__
 
         for hook in self.hooks:
-            handler = getattr(hook, node_type, None)
-            if handler is not None:
+            if (handler := hook.defined_node_types.get(node_type)):
                 self.hits.extend(handler(context=context))
-            elif hasattr(hook, "_visit_node"):
-                self.hits.extend(hook._visit_node(context=context))
+
+            self.hits.extend(hook._visit_node(context=context))

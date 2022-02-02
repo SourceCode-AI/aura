@@ -10,6 +10,7 @@ from .detections import Detection
 from .python.nodes import String, Call, Dictionary
 from .base import NodeAnalyzerV2
 from ..utils import Analyzer
+from ..bases import ASTAnalyzer
 from .. import config
 
 
@@ -17,13 +18,14 @@ logger = config.get_logger(__name__)
 
 
 @Analyzer.ID("setup_py")
-class SetupPy(NodeAnalyzerV2):
+class SetupPy(NodeAnalyzerV2, ASTAnalyzer):
     """Audit setup.py file for anomalies such as code execution or network communication"""
 
     __slots__ = ("hits",)
     filename_whitelist = set(["setup.py"])
 
     def __init__(self):
+        super().__init__()
         self.hits = []
 
     def node_Call(self, context):
