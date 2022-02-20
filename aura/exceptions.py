@@ -45,11 +45,7 @@ class FeatureDisabled(AuraException):
     pass
 
 
-class PluginDisabled(FeatureDisabled):  # TODO: consider removing
-    pass
-
-
-class AnalyzerDeactivated(FeatureDisabled):
+class PluginDisabled(FeatureDisabled):
     pass
 
 

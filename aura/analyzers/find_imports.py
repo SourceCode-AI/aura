@@ -64,7 +64,7 @@ def get_imports(py_src, metadata=None) -> List:
 
 
 # TODO: add support for other "pythonic" files, see modulefinder (pyc, dynlib etc.)
-def find_imports(py_src: Path, metadata=None):
+def find_imports(py_src: Path, metadata=None) -> Optional[dict]:
     """
     Construct a dependency matrix of import files
     """
@@ -73,7 +73,7 @@ def find_imports(py_src: Path, metadata=None):
 
     imports = get_imports(py_src, metadata=metadata)
     if not imports:
-        return
+        return {"dependencies": set(), "unknown": set()}
 
     for level, pkg, name in imports:
         if level == 0 or pkg is None:

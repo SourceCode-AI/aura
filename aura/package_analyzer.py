@@ -151,11 +151,11 @@ class Analyzer:
                     logger.debug("Computing import graph")
 
                     for x in collected:
-                        if not x.metadata.get('py_imports'):
+                        if not (py_imports:=x.py_imports):
                             continue
 
                         node = Path(x.location).absolute()
-                        topo.add_edge(node, x.metadata['py_imports']['dependencies'])
+                        topo.add_edge(node, py_imports['dependencies'])
 
                     topology = topo.sort()
 

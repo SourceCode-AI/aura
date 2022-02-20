@@ -169,10 +169,6 @@ class Detection(JSONSerializable):
         return self.name.lower()
 
 
-class DataProcessing(Detection):
-    pass
-
-
 def get_severity(detection: Detection) -> str:
     if detection._severity is not None:
         return detection._severity

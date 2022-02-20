@@ -4,7 +4,8 @@ python:
   - "3.9"
 
 install:
-  - echo "install disabled"
+  - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+  - docker buildx create --name xbuilder --use
 
 services:
   - docker
@@ -27,10 +28,10 @@ jobs:
   include:
     - stage: build
       script:
-        - docker build --target aura-full-tests .
-        - docker build --target aura-full -t ${IMAGE_NAME}-full .
-        - docker build --target aura-lite-tests .
-        - docker build --target aura-lite -t ${IMAGE_NAME}-lite .
+        - docker buildx --progress plain --platform=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6 --target aura-full-tests .
+        - docker buildx --progress plain --platform=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6 --target aura-full -t ${IMAGE_NAME}-full .
+        - docker buildx --progress plain --platform=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6 --target aura-lite-tests .
+        - docker buildx --progress plain --platform=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6 --target aura-lite -t ${IMAGE_NAME}-lite .
         - docker push ${IMAGE_NAME}-full
         - docker push ${IMAGE_NAME}-lite
 

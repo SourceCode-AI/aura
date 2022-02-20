@@ -106,6 +106,10 @@ aura: &aura_config
   # This will ensure that imported files will be analyzed before the files that are importing them
   sort_by_imports: false
 
+  # List of tags to exclude from the aggregation, e.g. when summing up all tags in a scan
+  exclude_aggregated_tags:
+    - "misc:file_stats"
+
 
 tags: &tags
   # Filter results that contain only the specified tags
@@ -295,6 +299,9 @@ score: &scores
 
   # Variables, attributes and function definitions containing non-ascii characters
   non-ascii-tokens: 50
+
+  # Leaking PyPIrc credentials
+  # leaking_pypirc: 100
 
 cache: &cache
   # Mode can be one of:

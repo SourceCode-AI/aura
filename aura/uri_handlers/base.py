@@ -25,11 +25,8 @@ from .. import config
 from ..utils import KeepRefs, lookup_lines, lzset, jaccard, walk, sanitize_uri
 from ..exceptions import PythonExecutorError, UnsupportedDiffLocation, FeatureDisabled
 from ..analyzers import find_imports
-from ..analyzers.detections import DataProcessing, get_severity
+from ..analyzers.detections import get_severity, Detection
 from ..type_definitions import ScanLocationType
-
-if t.TYPE_CHECKING:
-    from ..analyzers.detections import Detection
 
 
 logger = config.get_logger(__name__)
@@ -138,6 +135,8 @@ class ScanLocation(KeepRefs, ScanLocationType):
     _str_location: t.Optional[str] = None
     _str_parent: t.Optional[str] = None
     _lzset: t.Optional[str] = None
+    _mime: t.Optional[str] = None
+    _py_imports: t.Optional[dict] = None
 
     def __post_init__(self):
         if type(self.location) == str:
@@ -160,20 +159,7 @@ class ScanLocation(KeepRefs, ScanLocationType):
         if self.location.is_file():
             self.size = self.location.stat().st_size
             self.__compute_hashes()
-            self.metadata["mime"] = magic.from_file(self.str_location, mime=True)
-
-            if self.metadata["mime"] in ("text/plain", "application/octet-stream", "text/none"):
-                self.metadata["mime"] = mimetypes.guess_type(self._str_location)[0]
-            elif self.metadata["mime"] != "text/x-python" and self.is_python_source_code:  # FIXME: not very elegant mime normalization
-                self.metadata["mime"] = "text/x-python"
-
-            if self.is_python_source_code and "no_imports" not in self.metadata:
-                try:
-                    imports = find_imports.find_imports(self.location, metadata=self.metadata)
-                    if imports:
-                        self.metadata["py_imports"] = imports
-                except PythonExecutorError:
-                    pass
+            self.metadata["mime"] = self.mime
 
     def __compute_hashes(self):
         if self.size == 0:  # Can't mmap empty file
@@ -236,8 +222,31 @@ class ScanLocation(KeepRefs, ScanLocationType):
             return None
 
     @property
+    def mime(self) -> str:
+        if self._mime is None:
+            self._mime = magic.from_file(self.str_location, mime=True)
+            if self._mime in ("text/plain", "application/octet-stream", "text/none"):
+                self._mime = mimetypes.guess_type(self._str_location)[0]
+            elif self._mime == "text/x-script.python":
+                self._mime = "text/x-python"
+
+        return self._mime
+
+    @property
     def is_python_source_code(self) -> bool:
-        return (self.metadata["mime"] in ("text/x-python", "text/x-script.python"))
+        return (self.mime in ("text/x-python", "text/x-script.python"))
+
+    @property
+    def py_imports(self) -> t.Optional[dict]:
+        if not self.is_python_source_code:
+            return None
+        if self._py_imports is None:
+            try:
+                self._py_imports = find_imports.find_imports(self.location, metadata=self.metadata)
+            except PythonExecutorError:
+                pass
+
+        return self._py_imports
 
     @property
     def is_archive(self) -> bool:
@@ -344,7 +353,8 @@ class ScanLocation(KeepRefs, ScanLocationType):
         """
         max_depth = int(config.CFG["aura"].get("max-depth", 5))  #type: ignore[index]
         if self.metadata["depth"] > max_depth:
-            d = DataProcessing(
+            d = Detection(
+                detection_type = "DataProcessing",
                 message = f"Maximum processing depth reached",
                 extra = {
                     "reason": "max_depth",
