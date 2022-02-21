@@ -24,8 +24,6 @@ before_install:
 stages:
   - build
   - test
-#  - deploy_prod
-#  - deploy_dev
   - make_docs
 
 jobs:
@@ -37,30 +35,9 @@ jobs:
         - docker buildx build --platform=linux/amd64,linux/arm64 --target aura-full --push -t ${IMAGE_NAME}-full -t ${DOCKER_REPO}:${IMAGE_TAG} .
         - docker buildx build --platform=linux/amd64,linux/arm64 --target aura-lite-tests .
         - docker buildx build --platform=linux/amd64,linux/arm64 --target aura-lite --push -t ${IMAGE_NAME}-lite -t ${DOCKER_REPO}:${IMAGE_TAG_LITE} .
-        #- docker push ${IMAGE_NAME}-full
-        #- docker push ${IMAGE_NAME}-lite
-
-#    - stage: deploy_prod
-#      if: branch = master
-#      script:
-#        - docker pull ${IMAGE_NAME}-full
-#        - docker tag ${IMAGE_NAME}-full ${DOCKER_REPO}:latest
-#        - docker push ${DOCKER_REPO}:latest
-#        - docker pull ${IMAGE_NAME}-lite
-#        - docker tag ${IMAGE_NAME}-lite ${DOCKER_REPO}:latest-lite
-#        - docker push ${DOCKER_REPO}:latest-lite
-#
-#    - stage: deploy_dev
-#      if: branch = dev
-#      script:
-#        - docker pull ${IMAGE_NAME}-full
-#        - docker tag ${IMAGE_NAME}-full ${DOCKER_REPO}:dev
-#        - docker push ${DOCKER_REPO}:dev
-#        - docker pull ${IMAGE_NAME}-lite
-#        - docker tag ${IMAGE_NAME}-lite ${DOCKER_REPO}:dev-lite
-#        - docker push ${DOCKER_REPO}:dev-lite
 
     - stage: make_docs
+      if: branch = dev
       script:
         - pip install -U pip
         - pip install awscli

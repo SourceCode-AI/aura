@@ -7,7 +7,9 @@ ENV PATH="/root/.local/bin:${PATH}"
 ENV CRYPTOGRAPHY_DONT_BUILD_RUST=1
 
 # This is a specific order of installing the dependencies first so we can use caching mechanism to quickly rebuild the image in case only aura source code changed
-RUN addgroup analysis && adduser -S -G analysis analysis
+RUN addgroup analysis && adduser -S -G analysis analysis && mkdir /analyzer
+
+ADD files/install_poetry.sh /analyzer
 
 RUN apk add --no-cache \
     python2 \
@@ -21,17 +23,8 @@ RUN apk add --no-cache \
     libffi-dev \
     rust \
     cargo \
-    git
-
-
-RUN mkdir /analyzer
-ADD files/install_poetry.sh /analyzer
-
-RUN /analyzer/install_poetry.sh
-
-#RUN mkdir /analyzer && \
-#    curl -sSL https://install.python-poetry.org | python3 - && \
-#    poetry config virtualenvs.create false
+    git && \
+    /analyzer/install_poetry.sh
 
 WORKDIR /analyzer
 
