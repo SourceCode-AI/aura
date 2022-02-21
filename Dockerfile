@@ -4,6 +4,7 @@ ARG alpinever=3.15
 FROM python:${pythonver}-alpine${alpinever} AS aura-base
 
 ENV PATH="/root/.local/bin:${PATH}"
+ENV CRYPTOGRAPHY_DONT_BUILD_RUST=1
 
 # This is a specific order of installing the dependencies first so we can use caching mechanism to quickly rebuild the image in case only aura source code changed
 RUN addgroup analysis && adduser -S -G analysis analysis
@@ -18,11 +19,19 @@ RUN apk add --no-cache \
     libtool \
     build-base \
     libffi-dev \
+    rust \
+    cargo \
     git
 
-RUN mkdir /analyzer && \
-    curl -sSL https://install.python-poetry.org | python3 - && \
-    poetry config virtualenvs.create false
+
+RUN mkdir /analyzer
+ADD files/install_poetry.sh /analyzer
+
+RUN /analyzer/install_poetry.sh
+
+#RUN mkdir /analyzer && \
+#    curl -sSL https://install.python-poetry.org | python3 - && \
+#    poetry config virtualenvs.create false
 
 WORKDIR /analyzer
 
