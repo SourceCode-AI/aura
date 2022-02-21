@@ -55,7 +55,8 @@ ADD tests /analyzer/tests
 ENV AURA_NO_CACHE=true
 
 # Install Aura
-RUN poetry install --no-dev &&\
+RUN --mount=type=cache,mode=0755,target=/root/.cache poetry build &&\
+    cd dist && export WHEEL_NAME=$(ls|grep .whl) && pip install $WHEEL_NAME &&\
     python -c "import aura;"  &&\
     find /analyzer -name '*.pyc' -delete -print &&\
     chmod +x /analyzer/entrypoint.sh &&\
@@ -69,7 +70,8 @@ CMD ["--help"]
 
 FROM aura-lite AS aura-lite-tests
 
-RUN poetry install
+#RUN poetry install
+RUN --mount=type=cache,mode=0755,target=/root/.cache cd dist && export WHEEL_NAME=$(ls|grep .whl) && pip install $WHEEL_NAME\[dev\]
 
 RUN pytest tests/
 
@@ -83,7 +85,8 @@ RUN apk add --no-cache \
     libxslt-dev \
     postgresql-dev
 
-RUN poetry install --no-dev -E full
+#RUN poetry install --no-dev -E full
+RUN --mount=type=cache,mode=0755,target=/root/.cache cd dist && export WHEEL_NAME=$(ls|grep .whl) && pip install $WHEEL_NAME\[full\]
 
 ADD docs /analyzer/docs
 
@@ -94,7 +97,8 @@ CMD ["--help"]
 
 FROM aura-full AS aura-full-tests
 
-RUN poetry install -E full
+#RUN poetry install -E full
+RUN --mount=type=cache,mode=0755,target=/root/.cache cd dist && export WHEEL_NAME=$(ls|grep .whl) && pip install $WHEEL_NAME\[dev,full\]
 
 RUN pytest tests/
 

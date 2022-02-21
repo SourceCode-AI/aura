@@ -68,9 +68,20 @@ opentelemetry-api = { version = "~1.9", optional = true }
 opentelemetry-sdk = { version = "~1.9", optional = true }
 opentelemetry-exporter-jaeger = { version = "~1.9", optional = true }
 
+# dev dependencies
+responses = { version = "^0.17", optional = true }
+tox = { version = "~3.24", optional = true }
+pytest = { version = "~6.2", optional = true }
+pytest-cov = { version = "~3.0", optional = true }
+pytest-randomly = { version = "~3.11", optional = true }
+sphinx = { version = "~4.3", optional = true }
+sphinxcontrib-mermaid = { version = "~0.7", optional = true }
+
+
 [tool.poetry.extras]
 full = ["yara-python", "networkx", "cssselect", "GitPython", "python-rapidjson", "defusedxml", "jsonschema", "tomli", "psycopg2", "xxhash", "SQLAlchemy"]
 telemetry = ["opentelemetry-api", "opentelemetry-sdk", "opentelemetry-exporter-jaeger"]
+dev = ["responses", "tox", "pytest", "pytest-cov", "pytest-randomly", "sphinx", "sphinxcontrib-mermaid"]
 
 [tool.poetry.dev-dependencies]
 responses = "^0.17"
