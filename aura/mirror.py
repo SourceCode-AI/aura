@@ -32,11 +32,11 @@ class LocalMirror:
     def get_json(self, package_name) -> dict:
         assert package_name
         json_path = self.get_mirror_path() / "json" / package_name
-        target = cache.MirrorJSON.proxy(src=json_path)
+        target = cache.MirrorRequest(src=json_path).proxy()
 
         if not target.is_file():
             json_path = self.get_mirror_path() / "json" / canonicalize_name(package_name)
-            target = cache.MirrorJSON.proxy(src=json_path)
+            target = cache.MirrorRequest(src=json_path).proxy()
             if not target.exists():
                 raise NoSuchPackage(package_name)
 

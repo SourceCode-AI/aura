@@ -9,6 +9,7 @@ from aura import plugins
 from aura import utils
 from aura import config
 from aura import python_executor
+from aura import cache
 from aura.analyzers.archive import archive_analyzer
 from aura.analyzers.stats import analyze as  stats_analyzer
 from aura.analyzers.data_finder import StringFinder
@@ -61,3 +62,13 @@ def test_invalid_interpreters(caplog):
     assert valid in verified
     assert invalid not in verified
     assert err_msg in caplog.text
+
+
+def test_ast_pattern_fetching(mock_cache):
+    cache.ASTPatternsRequest.default = None
+
+    default = cache.ASTPatternsRequest.get_default()
+    assert default is cache.ASTPatternsRequest.default
+
+    assert default.proxy() is not None
+    assert cache.ASTPatternsRequest.get_default().proxy() is not None

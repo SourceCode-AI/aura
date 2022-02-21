@@ -37,7 +37,6 @@ class SQLi(base.NodeAnalyzerV2, ASTAnalyzer):
         BinOp(op='add', left='uid', right=String(value='SELECT * FROM users where id = '))
         """
         n = context.node
-        yield from []
         if not (isinstance(n.right, String) and n.op in ("mod", "add")):
             return
 

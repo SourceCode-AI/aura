@@ -1,6 +1,6 @@
 from abc import abstractmethod, ABC
-from typing import ClassVar, Union
-from inspect import getdoc
+from typing import ClassVar, Union, Set, Any
+from inspect import getdoc, getmembers
 
 
 MISSING = object()
@@ -38,6 +38,22 @@ class ASTAnalyzer(AbstractAnalyzer):
             raise RuntimeError(f"You must define the analyzer_id for `{self.__class__}`!")
 
         super().__init__(*args, **kwargs)
+        self._node_types = None
+
+    @property
+    def defined_node_types(self) -> dict[str, any]:
+        if self._node_types is None:
+            self._node_types = dict()
+
+            for attr, val in getmembers(self):
+                if attr.startswith("node_"):
+                    self._node_types[attr] = val
+
+        assert self._node_types is not None  # This is to make mypy happy
+        return self._node_types
+
+    def _visit_node(self, context):
+        yield from []
 
 
 # TODO: transition raw file analyzers to this class

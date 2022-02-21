@@ -24,7 +24,7 @@ from .exceptions import InvalidConfiguration, MissingFile
 
 
 CFG : dict
-CFG_PATH = None
+CFG_PATH: Path
 SEMANTIC_RULES : dict
 LOG_FMT = logging.Formatter("%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s")
 LOG_ERR = None
@@ -178,13 +178,15 @@ def get_file_location(
         if pth.is_file():
             return str(pth)
     else:
-        pth = location
+        pth = Path(location)
 
     if exc:
-        # TODO: add location and base path directoly to the exception as variables for easy extraction
-        raise MissingFile(f"Can't find configuration file `{location}` using base path `{base_path}`")
+        raise MissingFile(
+            f"Can't find configuration file `{location}` using base path `{base_path}`",
+            file_location=location, base_path=str(base_path)
+        )
     else:
-        return pth
+        return str(pth)
 
 
 def get_file_content(location: str, base_path: Optional[str]=None) -> str:
@@ -297,8 +299,7 @@ def get_maximum_archive_size() ->typing.Optional[int] :
 
 
 def get_default_tag_filters() -> typing.List[str]:
-    tags = CFG.get("tags", [])
-    return tags
+    return CFG.get("tags", [])
 
 
 def get_installed_stages() -> typing.Generator[str,None,None]:

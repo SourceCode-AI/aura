@@ -31,7 +31,10 @@ class InvalidConfiguration(AuraException, ValueError):
 
 
 class MissingFile(InvalidLocation):
-    pass
+    def __init__(self, msg: str, file_location: Optional[str]=None, base_path: Optional[str]=None):
+        super().__init__(msg)
+        self.file_location = file_location
+        self.base_path = base_path
 
 
 class ASTNodeRewrite(AuraException):
@@ -42,11 +45,7 @@ class FeatureDisabled(AuraException):
     pass
 
 
-class PluginDisabled(FeatureDisabled):  # TODO: consider removing
-    pass
-
-
-class AnalyzerDeactivated(FeatureDisabled):
+class PluginDisabled(FeatureDisabled):
     pass
 
 

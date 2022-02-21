@@ -36,7 +36,7 @@ include = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.8 || ^3.9 || ^3.10"
+python = "^3.10"
 packaging = "~20.9"
 python-magic = "~0.4.24"
 click = "~8.0"
@@ -51,8 +51,8 @@ python-tlsh = "~3.17.0"
 prettyprinter = "~0.18"
 chardet = "~4.0"
 
-# TODO: Extras, autodetect their presence in aura
-jsonschema = { version = "~3.2", optional = true }
+
+jsonschema = { version = "~4.4", optional = true }
 GitPython = { version = "~3.1", optional = true }
 defusedxml = { version = "~0.7", optional = true }
 tomli = { version = "~2.0", optional = true }
@@ -63,9 +63,25 @@ psycopg2 = { version = "~2.9", optional = true }
 SQLAlchemy = { version = "~1.4", optional = true, extras = ["mypy"] }
 xxhash = { version = "~2.0", optional = true }
 
+# Extras for collecting perfomance telemetry/traces
+opentelemetry-api = { version = "~1.9", optional = true }
+opentelemetry-sdk = { version = "~1.9", optional = true }
+opentelemetry-exporter-jaeger = { version = "~1.9", optional = true }
+
+# dev dependencies
+responses = { version = "^0.17", optional = true }
+tox = { version = "~3.24", optional = true }
+pytest = { version = "~6.2", optional = true }
+pytest-cov = { version = "~3.0", optional = true }
+pytest-randomly = { version = "~3.11", optional = true }
+sphinx = { version = "~4.3", optional = true }
+sphinxcontrib-mermaid = { version = "~0.7", optional = true }
+
 
 [tool.poetry.extras]
 full = ["yara-python", "networkx", "cssselect", "GitPython", "python-rapidjson", "defusedxml", "jsonschema", "tomli", "psycopg2", "xxhash", "SQLAlchemy"]
+telemetry = ["opentelemetry-api", "opentelemetry-sdk", "opentelemetry-exporter-jaeger"]
+dev = ["responses", "tox", "pytest", "pytest-cov", "pytest-randomly", "sphinx", "sphinxcontrib-mermaid"]
 
 [tool.poetry.dev-dependencies]
 responses = "^0.17"

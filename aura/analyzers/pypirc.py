@@ -44,7 +44,7 @@ def analyze(*, location: ScanLocation) -> AnalyzerReturnType:
                 message = "Leaking credentials in the `.pypirc` file",
                 signature = f"pypirc#{sig}",
                 location = location.location,
-                score = 100,  # TODO: make the score configurable
+                score = config.get_score_or_default("leaking_pypirc", 100),
                 extra = {
                     "section": section_name,
                     "username": username,

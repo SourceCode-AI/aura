@@ -10,7 +10,7 @@ from typing import Generator, Tuple, Optional, Dict, Any, List
 from packaging.utils import canonicalize_name
 
 from .base import URIHandler, PackageProvider, ScanLocation
-from ..cache import FileDownloadCache
+from ..cache import FileDownloadRequest
 from ..exceptions import UnsupportedDiffLocation
 from ..package import PypiPackage
 from ..type_definitions import ReleaseInfo
@@ -99,7 +99,7 @@ class PyPiHandler(URIHandler, PackageProvider):
             loc = self.opts["download_dir"] / release["filename"]
 
             with loc.open("wb") as fd:
-                FileDownloadCache.proxy(url=release["url"], fd=fd)
+                FileDownloadRequest(url=release["url"], fd=fd).proxy()
 
             if metadata:
                 meta = metadata.copy()

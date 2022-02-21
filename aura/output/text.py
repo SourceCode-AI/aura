@@ -379,11 +379,13 @@ class TextInfoOutput(InfoOutputBase):
         lhs_lines = logo.split("\n")
         lhs_size = max(len(x) for x in lhs_lines) + 1
 
-        #print(logo)
         out.print_top_separator()
 
         # Right hand side lists environment information (installed plugins, URI handlers etc.)
         rhs_lines = []
+
+        rhs_lines.append(style(f" Aura version: {data['aura_version']}", fg="bright_blue"))
+        rhs_lines.append(style(f" Python version: {data['python_version']}", fg="bright_blue"))
 
         if data["schema_validation"] is not None:
             semantic = data["schema_validation"]["semantic_rules"]

@@ -9,12 +9,12 @@ import tempfile
 import shutil
 import copy
 import hashlib
+import typing as t
 from abc import ABC, abstractmethod
 from itertools import product
 from dataclasses import dataclass, field
 from pathlib import Path
 from difflib import SequenceMatcher
-from typing import Union, Optional, Tuple, Iterable, TYPE_CHECKING
 from warnings import warn
 
 import tlsh
@@ -25,11 +25,8 @@ from .. import config
 from ..utils import KeepRefs, lookup_lines, lzset, jaccard, walk, sanitize_uri
 from ..exceptions import PythonExecutorError, UnsupportedDiffLocation, FeatureDisabled
 from ..analyzers import find_imports
-from ..analyzers.detections import DataProcessing, get_severity
+from ..analyzers.detections import get_severity, Detection
 from ..type_definitions import ScanLocationType
-
-if TYPE_CHECKING:
-    from ..analyzers.detections import Detection
 
 
 logger = config.get_logger(__name__)
@@ -49,7 +46,7 @@ class URIHandler(ABC):
         return parsed_uri.scheme == cls.scheme
 
     @classmethod
-    def from_uri(cls, uri: str) -> Optional[URIHandler]:
+    def from_uri(cls, uri: str) -> t.Optional[URIHandler]:
         parsed = urllib.parse.urlparse(uri)
         cls.load_handlers()
 
@@ -60,7 +57,7 @@ class URIHandler(ABC):
         return cls.default(parsed)
 
     @classmethod
-    def diff_from_uri(cls, uri1: str, uri2: str) -> Tuple[URIHandler, URIHandler]:
+    def diff_from_uri(cls, uri1: str, uri2: str) -> t.Tuple[URIHandler, URIHandler]:
         cls.load_handlers()
         parsed1 = urllib.parse.urlparse(uri1)
         parsed2 = urllib.parse.urlparse(uri2)
@@ -102,10 +99,10 @@ class URIHandler(ABC):
         return True
 
     @abstractmethod
-    def get_paths(self, metadata: Optional[dict]=None) -> Iterable[ScanLocation]:
+    def get_paths(self, metadata: t.Optional[dict]=None) -> t.Iterable[ScanLocation]:
         ...
 
-    def get_diff_paths(self, other: URIHandler) -> Iterable[Tuple[ScanLocation, ScanLocation]]:
+    def get_diff_paths(self, other: URIHandler) -> t.Iterable[t.Tuple[ScanLocation, ScanLocation]]:
         raise UnsupportedDiffLocation()
 
     def cleanup(self):
@@ -127,29 +124,30 @@ class IdenticalName(float):
     pass
 
 
-@dataclass
+@dataclass(slots=True)
 class ScanLocation(KeepRefs, ScanLocationType):
     location: Path
     metadata: dict = field(default_factory=dict)
-    cleanup: Union[bool, Path, str] = False
-    parent: Optional[ScanLocation] = None
+    cleanup: t.Union[bool, Path, str] = False
+    parent: t.Optional[ScanLocation] = None
     strip_path: str = ""
-    size: Optional[int] = None
+    size: t.Optional[int] = None
+    _str_location: t.Optional[str] = None
+    _str_parent: t.Optional[str] = None
+    _lzset: t.Optional[str] = None
+    _mime: t.Optional[str] = None
+    _py_imports: t.Optional[dict] = None
 
     def __post_init__(self):
-        assert type(self.parent) != str  # Type guard format change, should be ScanLocation or None now
-
         if type(self.location) == str:
-            self.__str_location = self.location
+            self._str_location = self.location
             self.location = Path(self.location)
         else:
-            self.__str_location = os.fspath(self.location)
+            self._str_location = os.fspath(self.location)
 
         if self.cleanup:
             CLEANUP_LOCATIONS.add(self.location)
 
-        self.__str_parent = None
-        self._lzset: Optional[set] = None
         self.metadata["path"] = self.location
         self.metadata["normalized_path"] = str(self)
         self.metadata["tags"] = set()
@@ -161,20 +159,7 @@ class ScanLocation(KeepRefs, ScanLocationType):
         if self.location.is_file():
             self.size = self.location.stat().st_size
             self.__compute_hashes()
-            self.metadata["mime"] = magic.from_file(self.str_location, mime=True)
-
-            if self.metadata["mime"] in ("text/plain", "application/octet-stream", "text/none"):
-                self.metadata["mime"] = mimetypes.guess_type(self.__str_location)[0]
-            elif self.metadata["mime"] != "text/x-python" and self.is_python_source_code:  # FIXME: not very elegant mime normalization
-                self.metadata["mime"] = "text/x-python"
-
-            if self.is_python_source_code and "no_imports" not in self.metadata:
-                try:
-                    imports = find_imports.find_imports(self.location, metadata=self.metadata)
-                    if imports:
-                        self.metadata["py_imports"] = imports
-                except PythonExecutorError:
-                    pass
+            self.metadata["mime"] = self.mime
 
     def __compute_hashes(self):
         if self.size == 0:  # Can't mmap empty file
@@ -227,18 +212,41 @@ class ScanLocation(KeepRefs, ScanLocationType):
 
     @property
     def str_location(self) -> str:
-        return self.__str_location
+        return self._str_location
 
     @property
-    def filename(self) -> Optional[str]:
+    def filename(self) -> t.Optional[str]:
         if self.location.is_file():
             return self.location.name
         else:
             return None
 
     @property
+    def mime(self) -> str:
+        if self._mime is None:
+            self._mime = magic.from_file(self.str_location, mime=True)
+            if self._mime in ("text/plain", "application/octet-stream", "text/none"):
+                self._mime = mimetypes.guess_type(self._str_location)[0]
+            elif self._mime == "text/x-script.python":
+                self._mime = "text/x-python"
+
+        return self._mime
+
+    @property
     def is_python_source_code(self) -> bool:
-        return (self.metadata["mime"] in ("text/x-python", "text/x-script.python"))
+        return (self.mime in ("text/x-python", "text/x-script.python"))
+
+    @property
+    def py_imports(self) -> t.Optional[dict]:
+        if not self.is_python_source_code:
+            return None
+        if self._py_imports is None:
+            try:
+                self._py_imports = find_imports.find_imports(self.location, metadata=self.metadata)
+            except PythonExecutorError:
+                pass
+
+        return self._py_imports
 
     @property
     def is_archive(self) -> bool:
@@ -260,10 +268,10 @@ class ScanLocation(KeepRefs, ScanLocationType):
         return self._lzset
 
     @property
-    def md5(self) -> Optional[str]:
+    def md5(self) -> t.Optional[str]:
         return self.metadata.get("md5")
 
-    def create_child(self, new_location: Union[str, Path], metadata=None, **kwargs) -> ScanLocation:
+    def create_child(self, new_location: t.Union[str, Path], metadata=None, **kwargs) -> ScanLocation:
         if metadata is None:
             metadata = copy.deepcopy(self.metadata)
             metadata["depth"] = self.metadata["depth"] + 1
@@ -303,7 +311,7 @@ class ScanLocation(KeepRefs, ScanLocationType):
 
         return child
 
-    def strip(self, target: Union[str, Path], include_parent: bool=True) -> str:
+    def strip(self, target: t.Union[str, Path], include_parent: bool=True) -> str:
         """
         Strip/normalize given path
         Left side part of the target is replaced with the configured strip path
@@ -335,7 +343,7 @@ class ScanLocation(KeepRefs, ScanLocationType):
 
         return str(target)
 
-    def should_continue(self) -> Union[bool, Detection]:
+    def should_continue(self) -> t.Union[bool, Detection]:
         """
         Determine if the processing of this scan location should continue
         Currently, the following reasons can halt the processing:
@@ -345,7 +353,8 @@ class ScanLocation(KeepRefs, ScanLocationType):
         """
         max_depth = int(config.CFG["aura"].get("max-depth", 5))  #type: ignore[index]
         if self.metadata["depth"] > max_depth:
-            d = DataProcessing(
+            d = Detection(
+                detection_type = "DataProcessing",
                 message = f"Maximum processing depth reached",
                 extra = {
                     "reason": "max_depth",
@@ -363,7 +372,7 @@ class ScanLocation(KeepRefs, ScanLocationType):
         from prettyprinter import pprint as pp
         pp(self)
 
-    def post_analysis(self, detections: Iterable[Detection]):
+    def post_analysis(self, detections: t.Iterable[Detection]):
         encoding = self.metadata.get("encoding") or "utf-8"
         line_numbers = [d.line_no for d in detections if d.line_no is not None and d.line is None]
 
@@ -390,7 +399,7 @@ class ScanLocation(KeepRefs, ScanLocationType):
             if d._severity is None:
                 d._severity = get_severity(d)
 
-    def is_renamed_file(self, other: ScanLocation, max_depth: Optional[int]=None) -> float:
+    def is_renamed_file(self, other: ScanLocation, max_depth: t.Optional[int]=None) -> float:
         max_depth = max_depth or get_diff_depth_limit()
         self_name = self.strip(self.str_location, include_parent=False).lstrip("/")
         other_name = other.strip(other.str_location, include_parent=False).lstrip("/")
@@ -416,7 +425,7 @@ class ScanLocation(KeepRefs, ScanLocationType):
         else:
             return ratio
 
-    def list_recursive(self) -> Iterable[ScanLocation]:
+    def list_recursive(self) -> t.Iterable[ScanLocation]:
         for f in walk(self.location):
             yield self.create_child(
                 new_location=f,
@@ -451,7 +460,7 @@ def cleanup_locations():
         else:
             obj.do_cleanup()
 
-    for location in CLEANUP_LOCATIONS:  # type: Union[Path, ScanLocation]
+    for location in CLEANUP_LOCATIONS:  # type: t.Union[Path, ScanLocation]
         if isinstance(location, ScanLocation):
             location.do_cleanup()
 

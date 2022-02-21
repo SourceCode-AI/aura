@@ -7,11 +7,11 @@ from ..uri_handlers.base import ScanLocation
 
 from .detections import Detection
 from ..utils import Analyzer
+from .. import config
 
 
 PATH_SPLIT_CHARS = re.compile("[$/]")
-AGGREGATION_EXCLUDE_TAGS = {"misc:file_stats"}  # TODO: make this configurable
-
+AGGREGATION_EXCLUDE_TAGS = set(config.CFG.get("exclude_aggregated_tags", []))
 
 
 @Analyzer.ID("file_stats")

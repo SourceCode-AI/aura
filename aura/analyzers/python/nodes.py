@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 import typing
+import typing as t  # TODO: Migrate to use this
 import inspect
 import logging
 from abc import ABCMeta, abstractmethod
@@ -12,14 +13,13 @@ from enum import Enum
 from pathlib import Path
 from warnings import warn
 from collections import defaultdict
-from collections.abc import Hashable
 from dataclasses import dataclass, InitVar, field
-from functools import partial, total_ordering, wraps
+from functools import partial, total_ordering
 
 import chardet
 
 from ...stack import Stack
-from ...utils import KeepRefs, slotted_dataclass
+from ...utils import KeepRefs
 from ... import exceptions
 
 
@@ -58,7 +58,7 @@ class Taints(Enum):
         else:
             return False
 
-    def __add__(self, other):
+    def __add__(self, other) -> Taints:
         if type(other) != Taints:
             return NotImplemented
 
@@ -74,30 +74,23 @@ class Taints(Enum):
             return Taints.UNKNOWN
 
 
-@slotted_dataclass(
-    taint_level = None,
-    line_no = None,
-    message = None,
-    extra = field(default_factory=dict),
-    node = None
-)
+@dataclass(slots=True)
 class TaintLog:
     """
     Log entry to track the propagation of taints in the AST
     """
-    __slots__ = ("path", "taint_level", "line_no", "message", "extra", "node")
     path: Path  # Path to the affected source code
-    taint_level: typing.Optional[Taints]
-    line_no: typing.Optional[int]
-    message: typing.Optional[str]
-    extra: typing.Dict[str, typing.Any]
-    node: typing.Optional[ASTNode]
+    taint_level: t.Optional[Taints] = None
+    line_no: t.Optional[int] = None
+    message: t.Optional[str] = None
+    extra: t.Dict[str, typing.Any] = field(default_factory=dict)
+    node: t.Optional[ASTNode] = None
 
     def __post_init__(self):
         self.path = Path(self.path).absolute()
 
     def json(self) -> dict:
-        d : typing.Dict[str, typing.Any] = {
+        d : typing.Dict[str, t.Any] = {
             'line_no': self.line_no,
             'message': self.message
         }
@@ -132,26 +125,31 @@ class TaintLog:
 
 
 class ASTNode(KeepRefs, metaclass=ABCMeta):
-    def __post_init__(self, *args, previous_node=None, **kwargs):
-        self._full_name = None
-        self._original = None
-        self._docs = None
+    __slots__ = (
+        "_full_name", "_original", "_docs", "_converged", "line_no", "col", "end_line_no", "end_col",
+        "tags", "_hash", "_taint_class", "_taint_locked", "_taint_log"
+    )
+
+    def __post_init__(self, *args, previous_node: t.Optional[ASTNode]=None, **kwargs):
+        self._full_name: t.Optional[str] = None
+        self._original: t.Optional[NodeType] = None
+        self._docs: t.Optional[str] = None
         self._converged: bool = False
-        self.line_no = None
-        self.col = None
-        self.end_line_no = None
-        self.end_col = None
+        self.line_no: t.Optional[int] = None
+        self.col: t.Optional[int] = None
+        self.end_line_no: t.Optional[int] = None
+        self.end_col: t.Optional[int] = None
 
         if previous_node is not None:
             self.enrich_from_previous(previous_node)
 
-        self.tags : typing.Set[str] = set()
+        self.tags : t.Set[str] = set()
         self._hash = None
         self._taint_class: Taints = Taints.UNKNOWN
         self._taint_locked: bool = False
-        self._taint_log: typing.List[TaintLog] = []
+        self._taint_log: t.List[TaintLog] = []
 
-    def enrich_from_previous(self, node: typing.Union[dict, ASTNode]):
+    def enrich_from_previous(self, node: t.Union[dict, ASTNode]):
         """
         Enrich the current node using the information from the previous node
         This is used when AST tree is rewritten/replace with a new node so we copy all the information from the previous one
@@ -196,8 +194,8 @@ class ASTNode(KeepRefs, metaclass=ABCMeta):
         return self._full_name
 
     @property
-    def json(self) -> typing.Dict[str, typing.Any]:
-        data : typing.Dict[str, typing.Any] = {
+    def json(self) -> t.Dict[str, t.Any]:
+        data : t.Dict[str, t.Any] = {
             "AST_Type": self.__class__.__name__,
         }
         if self.full_name is not None:
@@ -229,11 +227,20 @@ class ASTNode(KeepRefs, metaclass=ABCMeta):
     def _visit_node(self, context: Context):
         return NotImplemented
 
+    def as_native(self):
+        """
+        Return the current node as a native python type if possible
+        For example:
+        - String(value="a").as_native() == "a"
+        - Dictionary(keys=[String("a")], values=[String("b")]).as_native() == {"a": "b"}
+        """
+        return self
+
     def pprint(self):
         from prettyprinter import pprint as pp
         pp(self)
 
-    def add_taint(self, taint: Taints, context: Context, lock=False, taint_log: typing.Optional[TaintLog]=None) -> bool:
+    def add_taint(self, taint: Taints, context: Context, lock=False, taint_log: t.Optional[TaintLog]=None) -> bool:
         """
         Assign a taint to the node
         Operation is ignored if the current taint is already higher or equal
@@ -284,7 +291,7 @@ class ASTNode(KeepRefs, metaclass=ABCMeta):
         self.tags.add("taint_sink")
         self._taint_log.append(log)
 
-    def match(self, other, ctx) -> bool:
+    def match(self, other: ASTNode, ctx) -> bool:
         return False
 
 
@@ -293,7 +300,7 @@ NodeType = typing.Union["NodeType", ASTNode, typing.Dict, typing.List, int, str]
 
 @dataclass
 class Module(ASTNode):
-    body: typing.List[NodeType]
+    body: t.List[NodeType]
 
     def _visit_node(self, context: Context):
         for idx, x in enumerate(self.body):
@@ -349,6 +356,9 @@ class Constant(ASTNode):
         else:
             raise ValueError(f"Incompatible value type: {repr(type(self.value))}")
 
+    def as_native(self):
+        return self.value
+
     def match(self, other, ctx) -> bool:
         if type(other) != Constant:
             return False
@@ -362,25 +372,46 @@ class Constant(ASTNode):
         return True
 
 
-@dataclass
-class Dictionary(ASTNode):  # TODO: implement methods from ASTNode
-    keys: list
-    values: list
+@dataclass()
+class Dictionary(ASTNode, t.Mapping):  # TODO: implement methods from ASTNode
+    keys: t.List[NodeType]
+    values: t.List[NodeType]
 
     def _visit_node(self, context):
-        for idx, key in enumerate(self.keys):
+        if len(self.keys) != len(self.values):
+            logger.warning(f"AST dictionary node does not have the same length for keys and values: {self}")
+
+        size = min(len(self.keys), len(self.values))
+
+        for idx in range(size):
+            key: t.Optional[NodeType] = self.keys[idx]
+            value: NodeType = self.values[idx]
+
             context.visit_child(
-                node=key,
+                node=self.keys[idx],
                 replace=partial(self.__replace_key, idx=idx, visitor=context.visitor),
             )
 
-        for idx, value in enumerate(self.values):
             if isinstance(value, str) and value in context.stack:
                 value = context.stack[value]
                 self.values[idx] = value
 
+            if isinstance(value, Var):
+                self.values[idx] = value.value
+                value = self.values[idx]
+
+            if key is None and isinstance(value, t.Mapping):
+                self.keys = self.keys[:idx] + self.keys[idx+1:]
+                self.values = self.values[:idx] + self.values[idx+1:]
+
+                for sub_key, sub_value in value.items():
+                    self.keys.append(sub_key)
+                    self.values.append(sub_value)
+
+                return
+
             context.visit_child(
-                node=value,
+                node=self.values[idx],
                 replace=partial(self.__replace_value, idx=idx, visitor=context.visitor),
             )
 
@@ -398,19 +429,49 @@ class Dictionary(ASTNode):  # TODO: implement methods from ASTNode
         d["items"] = list(zip(self.keys, self.values))
         return d
 
-    def to_dict(self):
-        return dict(zip(self.keys, self.values))
+    def as_native(self) -> dict:
+        native_keys = [
+            key.as_native() if isinstance(key, ASTNode) else key
+            for key in self.keys
+        ]
+        native_values = [
+            value.as_native() if isinstance(value, ASTNode) else value
+            for value in self.values
+        ]
+        return dict(zip(native_keys, native_values))
+
+    def items(self):
+        return zip(self.keys, self.values)
+
+    def to_dict(self) -> dict:
+        return dict(self.items())
+
+    def __len__(self) -> int:
+        return len(self.keys)
+
+    def __iter__(self):
+        return iter(self.keys)
+
+    def __getitem__(self, item: NodeType) -> NodeType:
+        try:
+            idx = self.keys.index(item)
+            return self.values[idx]
+        except ValueError as exc:
+            raise KeyError("No such key in a dictionary") from exc
 
     def __str__(self):
         return str(self.to_dict())
 
 
-@dataclass
+@dataclass()
 class Number(ASTNode):
     value: int
 
     def __int__(self):
         return self.value
+
+    def __hash__(self):
+        return hash(self.value)
 
     def _visit_node(self, context: Context):
         if type(self.value) not in (int, float):
@@ -427,8 +488,11 @@ class Number(ASTNode):
         super().__post_init__()
         self._taint_class = Taints.SAFE
 
+    def as_native(self) -> int:
+        return self.value
 
-@dataclass
+
+@dataclass()
 class String(ASTNode):
     value: str
 
@@ -471,6 +535,9 @@ class String(ASTNode):
         d = super().json
         d["value"] = self.value
         return d
+
+    def as_native(self) -> str:
+        return self.value
 
     def match(self, other, ctx) -> bool:
         if type(other) not in (str, String):
@@ -530,7 +597,7 @@ class List(ASTNode):
 @dataclass
 class Var(ASTNode):
     var_name: typing.Union[str, NodeType]
-    value: typing.Union[NodeType, None] = None
+    value: t.Optional[NodeType] = None
     var_type: str = "assign"
     typing = None
 
@@ -721,7 +788,7 @@ class FunctionDef(ASTNode):
         return self.args.set_taint(*args, **kwargs)
 
     def get_signature(self):
-        return self.args.get_signature()
+        return self.args.to_signature()
 
     def get_flask_routes(self):
         for d in self.decorator_list:
@@ -813,13 +880,13 @@ class ClassDef(ASTNode):
 @dataclass
 class Call(ASTNode):
     func: NodeType
-    args: list
-    kwargs: typing.Union[Dictionary, dict]
+    args: t.List[ASTNode]
+    kwargs: t.MutableMapping
     taints: dict = field(default_factory=dict)
 
     def __post_init__(self):
         super().__post_init__()
-        self._orig_args = [None] * len(self.args)
+        self._orig_args: t.List[NodeType] = [None] * len(self.args)
 
     def __repr__(self):
         if len(self.args) == 0 and len(self.kwargs) == 0:
@@ -845,10 +912,10 @@ class Call(ASTNode):
             try:
                 arg = self.args[idx]
                 if type(arg) == str:
-                    arg = context.stack[arg]
-                    if arg.line_no is None or arg.line_no != self.line_no:
+                    arg_node = context.stack[arg]
+                    if arg_node.line_no is None or arg_node.line_no != self.line_no:
                         self._orig_args[idx] = self.args[idx]
-                        self.args[idx] = arg
+                        self.args[idx] = arg_node
                         context.visitor.modified = True
             except (TypeError, KeyError):
                 pass
@@ -972,9 +1039,12 @@ class Call(ASTNode):
 
         return signature.bind(*self.args, **kw)
 
-    def match(self, other: Call, ctx) -> bool:
+    def match(self, other: ASTNode, ctx) -> bool:
         if type(other) != Call:
             return False
+
+        other = t.cast(Call, other)
+
         if self.cached_full_name != other.cached_full_name:
             return False
 
@@ -1010,22 +1080,49 @@ class Call(ASTNode):
         return True
 
 
+@dataclass(slots=True, frozen=True)
+class Arg:
+    arg: str
+    annotation: t.Optional[str] = None
+    type_comment: t.Optional[str] = None
+
+    @classmethod
+    def from_raw_ast(cls, data: dict) -> Arg:
+        return cls(
+            arg=data["arg"],
+            annotation=data.get("annotation"),
+            type_comment=data.get("type_comment")
+        )
+
+    def __str__(self):
+        return self.arg
+
+    def __eq__(self, other) -> bool:
+        if type(other) == str:
+            return self.arg == other
+        elif isinstance(other, Arg):
+            return self.arg == other.arg
+        else:
+            return NotImplemented
+
+
 @dataclass
-class Arguments(ASTNode):  # TODO: not used yet
-    args: typing.List[str]
-    vararg: NodeType
-    kwonlyargs: typing.List[NodeType]
-    kwarg: NodeType
-    defaults: typing.List[NodeType]
-    kw_defaults: typing.List[NodeType]
-    taints: typing.Dict[str, Taints] = field(default_factory=dict)
-    taint_logs: typing.Dict[str, list] = field(default_factory=lambda: defaultdict(list))
+class Arguments(ASTNode):
+    args: t.List[Arg]
+    vararg: t.Optional[Arg]
+    posonlyargs: t.List[NodeType]
+    kwonlyargs: t.List[NodeType]
+    kwarg: t.Optional[Arg]
+    defaults: t.List[NodeType]
+    kw_defaults: t.List[NodeType]
+    taints: t.Dict[str, Taints] = field(default_factory=dict)
+    taint_logs: t.Dict[str, list] = field(default_factory=lambda: defaultdict(list))
 
     def _visit_node(self, context):
         if self.args:
             for x in self.args:
-                if type(x) == str:
-                    context.stack[x] = Container(name=x, pointer=self)
+                if type(x) in (str, Arg):
+                    context.stack[str(x)] = Container(name=str(x), pointer=self)
 
         # TODO: add to stack other arguments
 
@@ -1041,51 +1138,6 @@ class Arguments(ASTNode):  # TODO: not used yet
         d["taints"] = self.taints
         return d
 
-    def get_signature(self):
-        params = []  # TODO add defaults
-        default_diff = len(self.args) - len(self.defaults)
-        for idx, x in enumerate(self.args):
-            if type(x) == str:
-                if idx >= default_diff:
-                    default = self.defaults[idx - default_diff]
-                else:
-                    default = inspect.Parameter.empty
-
-                params.append(
-                    inspect.Parameter(
-                        name=x,
-                        default=default,
-                        kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                    )
-                )
-
-        if self.vararg:
-            params.append(
-                inspect.Parameter(
-                    name=self.vararg, kind=inspect.Parameter.VAR_POSITIONAL
-                )
-            )
-
-        default_diff = len(self.kwonlyargs) - len(self.kw_defaults)
-        for idx, x in enumerate(self.kwonlyargs):
-            if idx >= default_diff:
-                default = self.kw_defaults[idx - default_diff]
-            else:
-                default = inspect.Parameter.empty
-
-            params.append(
-                inspect.Parameter(
-                    name=x, default=default, kind=inspect.Parameter.KEYWORD_ONLY
-                )
-            )
-
-        if self.kwarg:
-            params.append(
-                inspect.Parameter(name=self.kwarg, kind=inspect.Parameter.VAR_KEYWORD)
-            )
-
-        return inspect.Signature(parameters=params)
-
     def set_taint(self, name: typing.Union[str, int], taint_level, context, taint_log=None):
         if type(name) == int and name < len(self.args):
             name : str = self.args[name]  # type: ignore[no-redef]
@@ -1093,7 +1145,7 @@ class Arguments(ASTNode):  # TODO: not used yet
         if taint_log is None:
             warn("Attempting to modify argument taint but log is not set", stacklevel=2)
 
-        name = typing.cast(str, name)
+        name = str(name)
 
         if name in self.taints:
             taint = self.taints[name]
@@ -1120,16 +1172,16 @@ class Arguments(ASTNode):  # TODO: not used yet
 
             params.append(
                 inspect.Parameter(
-                    name=arg,
+                    name=str(arg),
                     kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
                     default=default,
                 )
             )
 
-        if self.vararg is not None:
+        if self.vararg:
             params.append(
                 inspect.Parameter(
-                    name=self.vararg, kind=inspect.Parameter.VAR_POSITIONAL
+                    name=str(self.vararg), kind=inspect.Parameter.VAR_POSITIONAL
                 )
             )
 
@@ -1146,9 +1198,9 @@ class Arguments(ASTNode):  # TODO: not used yet
                 )
             )
 
-        if self.kwarg is not None:
+        if self.kwarg:
             params.append(
-                inspect.Parameter(name=self.kwarg, kind=inspect.Parameter.VAR_KEYWORD)
+                inspect.Parameter(name=str(self.kwarg), kind=inspect.Parameter.VAR_KEYWORD)
             )
 
         return params
@@ -1156,11 +1208,15 @@ class Arguments(ASTNode):  # TODO: not used yet
     def to_signature(self):
         return inspect.Signature(parameters=self.to_parameters())
 
+    def __contains__(self, item: t.Union[str, Arg]):
+        str_arg = str(item)
+        return any(str_arg == x.arg for x in self.args)
+
 
 @dataclass
 class Import(ASTNode):
     names: dict = field(default_factory=dict)
-    level : typing.Optional[int] = None
+    level : t.Optional[int] = None
 
     def _visit_node(self, context: Context):
         for name, target in self.names.items():
@@ -1170,11 +1226,11 @@ class Import(ASTNode):
 
             context.stack[name] = Container(name=name, pointer=self)
 
-    def get_modules(self) -> typing.Iterable[str]:
+    def get_modules(self) -> t.Iterable[str]:
         m = set(self.names.values())
         return m
 
-    def get_files(self, base: Path) -> typing.Dict[str, Path]:
+    def get_files(self, base: Path) -> t.Dict[str, Path]:
         imp_files = {}
 
         for name, target in self.names.items():
@@ -1198,8 +1254,8 @@ class Import(ASTNode):
         return None
 
     @property
-    def json(self) -> typing.Dict[str, typing.Any]:
-        d: typing.Dict[str, typing.Any] = super().json
+    def json(self) -> t.Dict[str, t.Any]:
+        d: typing.Dict[str, t.Any] = super().json
         d["names"] = self.names
         if self.level is not None:
             d["level"] = self.level
@@ -1428,7 +1484,7 @@ class Container(ASTNode):
         return d
 
     @property
-    def full_name(self):
+    def full_name(self) -> str:
         if type(self.pointer) == Import:
             return self.pointer.names[self.name]
         else:
@@ -1436,32 +1492,18 @@ class Container(ASTNode):
 
 
 
-@slotted_dataclass(
-    replace=field(default=lambda x: None),
-    visitor=field(default=None),
-    stack=field(default_factory=Stack),
-    depth=field(default=0),
-    modified=field(default=False),
-    shared_state=field(default_factory=dict),
-    scope_closure=field(default=None)
-)
+@dataclass(slots=True)
 class Context:
-    __slots__ = (
-        "node", "parent", "replace",
-        "visitor", "stack", "depth",
-        "modified", "shared_state", "scope_closure"
-    )
-
     node: NodeType
-    parent: typing.Union[Context, None]
+    parent: t.Union[Context, None]
     # can_replace: bool = True
-    replace: typing.Callable[[NodeType], None]
-    visitor: typing.Any # FIXME typing
-    stack: Stack
-    depth: int
-    modified: bool
-    shared_state: dict
-    scope_closure: typing.Optional[ASTNode]
+    replace: t.Callable[[NodeType], None] = field(default=lambda x: None)
+    visitor: t.Any = None # FIXME typing
+    stack: Stack = field(default_factory=Stack)
+    depth: int = 0
+    modified: bool = False
+    shared_state: dict = field(default_factory=dict)
+    scope_closure: t.Optional[ASTNode] = None
 
     @property
     def call_graph(self):
@@ -1484,7 +1526,7 @@ class Context:
             scope_closure=self.scope_closure
         )
 
-    def visit_child(self, node, stack=None, replace=lambda x: None, closure=None):
+    def visit_child(self, node, stack=None, replace=lambda x: None, closure=None) -> None:
         if type(node) in (str, int, type(...)) or node is None or node == ...:
             return
 

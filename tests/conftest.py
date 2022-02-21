@@ -8,6 +8,7 @@ import pprint
 import inspect
 import tempfile
 import contextlib
+import unittest.mock
 from pathlib import Path
 from unittest import mock
 from typing import Pattern
@@ -254,6 +255,12 @@ def pytest_collection_modifyitems(config, items):
 @pytest.fixture(scope="module")
 def fixtures():
     yield Fixtures()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def mock_telemetry():
+    with unittest.mock.patch("aura.tracing.tracer") as m:
+        yield m
 
 
 @pytest.fixture

@@ -172,7 +172,7 @@ def generate_combinations(
         right: Optional[Iterable[str]] = None
 ) -> Generator[Tuple[str, str], None, None]:
     if right is None:
-        right =cache.PyPIPackageList.proxy()
+        right =cache.PyPIPackageListRequest().proxy()
 
     #yield from itertools.product(left, right)
     set_left = set(left)

@@ -101,9 +101,10 @@ class DataFinder(NodeAnalyzerV2, ASTAnalyzer):
         return location
 
 
-@Analyzer.ID("string_finder")
-class StringFinder(NodeAnalyzerV2):
+class StringFinder(NodeAnalyzerV2, ASTAnalyzer):
     """Find string patterns as defined in the signatures file"""
+    analyzer_id = "string_finder"
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)  # type: ignore[call-arg]
 

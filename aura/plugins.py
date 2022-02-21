@@ -11,6 +11,7 @@ from .analyzers.base import NodeAnalyzerV2, PostAnalysisHook
 from .analyzers.detections import Detection
 from .analyzers.python.visitor import Visitor
 from .analyzers.python.readonly import ReadOnlyAnalyzer
+from .tracing import tracer
 
 PLUGIN_CACHE = {"analyzers": {}}
 
@@ -143,29 +144,32 @@ def get_analyzer_group(names: Optional[List[str]]):
             elif isinstance(x, PostAnalysisHook):
                 continue
             else:
-                yield from x(location=location)
+                with tracer.start_as_current_span("run-analyzer") as span:
+                    span.set_attribute("analyzer-name", getattr(x, "analyzer_id", "N/A"))
+                    yield from x(location=location)
 
         if ast_analysis and location.is_python_source_code:
-            try:
-                visitor = Visitor.run_stages(location=location)
-                yield from visitor()
-            except exceptions.ASTParseError:
-                yield Detection(
-                    location=location.location,
-                    detection_type="ASTParseError",
-                    message="Unable to parse the source code",
-                    signature=f"ast_parse_error#{str(location)}",
-                )
-            except exceptions.PythonExecutorError as exc:
-                yield Detection(
-                    location=location.location,
-                    detection_type="ASTParseError",
-                    message="Unable to parse the source code",
-                    signature=f"ast_parse_error#{str(location)}",
-                    extra={
-                        "stdout": exc.stdout,
-                        "stderr": exc.stderr
-                    }
-                )
+            with tracer.start_as_current_span("run-stages"):
+                try:
+                    visitor = Visitor.run_stages(location=location)
+                    yield from visitor()
+                except exceptions.ASTParseError:
+                    yield Detection(
+                        location=location.location,
+                        detection_type="ASTParseError",
+                        message="Unable to parse the source code",
+                        signature=f"ast_parse_error#{str(location)}",
+                    )
+                except exceptions.PythonExecutorError as exc:
+                    yield Detection(
+                        location=location.location,
+                        detection_type="ASTParseError",
+                        message="Unable to parse the source code",
+                        signature=f"ast_parse_error#{str(location)}",
+                        extra={
+                            "stdout": exc.stdout,
+                            "stderr": exc.stderr
+                        }
+                    )
 
     return _run_analyzers

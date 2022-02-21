@@ -4,9 +4,12 @@ from typing import Iterable, cast
 
 from ..nodes import *
 from ..visitor import Visitor
+from ....tracing import tracer
 
 
 class TaintAnalysis(Visitor):
+    __slots__ = Visitor.__slots__ + ("first_pass",)
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.first_pass = True
@@ -98,13 +101,14 @@ class TaintAnalysis(Visitor):
 
                 for url in urls:
                     for arg in context.node.args.args:
+                        str_arg = arg.arg
                         parsed_url = parse_werkzeug_url(url)
-                        if arg in parsed_url and parsed_url[arg] in ("int",):
+                        if str_arg in parsed_url and parsed_url[str_arg] in ("int",):
                             continue
                         else:
                             log = TaintLog(  # type: ignore[call-arg]
                                 path = self.path,
-                                node = arg,
+                                node = str_arg,
                                 line_no = context.node.line_no,
                                 message = "AST node has been marked as Taint because a variable is propagated via werkzeug URL parameter",
                                 taint_level=Taints.TAINTED
@@ -122,8 +126,8 @@ class TaintAnalysis(Visitor):
             args_taints = []
             # Extract taints from arguments
             for idx, x in enumerate(context.node.args):
-                if isinstance(x, Arguments) and type(context.node._orig_args[idx]) == str:
-                    arg_name = context.node._orig_args[idx]
+                if isinstance(x, Arguments) and isinstance(context.node._orig_args[idx], (Arg, str)):
+                    arg_name = str(context.node._orig_args[idx])
                     args_taints.append(x.taints.get(arg_name, Taints.SAFE))
                 elif isinstance(x, ASTNode):
                     args_taints.append(x._taint_class)

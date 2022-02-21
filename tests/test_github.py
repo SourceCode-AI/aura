@@ -46,11 +46,11 @@ def test_github_cache(mock_github, mock_cache):
     mock_session = mock.Mock(wraps=real_session, spec=True)
     _ = github.GitHub.from_url("https://github.com/psf/requests")
 
-    url1_cached = cache.URLCache(url=repo_url)
+    url1_cached = cache.URLCache(cache.URLCacheRequest(url=repo_url))
     assert url1_cached.is_valid is True
     assert type(json.loads(url1_cached.fetch())) == dict
 
-    url2_cached = cache.URLCache(url=contributors_url)
+    url2_cached = cache.URLCache(cache.URLCacheRequest(url=contributors_url))
     assert url2_cached.is_valid
     assert type(json.loads(url2_cached.fetch())) == list
 
@@ -58,11 +58,11 @@ def test_github_cache(mock_github, mock_cache):
     # Test that the data is cached and does not fire any requests
     _ = github.GitHub.from_url("https://github.com/psf/requests")
 
-    output = cache.URLCache.proxy(url=repo_url, session=mock_session)
+    output = cache.URLCacheRequest(url=repo_url, session=mock_session).proxy()
     assert mock_session.called is False
     assert type(json.loads(output)) == dict
 
-    output = cache.URLCache.proxy(url=contributors_url, session=mock_session)
+    output = cache.URLCacheRequest(url=contributors_url, session=mock_session).proxy()
     assert mock_session.called is False
     assert type(json.loads(output)) == list
 

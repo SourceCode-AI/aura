@@ -15,6 +15,7 @@ from .analyzers.python import nodes, visitor
 from .analyzers.detections import Detection
 from .uri_handlers.base import ScanLocation
 from .type_definitions import ScanLocationType
+from .tracing import tracer
 
 
 PATTERN_CACHE = None
@@ -218,28 +219,29 @@ class ASTPattern:
                 node: nodes.NodeType,  # original AST node from the source code
                 other: nodes.NodeType  # AST node pattern to match against
         ) -> bool:
-            if type(other) == ASTPattern.AnyOf:
+            node_type = type(node)
+            other_type = type(other)
+
+            if other_type == ASTPattern.AnyOf:
                 return self._match_any_of(node, other)
-            elif node is None:
-                return other is None
-            elif type(node) == bool:
-                if type(other) != bool:
-                    return False
+            elif other is None:
+                return node is None
+            elif other_type == bool:
                 return node is other
-            elif type(node) == str:
-                if type(other) not in (str, nodes.String):
+            elif node_type == str:
+                if other_type not in (str, nodes.String):
                     return False
                 return node == str(other)
-            elif type(node) == dict:
+            elif node_type == dict:
                 return self._match_dict(node, other)
-            elif type(node) in (list, tuple):
+            elif node_type in (list, tuple):
                 return self._match_list(node, other)
-            elif type(node) == int:
-                if type(other) not in (int, nodes.Number):
+            elif node_type == int:
+                if other_type not in (int, nodes.Number):
                     return False
                 return node == int(other)
-            elif type(node) == float:
-                if type(other) != float:
+            elif node_type == float:
+                if other_type != float:
                     return False
                 return node == other
 
@@ -347,9 +349,9 @@ class ASTPattern:
                 context.node._taint_log.append(log)
 
             if type(context.node) == nodes.Call and "args" in t:
-                for arg_name, arg_level in t["args"].items():
+                for arg_name, arg_level in t["args"].items():  # type: tuple[str, str]
                     for arg in context.node.args:
-                        if type(arg) == nodes.Arguments and arg_name in arg.args:
+                        if type(arg) == nodes.Arguments and arg_name in arg:
                             arg.taints[arg_name] = nodes.Taints.from_string(arg_level)
 
         if "detection" in self._signature:

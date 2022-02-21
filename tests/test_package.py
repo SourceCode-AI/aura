@@ -1,8 +1,5 @@
-import urllib.parse
 import uuid
-import os
 import datetime
-import tempfile
 from unittest.mock import patch
 
 import responses
@@ -133,7 +130,8 @@ def test_package_diff_candidates(mock_pypi_rest_api):
 @responses.activate
 def test_correct_location_metadata(uri, expected_metadata, mock_pypi_rest_api, fuzzy_rule_match):
     mock_pypi_rest_api(responses)
-    static_meta = {"test_key": "test_value"}
+    ref = str(uuid.uuid4())
+    static_meta = {"test_key": "test_value", "reference": ref}
 
     handler = URIHandler.from_uri(uri)
     locations = tuple(handler.get_paths(metadata=static_meta.copy()))
@@ -145,3 +143,34 @@ def test_correct_location_metadata(uri, expected_metadata, mock_pypi_rest_api, f
     assert fuzzy_rule_match(locations[0].metadata, expected_metadata)
     assert fuzzy_rule_match(locations[0].metadata, static_meta)
 
+
+@pytest.mark.parametrize("requirement,extras,should_match", (
+    (
+        "win-inet-pton; sys_platform == \"win32\" and python_version == \"2.7\" and extra == 'socks'", (), False
+    ),
+    (
+        "win-inet-pton; sys_platform == \"win32\" and python_version == \"2.7\" and extra == 'socks'", ("blah", "test"), False
+    ),
+    (
+        "win-inet-pton; sys_platform == \"win32\" and python_version == \"2.7\" and extra == 'socks'", ("socks",), True
+    ),
+    (
+        "win-inet-pton; sys_platform == \"win32\" and python_version == \"2.7\" and extra == 'socks'", ("socks", "blah"), True
+    ),
+    (
+        "req", (), True
+    ),
+    (
+        "req", ("blah",), True
+    ),
+    (
+        "idna (>=2.5,<3)", (), True
+    ),
+    (
+        "idna (>=2.5,<3)", ("blah",), True
+    )
+))
+@responses.activate
+def test_dependency_markers(requirement: str, extras: tuple, should_match:bool, mock_pypi_rest_api):
+    parsed_req = package.Requirement(requirement)
+    assert package.DependencyTree.is_marker_valid(parsed_req, extras) is should_match

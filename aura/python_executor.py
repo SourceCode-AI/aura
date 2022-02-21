@@ -18,6 +18,7 @@ from . import config
 from .analyzers import python_src_inspector
 from .json_proxy import loads, JSONDecodeError
 from .exceptions import PythonExecutorError
+from .tracing import tracer
 
 
 LOGGER = config.get_logger(__name__)
@@ -38,25 +39,27 @@ def run_with_interpreters(*, metadata=None, **kwargs):
     In case an interpreter that is able to execute the input script was not found, all tuple elements are set to None
     """
     if metadata and metadata.get("interpreter_path"):
-        return execute_interpreter(
-            interpreter=metadata["interpreter_path"],
-            **kwargs
-        )
+        with tracer.start_as_current_span("python_executor.run_with_interpreters.direct", {"interpreter": metadata["interpreter_path"]}):
+            return execute_interpreter(
+                interpreter=metadata["interpreter_path"],
+                **kwargs
+            )
 
     executor_exception = None
 
     for name, interpreter in get_interpreters().items():
-        try:
-            output = execute_interpreter(interpreter=interpreter, **kwargs)
-            if output is not None:
-                if metadata is not None:
-                    metadata["interpreter_name"] = name
-                    metadata["interpreter_path"] = interpreter
+        with tracer.start_as_current_span("python_executor.run_with_interpreters", attributes={"name": name, "interpreter": interpreter}):
+            try:
+                output = execute_interpreter(interpreter=interpreter, **kwargs)
+                if output is not None:
+                    if metadata is not None:
+                        metadata["interpreter_name"] = name
+                        metadata["interpreter_path"] = interpreter
 
-                return output
-        except PythonExecutorError as exc:
-            executor_exception = exc
-            continue
+                    return output
+            except PythonExecutorError as exc:
+                executor_exception = exc
+                continue
 
     if executor_exception is not None:
         raise executor_exception
