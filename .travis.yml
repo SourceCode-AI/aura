@@ -33,10 +33,10 @@ jobs:
     - stage: build
       if: (branch = master) OR (branch = dev)
       script:
-        - docker buildx build --platform=linux/amd64,linux/arm64 --target aura-full-tests .
-        - docker buildx build --platform=linux/amd64,linux/arm64 --target aura-full --push -t ${IMAGE_NAME}-full -t ${DOCKER_REPO}:${IMAGE_TAG} .
-        - docker buildx build --platform=linux/amd64,linux/arm64 --target aura-lite-tests .
-        - docker buildx build --platform=linux/amd64,linux/arm64 --target aura-lite --push -t ${IMAGE_NAME}-lite -t ${DOCKER_REPO}:${IMAGE_TAG_LITE} .
+        - travis_wait docker buildx build --platform=linux/amd64,linux/arm64 --target aura-full-tests .
+        - travis_wait docker buildx build --platform=linux/amd64,linux/arm64 --target aura-full --push -t ${IMAGE_NAME}-full -t ${DOCKER_REPO}:${IMAGE_TAG} .
+        - travis_wait docker buildx build --platform=linux/amd64,linux/arm64 --target aura-lite-tests .
+        - travis_wait docker buildx build --platform=linux/amd64,linux/arm64 --target aura-lite --push -t ${IMAGE_NAME}-lite -t ${DOCKER_REPO}:${IMAGE_TAG_LITE} .
         #- docker push ${IMAGE_NAME}-full
         #- docker push ${IMAGE_NAME}-lite
 
