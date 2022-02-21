@@ -4,7 +4,7 @@ python:
   - "3.9"
 
 install:
-  - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+  - docker run --privileged --rm tonistiigi/binfmt --install all
   - docker buildx create --name xbuilder --use
   - docker buildx install
 
@@ -33,10 +33,10 @@ jobs:
     - stage: build
       if: (branch = master) OR (branch = dev)
       script:
-        - docker buildx build --platform=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6 --target aura-full-tests .
-        - docker buildx build --platform=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6 --target aura-full --push -t ${IMAGE_NAME}-full -t ${DOCKER_REPO}:${IMAGE_TAG} .
-        - docker buildx build --platform=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6 --target aura-lite-tests .
-        - docker buildx build --platform=linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6 --target aura-lite --push -t ${IMAGE_NAME}-lite -t ${DOCKER_REPO}:${IMAGE_TAG_LITE} .
+        - docker buildx build --platform=linux/amd64,linux/arm64,linux/arm/v7 --target aura-full-tests .
+        - docker buildx build --platform=linux/amd64,linux/arm64,linux/arm/v7 --target aura-full --push -t ${IMAGE_NAME}-full -t ${DOCKER_REPO}:${IMAGE_TAG} .
+        - docker buildx build --platform=linux/amd64,linux/arm64,linux/arm/v7 --target aura-lite-tests .
+        - docker buildx build --platform=linux/amd64,linux/arm64,linux/arm/v7 --target aura-lite --push -t ${IMAGE_NAME}-lite -t ${DOCKER_REPO}:${IMAGE_TAG_LITE} .
         #- docker push ${IMAGE_NAME}-full
         #- docker push ${IMAGE_NAME}-lite
 
