@@ -191,7 +191,7 @@ def visit_arguments(context):
             match x:
                 case str():
                     args.append(Arg(arg=x))
-                case {"_type": "arg", **rest}:
+                case {"_type": "arg", **rest} | {"_type": "Name", **rest}:
                     args.append(Arg.from_raw_ast(x))
                 case _:
                     raise RuntimeError(f"Unknown AST type for arg: {x}")
