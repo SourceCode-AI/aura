@@ -1,3 +1,4 @@
+import sys
 import urllib.parse
 import uuid
 import logging
@@ -398,19 +399,21 @@ def get_session(engine_or_uri):
 def parse_bandersnatch_log(log_path: Path):
     for line in log_path.read_text().splitlines():
         fname = Path(line).name
-
-        if fname.endswith(".whl"):
-            pkg_name, ver, *_ = packaging.utils.parse_wheel_filename(fname)
-            pkg_name = packaging.utils.canonicalize_name(pkg_name)
-            yield f"pypi://{pkg_name}?filename={fname}&version={str(ver)}"
-        elif fname.endswith(".tar.gz"):
-            pkg_name, ver = packaging.utils.parse_sdist_filename(fname)
-            pkg_name = packaging.utils.canonicalize_name(pkg_name)
-            yield f"pypi://{pkg_name}?filename={fname}&version={str(ver)}"
-        elif fname.endswith(".egg"):
-            pkg_name, ver, *_ = fname.split("-")
-            pkg_name = packaging.utils.canonicalize_name(pkg_name)
-            yield f"pypi://{pkg_name}?filename={fname}&version={str(ver)}"
+        try:
+            if fname.endswith(".whl"):
+                pkg_name, ver, *_ = packaging.utils.parse_wheel_filename(fname)
+                pkg_name = packaging.utils.canonicalize_name(pkg_name)
+                yield f"pypi://{pkg_name}?filename={fname}&version={str(ver)}"
+            elif fname.endswith(".tar.gz"):
+                pkg_name, ver = packaging.utils.parse_sdist_filename(fname)
+                pkg_name = packaging.utils.canonicalize_name(pkg_name)
+                yield f"pypi://{pkg_name}?filename={fname}&version={str(ver)}"
+            elif fname.endswith(".egg"):
+                pkg_name, ver, *_ = fname.split("-")
+                pkg_name = packaging.utils.canonicalize_name(pkg_name)
+                yield f"pypi://{pkg_name}?filename={fname}&version={str(ver)}"
+        except Exception as exc:
+            logger.warning(f"Invalid entry: `{line}`")
 
 
 def ingest_bandersnatch_log(log_path: str, pg_uri: str):

@@ -1088,11 +1088,20 @@ class Arg:
 
     @classmethod
     def from_raw_ast(cls, data: dict) -> Arg:
-        return cls(
-            arg=data["arg"],
-            annotation=data.get("annotation"),
-            type_comment=data.get("type_comment")
-        )
+        if data.get("_type") == "arg":
+            return cls(
+                arg=data["arg"],
+                annotation=data.get("annotation"),
+                type_comment=data.get("type_comment")
+            )
+        elif data.get("_type") == "Name":
+            return cls(
+                arg=data["id"],
+                annotation=data.get("annotation"),
+                type_comment=data.get("type_comment")
+            )
+        else:
+            raise RuntimeError(f"Unknown AST for the `Arg` node: {data}")
 
     def __str__(self):
         return self.arg
