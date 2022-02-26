@@ -149,6 +149,13 @@ class PendingScans(Base):
 
 
 sa.event.listen(
+    ScanModel.__table__,
+    "after_create",
+    sa.DDL("CREATE INDEX scan_created_idx ON scans(created)")
+)
+
+
+sa.event.listen(
     DetectionModel.__table__,
     "after_create",
     sa.DDL("""

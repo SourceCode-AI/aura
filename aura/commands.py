@@ -23,11 +23,9 @@ from . import utils
 from . import mirror
 from . import typos
 from . import cache
-from .server.worker import ServerWorker
 from .scan_data import ScanData
 from .analyzers.detections import Detection
 from .output.base import ScanOutputBase, DiffOutputBase, InfoOutputBase, TyposquattingOutputBase
-from .output.filtering import FilterConfiguration
 from .tracing import tracer
 
 
@@ -150,22 +148,22 @@ def scan_uri(
         return scans
 
 
-def server_worker(pg_uri):
-    filter_cfg = FilterConfiguration()
-
-    def worker_func(task_data):
-        meta = {"format": pg_uri}
-        if (ref:=task_data.get("reference")):
-            meta["reference"] = ref
-
-        scan_uri(
-            task_data["uri"],
-            metadata=meta,
-            filter_cfg=filter_cfg
-        )
-
-    sw = ServerWorker(pg_uri, worker_func)
-    sw.loop()
+# def server_worker(pg_uri):
+#     filter_cfg = FilterConfiguration()
+#
+#     def worker_func(task_data):
+#         meta = {"format": pg_uri}
+#         if (ref:=task_data.get("reference")):
+#             meta["reference"] = ref
+#
+#         scan_uri(
+#             task_data["uri"],
+#             metadata=meta,
+#             filter_cfg=filter_cfg
+#         )
+#
+#     sw = ServerWorker(pg_uri, worker_func)
+#     sw.loop()
 
 
 

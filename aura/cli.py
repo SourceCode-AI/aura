@@ -273,7 +273,10 @@ def init_postgres(pg_uri):
 @cli.command()
 @click.argument("pg_uri")
 def server_worker(pg_uri):
-    commands.server_worker(pg_uri)
+    from .server.worker import ServerWorker
+
+    sw = ServerWorker(pg_uri)
+    sw.loop()
 
 
 @cli.command()

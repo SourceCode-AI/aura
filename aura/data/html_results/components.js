@@ -520,7 +520,7 @@ Vue.component("detection-browser", {
     },
     template: `
     <div class="row">
-        <div class="col-xl-4 col-lg-2 d-print-none">
+        <div class="col-xl-4 col-md-6 d-print-none">
             <div class="card shadow">
                 <h5 class="card-header">
                     Filtering
@@ -577,7 +577,7 @@ Vue.component("detection-browser", {
             </div>
         </div>
         
-        <div class="col-xl-8 col-lg-10">
+        <div class="col-xl-8 col-md-6">
             <h2 class="d-none d-print-block">Detections</h2>
             <div class="row">
                 <div class="col-sm-12" v-if="detections.length==0">
@@ -591,7 +591,6 @@ Vue.component("detection-browser", {
                 </div>
             </div>
         </div>
-        
     </div>
     `
 })
