@@ -347,7 +347,7 @@ class PostgresScanOutput(PGBase, ScanOutputBase):
                     else:
                         d_type = DetectionTypeModel(
                             slug=detection.slug,
-                            name=detection.slug,
+                            name=detection.name,
                         )
                         self.out_fd.add(d_type)
                         self.out_fd.flush()
