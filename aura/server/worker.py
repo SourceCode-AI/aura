@@ -1,5 +1,7 @@
 import time
 import multiprocessing as mp
+from multiprocessing.pool import Pool
+from functools import partial
 from concurrent import futures
 from typing import Optional
 
@@ -16,6 +18,7 @@ except (PluginDisabled):
     psycopg2 = None
 
 
+CLEANUP = object()
 logger = config.get_logger(__name__)
 try:
     mp.set_start_method("spawn")
@@ -30,12 +33,16 @@ class ServerWorker:
 
         self.pg_uri = pg_uri
         self.db_session = postgres.get_session(pg_uri)
-        self.executor = futures.ProcessPoolExecutor(
-            max_workers=max_workers,
-            mp_context=mp.get_context("spawn")
+
+        self.pool = Pool(
+            processes=1,
+            maxtasksperchild=3,
+            context=mp.get_context("spawn")
         )
+
         self.tasks = {}
         self.max_workers = max_workers
+        self.max_tasks_per_process = 2
 
     @staticmethod
     def default_worker_func(task_data: dict) -> None:
@@ -51,6 +58,17 @@ class ServerWorker:
             metadata=meta,
             filter_cfg=filter_cfg
         )
+
+    @staticmethod
+    def cleanup(*args) -> None:
+        import gc
+
+        from ..uri_handlers import base
+        from ..utils import KeepRefs
+
+        gc.collect()
+        KeepRefs.cleanup()
+        base.cleanup_locations()
 
 
     def fetch_task(self) -> Optional[dict]:
@@ -69,7 +87,7 @@ class ServerWorker:
             RETURNING queue_id, uri, reference;
             """)).fetchone()
             if not row:
-                return
+                return None
             else:
                 self.db_session.commit()
                 return {"scan_id": row[0], "uri": row[1], "reference": str(row[2]), "format": self.pg_uri}
@@ -81,7 +99,8 @@ class ServerWorker:
         try:
             while True:
                 if len(self.tasks) >= self.max_workers:
-                    self.wait_for_tasks()
+                    time.sleep(0.1)
+                    continue
 
                 task_data = self.fetch_task()
 
@@ -90,26 +109,55 @@ class ServerWorker:
                     time.sleep(1)
                     continue
                 else:
-                    task_future = self.executor.submit(worker_func, task_data)
-                    self.tasks[task_future] = task_data["scan_id"]
+                    callback = partial(self.handle_result, task_data["scan_id"])
+
+                    async_res = self.pool.apply_async(
+                        func=worker_func,
+                        args=(task_data,),
+                        callback=lambda result: callback(),
+                        error_callback=lambda exc: callback(exc=exc),
+                    )
+                    self.tasks[async_res] = task_data["scan_id"]
         finally:
-            self.wait_for_tasks(when=futures.ALL_COMPLETED)
+            self.pool.close()
+            self.pool.join()
 
-    def wait_for_tasks(self, when=futures.FIRST_COMPLETED):
-        done, _ = futures.wait(self.tasks, return_when=when)
+    def cleanup_tasks(self):
+        for t in tuple(self.tasks.keys()):
+            if t.ready():
+                self.handle_result(task_or_id=t)
 
-        with self.db_session():
-            for f in done:
-                f.result()
+    def handle_result(self, task_or_id, exc=None, status=2):
+        task: mp.pool.AsyncResult
 
-                if not (scan_id:=self.tasks.get(f)):
-                    continue
+        if isinstance(task_or_id, int):
+            for t, scan_id in self.tasks.items():
+                if scan_id == task_or_id:
+                    task = t
+                    break
+                return
+        else:
+            task = task_or_id
+
+        try:
+            with self.db_session():
+                if not (scan_id := self.tasks.get(task)):
+                    return
+
+                if exc:
+                    status = 3
 
                 self.db_session.execute(postgres.sa.text("""
-                    UPDATE pending_scans
-                    SET status=2
-                    WHERE queue_id=:scan_id
-                """), {"scan_id": scan_id})
+                                    UPDATE pending_scans
+                                    SET status=:status
+                                    WHERE queue_id=:scan_id
+                                """), {"scan_id": scan_id, "status": status})
 
                 self.db_session.commit()
-                del self.tasks[f]
+                if exc:
+                    raise exc
+        finally:
+            try:
+                del self.tasks[task]
+            except KeyError:
+                pass

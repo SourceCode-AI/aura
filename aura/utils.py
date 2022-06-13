@@ -48,6 +48,16 @@ class KeepRefs(Generic[T]):
             if inst is not None:
                 yield inst  # type: ignore[misc]
 
+    @classmethod
+    def cleanup(cls) -> None:
+        for key in tuple(cls.__refs__.keys()):
+            try:
+                del cls.__refs__[key]
+            except KeyError:
+                pass
+
+        cls.__refs__ = defaultdict(list)
+
 
 def walk(location: Union[str, Path]) -> Iterable[Path]:
     if not isinstance(location, Path):

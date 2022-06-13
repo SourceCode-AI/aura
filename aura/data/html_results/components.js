@@ -10,7 +10,9 @@ function hide_elem (cond) {
 }
 
 
-Vue.component("tree-view", {
+AURA_COMPONENTS = {};
+
+AURA_COMPONENTS["tree-view"] = {
     props: {
         name: {required: true},
         data: {required: true, default: {}},
@@ -80,10 +82,9 @@ Vue.component("tree-view", {
         </ul>
     </div>
     `
-})
+};
 
-
-Vue.component("behavioral-analysis", {
+AURA_COMPONENTS["behavioral-analysis"] = {
     props: ["data"],
     methods: {
         get_icon: function(details) {
@@ -124,9 +125,9 @@ Vue.component("behavioral-analysis", {
         </ul>
     </div>
     `
-})
+};
 
-Vue.component("overview", {
+AURA_COMPONENTS["overview"] = {
     props: ["results"],
     computed: {
         severities: function() {
@@ -246,9 +247,9 @@ Vue.component("overview", {
     </div>
     </div>
     `
-});
+};
 
-Vue.component("sbom", {
+AURA_COMPONENTS["sbom"] = {
     props: {
         component: {}
     },
@@ -288,9 +289,9 @@ Vue.component("sbom", {
         </div>
     </div>
     `
-})
+};
 
-Vue.component("sbom-overview", {
+AURA_COMPONENTS["sbom-overview"] = {
     props: {
         "results": {}
     },
@@ -320,9 +321,9 @@ Vue.component("sbom-overview", {
         <sbom v-for="component in components" :component="component"></sbom>
     </div>
     `
-});
+};
 
-Vue.component("detection", {
+AURA_COMPONENTS["detection"] = {
     props: ["detection"],
     computed: {
         severity: function() {
@@ -375,16 +376,24 @@ Vue.component("detection", {
         </div>
     </div>
     `
-});
+};
 
-Vue.component("toggle-filter", {
+AURA_COMPONENTS["toggle-filter"] = {
     props: {
         "base_color": {
             "default": "btn-outline-primary"
-        },
+        }/*,
         "target_object": {},
-        "target_property": {}
+        "target_property": {}*/
     },
+
+    data: function(){
+        return {
+            "target_object": {},
+            "target_property": null
+        };
+    },
+
     computed: {
         styles: function() {
             var s = {};
@@ -415,13 +424,13 @@ Vue.component("toggle-filter", {
     },
     methods: {
         showFilter: function(){
-            this.$set(this.target_object, this.target_property, true);
+            this.target_object[this.target_property] = true;
         },
         hideFilter: function(){
-            this.$set(this.target_object, this.target_property, false);
+            this.target_object[this.target_property] = false;
         },
         resetFilter: function(){
-            this.$delete(this.target_object, this.target_property);
+            delete this.target_object[this.target_property];
         }
     },
     template: `
@@ -437,9 +446,9 @@ Vue.component("toggle-filter", {
         </button>
     </div>
     `
-})
+};
 
-Vue.component("detection-browser", {
+AURA_COMPONENTS["detection-browser"] = {
     props: {
         "results": {},
         "tag_filters": {
@@ -593,17 +602,17 @@ Vue.component("detection-browser", {
         </div>
     </div>
     `
-})
+};
 
-Vue.component("tabs", {
+AURA_COMPONENTS["tabs"] = {
     props: {
-        results: {},
-        tab: {
-            default: "overview"
-        },
+        results: {}
     },
     methods: {
         "hide_elem": hide_elem
+    },
+    data: function(){
+        return { tab: "overview"}
     },
     template: `
     <div>
@@ -617,7 +626,7 @@ Vue.component("tabs", {
             </li>
             <li class="nav-item">
                 <a class="nav-link" :class="{active: (tab == 'detections')}" href="#" @click="tab='detections'">
-                <span class="badge bg-secondary">{{ results.detections.length }}</span>
+                <span class="badge bg-secondary" v-if="(!!results) && !!(results.detections)">{{ results.detections.length }}</span>
                 Detections
                 </a>
             </li>
@@ -629,7 +638,7 @@ Vue.component("tabs", {
             </li>
         </ul>
         <div class="card">
-            <div class="card-body">
+            <div class="card-body" v-if="!!results">
                 <div :class="hide_elem(tab == 'overview')">
                     <overview :results="results"></overview>
                 </div>
@@ -649,5 +658,22 @@ Vue.component("tabs", {
         </div>
     </div>
     `
-});
+};
 
+window.create_components = function(app, components){
+    'use strict';
+    for (const comp_name in components) {
+        if (components.hasOwnProperty(comp_name)){
+            app.component(comp_name, components[comp_name]);
+        }
+    }
+}
+
+window.create_directives = function(app, directives){
+    'use strict';
+    for (const dir_name in directives) {
+        if (directives.hasOwnProperty(dir_name)){
+            app.directive(dir_name, directives[dir_name]);
+        }
+    }
+}

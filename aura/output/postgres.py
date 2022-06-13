@@ -58,7 +58,7 @@ class DetectionModel(Base):
     id = sa.Column(sa.BIGINT, primary_key=True)
     signature = sa.Column(sa.BIGINT, nullable=False)
     score = sa.Column(sa.INTEGER, default=0, nullable=False)
-    slug = sa.Column(sa.VARCHAR(64), nullable=False)
+    detection_type = sa.Column(sa.BIGINT, sa.ForeignKey("detection_types.id"), nullable=False)
     data = sa.Column(JSONB, nullable=False)
     scan_id = sa.Column(sa.BIGINT, sa.ForeignKey("scans.id"), nullable=False)
     location_id = sa.Column(sa.BIGINT, nullable=False)
@@ -101,6 +101,13 @@ class TagsModel(Base):
         primaryjoin="TagsModel.id == DetectionTagsModel.tag_id",
         secondaryjoin="DetectionTagsModel.detection_id == DetectionModel.id",
     )
+
+class DetectionTypeModel(Base):
+    __tablename__ = "detection_types"
+
+    id = sa.Column(sa.BIGINT, primary_key=True)
+    slug = sa.Column(sa.VARCHAR(128), unique=True, nullable=False)
+    name = sa.Column(sa.VARCHAR(128), unique=True, nullable=False)
 
 
 class ScanTagsModel(Base):
@@ -266,6 +273,8 @@ class PostgresScanOutput(PGBase, ScanOutputBase):
 
     def output(self, scans: Sequence[ScanData]):
         tag_ids = {}
+        detection_types = {}
+
         with self.out_fd.begin():
             for scan in scans:
                 location_ids = {}
@@ -333,10 +342,22 @@ class PostgresScanOutput(PGBase, ScanOutputBase):
                         location_id = location_obj.id
                         location_ids[norm_path] = location_obj
 
+                    if detection.slug in detection_types:
+                        detection_type_id = detection_types[detection.slug]
+                    else:
+                        d_type = DetectionTypeModel(
+                            slug=detection.slug,
+                            name=detection.slug,
+                        )
+                        self.out_fd.add(d_type)
+                        self.out_fd.flush()
+                        detection_type_id = d_type.id
+                        detection_types[detection.slug] = detection_type_id
+
                     detection_obj = DetectionModel(
                         signature=detection.int_signature,
                         score=detection.score,
-                        slug=detection.slug,
+                        detection_type=detection_type_id,
                         data=detection.to_json(),#sanitize_json(detection),
                         scan_id = scan_obj.id,
                         location_id = location_id

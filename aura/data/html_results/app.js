@@ -3,8 +3,10 @@ if (window.scan_data == undefined) {
     window.scan_data = JSON.parse(atob(data_element.textContent));
 };
 
+create_components(Vue, AURA_COMPONENTS);
 
-const app = new Vue({
+
+const aura_app = new Vue({
     el: "#app",
     delimiters: ["{(", ")}"],
     data() {
