@@ -4,6 +4,7 @@ from .. import base
 from ..detections import Detection
 from .nodes import *
 from ...bases import ASTAnalyzer
+from ... import config
 
 
 SQL_REGEX = re.compile(
@@ -45,7 +46,7 @@ class SQLi(base.NodeAnalyzerV2, ASTAnalyzer):
 
         yield Detection(
             detection_type="SQLInjection",
-            score=50,
+            score=config.get_score_or_default("sqli-possible", 50),
             message="Possible SQL injection found",
             signature=f"vuln#{context.signature}",
             node = context.node,
@@ -72,7 +73,7 @@ class SQLi(base.NodeAnalyzerV2, ASTAnalyzer):
 
         yield Detection(
             detection_type="SQLInjection",
-            score=50,
+            score=config.get_score_or_default("sqli-possible", 50),
             message="Possible SQL injection found",
             signature=f"vuln#sqli#{context.signature}",
             node = context.node,
