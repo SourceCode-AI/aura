@@ -62,7 +62,7 @@ class SetupPy(NodeAnalyzerV2, ASTAnalyzer):
             ):
                 sig = Detection(
                     detection_type="SetupScript",
-                    score=100,
+                    score=config.get_score_or_default("setup-py-name-shadowing", 100),
                     message=f"Package '{parsed['name']}' is installed under different name: '{pkg}'",
                     signature=f"setup_analyzer#pkg_name_mismatch#{parsed['name']}#{pkg}",
                     tags = {"behavior:setup_py:name_shadowing"}
@@ -71,7 +71,7 @@ class SetupPy(NodeAnalyzerV2, ASTAnalyzer):
 
         main_sig = Detection(
             detection_type="SetupScript",
-            score=0,
+            score=config.get_score_or_default("setup-py-setup-script", 0),
             message="Setup script found", extra={"parsed": parsed},
             signature=f"setup_analyzer#setup_script#{context.visitor.normalized_path}#{context.node.line_no}",
             node=context.node
@@ -99,7 +99,7 @@ class SetupPy(NodeAnalyzerV2, ASTAnalyzer):
             if "behavior:code_execution" in x.tags:
                 sig = Detection(
                     detection_type="SetupScript",
-                    score=100,
+                    score=config.get_score_or_default("setup-py-code-exec", 100),
                     message="Code execution capabilities found in a setup.py script",
                     node=x.node,
                     line=x.line,
@@ -112,7 +112,7 @@ class SetupPy(NodeAnalyzerV2, ASTAnalyzer):
             if "behavior:network" in x.tags:
                 sig = Detection(
                     detection_type="SetupScript",
-                    score=100,
+                    score=config.get_score_or_default("setup-py-network", 100),
                     message="Found code with network communication capabilities in a setup.py script",
                     node=x.node,
                     line=x.line,
@@ -132,7 +132,7 @@ class SetupPy(NodeAnalyzerV2, ASTAnalyzer):
             if "install" in parsed["install_hooks"]:
                 sig = Detection(
                     detection_type="SetupScript",
-                    score=500,
+                    score=config.get_score_or_default("setup-py-install-hook", 500),
                     message="Setup script hooks to the `setup.py install` command.",
                     signature=f"setup_analyzer#install_hook#{context.visitor.normalized_path}#{context.node.line_no}",
                     node=context.node,

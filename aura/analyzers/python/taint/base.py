@@ -5,6 +5,7 @@ from ..nodes import Taints, ASTNode, TaintLog, Context, NodeType, ReturnStmt
 from ...base import NodeAnalyzerV2
 from ...detections import Detection
 from ....bases import ASTAnalyzer
+from .... import config
 
 
 class TaintDetection(NodeAnalyzerV2, ASTAnalyzer):
@@ -17,7 +18,7 @@ class TaintDetection(NodeAnalyzerV2, ASTAnalyzer):
 
         return Detection(
             detection_type="TaintAnomaly",
-            score=10,
+            score=config.get_score_or_default("taint-anomaly", 10),
             message="Tainted input is passed to the sink",
             node=context.node,
             line_no=context.node.line_no,
