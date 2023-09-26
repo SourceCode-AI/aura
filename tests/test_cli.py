@@ -109,32 +109,49 @@ def test_scan_min_score_option(fixtures):
 
 
 @pytest.mark.parametrize(
-    "tag_filter",
+    "tag_filter,length",
     (
-        ("!test_code",),
-        ("shell_injection",),
-        ("test_code", "shell_injection"),
-        ("test_code",),
-        ("!shell_injection",),
-        ("ratata_does_not_exists",),
-        ("!ratata_does_not_exists",),
+        (("!misc:test_code",), 0),
+        (("vuln:shell_injection",), 1),
+        (("misc:test_code", "vuln:shell_injection"), 2),
+        (("misc:test_code",), 2),
+        (("misc:*",), 2),
+        (("!vuln:shell_injection",), 1),
+        (("!vuln:*",), 1),
+        (("ratata_does_not_exists",), 0),
+        (("!ratata_does_not_exists",), 2),
     ),
 )
-def test_tag_filtering(tag_filter, fixtures):
+def test_tag_filtering(tag_filter, length, fixtures):
     args = []
     for tag in tag_filter:
         args += ["-t", tag]
 
+    # Possible detections' tags:
+    # 1. misc:test_code, vuln:shell_injection, taint_sink
+    # 2. behavior:code_execution, misc:test_code
     output = fixtures.scan_test_file("shelli.py", args=args)
 
     assert len(output["scans"]) == 1
+    assert len(output["scans"][0]["detections"]) == length
 
+    include_tags = [t for t in tag_filter if not t.startswith("!")]
+    exclude_tags = [t[1:] for t in tag_filter if t.startswith("!")]
     for hit in output["scans"][0]["detections"]:
-        for tag in tag_filter:
-            if tag.startswith("!"):
-                assert tag[1:] not in hit["tags"], (tag, hit)
+        for tag in exclude_tags:
+            if tag.endswith("*"):
+                assert not any(x.startswith(tag[:-1]) for x in hit["tags"]), (tag, hit)
             else:
-                assert tag in hit["tags"], (tag, hit)
+                assert tag[1:] not in hit["tags"], (tag, hit)
+
+        for tag in include_tags:
+            if tag.endswith("*"):
+                if any(x.startswith(tag[:-1]) for x in hit["tags"]):
+                    break
+            elif tag in hit["tags"]:
+                break
+        else:
+            assert include_tags == [], (tag_filter, hit)
 
 
 @pytest.mark.e2e
