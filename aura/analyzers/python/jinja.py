@@ -41,7 +41,7 @@ class JinjaAnalyzer(base.NodeAnalyzerV2, ASTAnalyzer):
             hit = Detection(
                 detection_type="JinjaVulnerability",
                 message="Detected jinja environment with autoescaping explicitly disabled",
-                score=100,
+                score=config.get_score_or_default("jinja-disabled-autoescape", 100),
                 line_no=context.node.line_no,
                 signature=f"jinja#xss#{context.visitor.normalized_path}#{context.node.line_no}",
                 tags = {"vuln:jinja:disabled_autoescape"}
@@ -193,7 +193,7 @@ class JinjaTemplateVisitor(Visitor):
             hit = Detection(
                 detection_type="JinjaVulnerability",
                 message="Tainted input passed to sink in the jinja template",
-                score=100,
+                score=config.get_score_or_default("jinja-taint", 100),
                 line_no=lineno,
                 signature=f"jinja#taint_analysis#{str(self.location)}#{lineno}",
                 location=self.location.location,

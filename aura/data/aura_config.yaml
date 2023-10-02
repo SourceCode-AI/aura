@@ -303,6 +303,33 @@ score: &scores
   # Leaking PyPIrc credentials
   # leaking_pypirc: 100
 
+  # Package is installed with another name
+  # setup-py-name-shadowing: 100
+
+  # Found the setup script
+  # setup-py-setup-script: 0
+
+  # Code execution found in setup.py
+  # setup-py-code-exec: 100
+
+  # Network communication found in setup.py
+  # setup-py-network: 100
+
+  # Install hook found in setup.py
+  # setup-py-install-hook: 500
+
+  # Jinja: disabled autoescape
+  # jinja-disabled-autoescape: 100
+
+  # Jinja: tainted input passed to sink variable
+  # jinja-taint: 100
+
+  # Possible SQL injection
+  # sqli-possible: 50
+
+  # Tainted data passed to sink
+  # taint-anomaly: 10
+
 cache: &cache
   # Mode can be one of:
   # - "ask": ask if cache should be purged when running some commands (aura info, aura update ...)

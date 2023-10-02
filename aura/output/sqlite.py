@@ -28,6 +28,9 @@ def check_sqlite_support():
 
 @dataclass()
 class DiffBase(metaclass=ABCMeta):
+    def __post_init__(self):
+        check_sqlite_support()
+
     def __enter__(self):
         if self.output_location == "-":
             raise InvalidOutput("SQLite format can't output to the stdout")
@@ -287,6 +290,3 @@ class SQLiteDiffOutput(DiffBase, DiffOutputBase):
             raise
         else:
             self.out_fd.commit()
-
-
-check_sqlite_support()
