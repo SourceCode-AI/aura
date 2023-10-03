@@ -8,8 +8,9 @@ import pytest
 
 from aura import diff
 from aura.uri_handlers.base import ScanLocation
+from aura.output.sqlite import check_sqlite_support
 from aura.output.base import DiffOutputBase
-from aura.exceptions import FeatureDisabled
+from aura.exceptions import FeatureDisabled, PluginDisabled
 
 
 try:
@@ -18,6 +19,15 @@ except ImportError:
     jsonschema = None
 
 
+def sqlite_json_disabled() -> bool|str:
+    try:
+        check_sqlite_support()
+        return False
+    except (PluginDisabled, FeatureDisabled) as exc:
+        return exc.args[0]
+
+
+SQLITE_JSON_DISABLED = sqlite_json_disabled()
 
 DIFF_MATCHES = [
     {
@@ -109,6 +119,7 @@ def test_text_scan_output_e2e(fixtures):
     # TODO: add more patterns to test for in text output
 
 
+@pytest.mark.skipif(bool(SQLITE_JSON_DISABLED), reason=str(SQLITE_JSON_DISABLED))
 def test_sqlite_scan_output(fixtures, tmp_path: Path):
     scan_path = str(fixtures.path("flask_app.py"))
     db_path = tmp_path / "aura_test_output.sqlite"
@@ -161,13 +172,15 @@ def test_non_existing(fixtures):
     assert "Invalid location" not in cli.stdout
 
 
+
+out_types = ["text", "json"]
+if not SQLITE_JSON_DISABLED:
+    out_types.append("sqlite")
+
+
 @pytest.mark.parametrize(
     "output_type",
-    (
-        "text",
-        "json",
-        "sqlite"
-    )
+    out_types
 )
 @pytest.mark.e2e
 def test_output_not_created_when_below_minimum_score(output_type, fixtures, tmp_path: Path):
@@ -333,6 +346,7 @@ def test_diff_json_output_e2e(fixtures, fuzzy_rule_match):
         assert any(fuzzy_rule_match(x, match) for x in diffs), (match, diffs)
 
 
+@pytest.mark.skipif(bool(SQLITE_JSON_DISABLED), reason=str(SQLITE_JSON_DISABLED))
 @pytest.mark.e2e
 def test_diff_sqlite_output_e2e(fixtures, fuzzy_rule_match, tmp_path):
     pth1 = fixtures.path("diffs/1_a")
